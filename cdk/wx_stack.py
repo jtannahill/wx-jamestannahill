@@ -140,3 +140,37 @@ class WxStack(Stack):
             ),
         )
         cdk.CfnOutput(self, "ApiDistributionDomain", value=self.api_distribution.distribution_domain_name)
+
+        # --- Dashboard S3 + CloudFront ---
+        self.dashboard_bucket = s3.Bucket(
+            self, "WxDashboardBucket",
+            bucket_name="wx-jamestannahill-dashboard",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        oac = cloudfront.S3OriginAccessControl(self, "WxDashboardOAC")
+        dashboard_origin = origins.S3BucketOrigin.with_origin_access_control(
+            self.dashboard_bucket, origin_access_control=oac
+        )
+
+        self.dashboard_distribution = cloudfront.Distribution(
+            self, "WxDashboardDistribution",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=dashboard_origin,
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            ),
+            default_root_object="index.html",
+            error_responses=[
+                cloudfront.ErrorResponse(
+                    http_status=403,
+                    response_http_status=200,
+                    response_page_path="/index.html",
+                )
+            ],
+        )
+
+        cdk.CfnOutput(self, "DashboardBucketName", value=self.dashboard_bucket.bucket_name)
+        cdk.CfnOutput(self, "DashboardDistributionId", value=self.dashboard_distribution.distribution_id)
+        cdk.CfnOutput(self, "DashboardDistributionDomain", value=self.dashboard_distribution.distribution_domain_name)
