@@ -87,6 +87,8 @@ def _history(hours: int):
 def _floatify(obj):
     if isinstance(obj, dict):
         return {k: _floatify(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_floatify(v) for v in obj]
     if isinstance(obj, Decimal):
         return float(obj)
     return obj
