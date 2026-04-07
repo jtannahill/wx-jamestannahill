@@ -38,14 +38,17 @@ def _current():
     result = table.query(
         KeyConditionExpression=Key('station_id').eq(mac),
         ScanIndexForward=False,
-        Limit=5,
+        Limit=10,
     )
     items = result.get('Items', [])
     if not items:
         return _resp(503, {"error": "No data available"})
 
-    reading = _floatify(items[0])
-    recent = [_floatify(r) for r in items]
+    floated = [_floatify(r) for r in items]
+    recent = floated
+
+    # Use most recent reading that has outdoor sensor data; fall back to latest
+    reading = next((r for r in floated if r.get('tempf') is not None), floated[0])
 
     now = datetime.now(timezone.utc)
     month_hour = now.strftime('%m-%H')
