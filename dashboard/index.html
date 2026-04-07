@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wx.jamestannahill.com — Midtown Manhattan Weather</title>
+  <meta name="description" content="Live hyperlocal weather data from a private station in Midtown Manhattan, New York.">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
+      <span class="updated-at" id="updated-at">—</span>
+    </header>
+
+    <section class="hero">
+      <div class="temp-block">
+        <span class="temp" id="temp">—</span>
+        <span class="temp-unit">°F</span>
+      </div>
+      <div class="feels-like" id="feels-like">Feels like —°F</div>
+      <div class="condition" id="condition">—</div>
+      <div class="anomaly-headline" id="anomaly-headline">—</div>
+    </section>
+
+    <section class="conditions-grid">
+      <div class="card">
+        <div class="card-label">WIND</div>
+        <div class="card-value" id="wind-speed">—</div>
+        <div class="card-sub" id="wind-detail">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">HUMIDITY</div>
+        <div class="card-value" id="humidity">—</div>
+        <div class="card-sub" id="dewpoint">Dew point —°F</div>
+      </div>
+      <div class="card">
+        <div class="card-label">PRESSURE</div>
+        <div class="card-value" id="pressure">—</div>
+        <div class="card-sub" id="pressure-trend">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">UV INDEX</div>
+        <div class="card-value" id="uv">—</div>
+        <div class="card-sub" id="solar">— W/m²</div>
+      </div>
+      <div class="card">
+        <div class="card-label">RAINFALL</div>
+        <div class="card-value" id="rain-hourly">—</div>
+        <div class="card-sub" id="rain-daily">Daily: —"</div>
+      </div>
+      <div class="card">
+        <div class="card-label">WIND GUST</div>
+        <div class="card-value" id="wind-gust">—</div>
+        <div class="card-sub" id="wind-dir">—</div>
+      </div>
+    </section>
+
+    <section class="chart-section">
+      <div class="chart-controls">
+        <button class="chart-btn active" data-field="tempf">Temperature</button>
+        <button class="chart-btn" data-field="humidity">Humidity</button>
+        <button class="chart-btn" data-field="windspeedmph">Wind</button>
+        <button class="chart-btn" data-field="baromrelin">Pressure</button>
+      </div>
+      <canvas id="wx-chart" height="80"></canvas>
+    </section>
+
+    <footer>
+      <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
+      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a></p>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

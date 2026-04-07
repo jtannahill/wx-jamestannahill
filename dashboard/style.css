@@ -1,0 +1,68 @@
+@import url('https://fonts.jamestannahill.com/nhg-display.css');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --border: #222;
+  --text: #f0f0f0;
+  --muted: #666;
+  --accent: #e8e0d0;
+  --anomaly: #c8b97a;
+  --font: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
+}
+
+html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+main { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 56px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
+}
+.station-label { font-size: 11px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
+.updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
+
+.hero { margin-bottom: 48px; }
+.temp-block { display: flex; align-items: flex-start; line-height: 1; }
+.temp { font-size: clamp(80px, 15vw, 140px); font-weight: 400; letter-spacing: -0.02em; }
+.temp-unit { font-size: 40px; margin-top: 20px; color: var(--muted); }
+.feels-like { font-size: 18px; color: var(--muted); margin-top: 8px; }
+.condition { font-size: 20px; font-weight: 500; margin-top: 16px; }
+.anomaly-headline {
+  font-size: 16px; color: var(--anomaly); margin-top: 12px;
+  font-style: italic; letter-spacing: 0.01em;
+}
+
+.conditions-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  border: 1px solid var(--border); margin-bottom: 48px;
+}
+.card {
+  background: var(--surface); padding: 24px 20px;
+  border: 1px solid var(--border);
+}
+.card-label { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 12px; }
+.card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; }
+.card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.chart-section { margin-bottom: 48px; }
+.chart-controls { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.chart-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 6px 14px; font-family: var(--font); font-size: 12px;
+  letter-spacing: 0.08em; cursor: pointer; transition: all 0.15s;
+}
+.chart-btn:hover, .chart-btn.active {
+  border-color: var(--accent); color: var(--accent);
+}
+
+footer { border-top: 1px solid var(--border); padding-top: 24px; }
+footer p { font-size: 12px; color: var(--muted); line-height: 1.8; }
+footer a { color: var(--muted); text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .conditions-grid { grid-template-columns: repeat(2, 1fr); }
+  .temp { font-size: 80px; }
+}
