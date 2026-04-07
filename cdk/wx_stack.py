@@ -17,4 +17,32 @@ from constructs import Construct
 class WxStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        # Tables, Lambdas, API, CloudFront added in subsequent tasks
+
+        # --- DynamoDB Tables ---
+        self.readings_table = dynamodb.Table(
+            self, "WxReadings",
+            table_name="wx-readings",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="timestamp", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            time_to_live_attribute="ttl",
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        self.stats_table = dynamodb.Table(
+            self, "WxDailyStats",
+            table_name="wx-daily-stats",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="month_hour", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        self.baselines_table = dynamodb.Table(
+            self, "WxBaselines",
+            table_name="wx-baselines",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="month", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
