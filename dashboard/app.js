@@ -471,7 +471,7 @@ function renderNearby(stations, snapshotAt) {
     const rain = s.rain_rate_in_hr > 0 ? `${s.rain_rate_in_hr.toFixed(2)}" /hr` : '';
     const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
     return `<div class="nearby-chip">
-      <div class="nearby-chip-id">${s.station_id}</div>
+      <div class="nearby-chip-id">${s.station_id ?? ''}</div>
       <div class="nearby-chip-temp">${temp}</div>
       ${rain ? `<div class="nearby-chip-rain">${rain}</div>` : ''}
       <div class="nearby-chip-dist">${dist}</div>
