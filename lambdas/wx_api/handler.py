@@ -9,6 +9,7 @@ from shared.dynamodb import get_table
 from wx_api.anomaly import compute_anomalies, pressure_trend, condition_label, percentile_rank
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
+from wx_api.nearby import nearby_route, _fetch_nearby_snapshot
 from boto3.dynamodb.conditions import Key
 
 READINGS_TABLE     = os.environ.get('READINGS_TABLE',     'wx-readings')
@@ -46,6 +47,10 @@ def handler(event, context):
         params = event.get('queryStringParameters') or {}
         days = int(params.get('days', 90))
         return _daily_summaries_route(min(days, 365))
+    elif path == '/nearby':
+        station = get_secret(STATION_SECRET)
+        station_id = station['mac_address']
+        return _resp(200, nearby_route(station_id))
     else:
         return _resp(404, {"error": "Not found"})
 
@@ -102,7 +107,8 @@ def _current():
     uhi             = fetch_uhi(reading['tempf']) if reading.get('tempf') is not None else {}
     comfort         = comfort_score(reading, baseline, local_now.month)
     pct_rank        = percentile_rank(reading, baseline, local_now.month) if baseline else None
-    rain_prob       = rain_probability(reading, recent)
+    nearby          = _fetch_nearby_snapshot(mac)
+    rain_prob       = rain_probability(reading, recent, nearby)
     forecast        = _fetch_forecast(mac)
     uhi_seasonal    = _fetch_uhi_seasonal(mac)
     station_records = _fetch_station_records(mac, local_now.month)
@@ -127,6 +133,7 @@ def _current():
         "uhi_seasonal_curve":    uhi_seasonal,
         "station_records":       station_records,
         "daily_summary":         daily_summary,
+        "nearby_stations":       nearby[:8],
         **uhi,
     }
     return _resp(200, body)
