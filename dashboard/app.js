@@ -131,12 +131,11 @@ function renderCurrent(data) {
   // Rain Probability
   const rp = data.rain_probability;
   document.getElementById('rain-prob').textContent = rp ? `${rp.probability}%` : '—';
-  document.getElementById('rain-prob-label').textContent = rp?.label ?? '—';
-  // Spatial boost source annotation
+  // Spatial boost source annotation: combine label with boost source when present
   const rainProbLabelEl = document.getElementById('rain-prob-label');
-  if (rainProbLabelEl && rp?.spatial_source) {
-    rainProbLabelEl.textContent = `↑ boosted · ${rp.spatial_source}`;
-  }
+  rainProbLabelEl.textContent = rp?.spatial_source
+    ? `${rp?.label ?? '—'} · ↑ ${rp.spatial_source}`
+    : (rp?.label ?? '—');
 
   // Urban Heat Island
   const uhi = data.uhi_delta;

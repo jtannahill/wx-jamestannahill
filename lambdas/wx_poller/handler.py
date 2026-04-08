@@ -63,12 +63,12 @@ def handler(event, context):
 
     # --- Fetch and store nearby WU stations (non-critical) --------------------
     if quality_flag is None and wu_key:
-        nearby = fetch_nearby(wu_key, limit=20)
-        if nearby:
-            try:
+        try:
+            nearby = fetch_nearby(wu_key, limit=20)
+            if nearby:
                 _write_nearby_snapshot(mac, now, nearby)
-            except Exception as e:
-                print(f"[poller] nearby snapshot write failed (non-critical): {e}")
+        except Exception as e:
+            print(f"[poller] nearby fetch/write failed (non-critical): {e}")
 
     # --- Update rolling stats only for clean outdoor readings -----------------
     if cleaned.get('tempf') is not None and quality_flag is None:
@@ -244,7 +244,7 @@ def _write_nearby_snapshot(station_id: str, now, nearby: list):
         'snapshot_at':   now.isoformat(),
         'stations_json': _json.dumps(nearby),
         'station_count': len(nearby),
-        'ttl':           int(__import__('time').time()) + (30 * 86400),
+        'ttl':           int(time.time()) + (30 * 86400),
     })
 
 
