@@ -179,6 +179,20 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
     <hr class="divider">
 
+    <h2>NEARBY STATIONS</h2>
+    <p>Every 5 minutes, alongside the primary station reading, the poller fetches up to 20 nearby Personal Weather Stations from the Weather Underground API using the geocode endpoint (centered on 40.7549°N, 73.984°W). Each result is filtered to exclude the home station (distance &lt; 0.05 mi) and sorted by distance. The snapshot — station ID, temperature, humidity, rain rate, wind, bearing, and distance — is written to the <code>wx-nearby-snapshots</code> DynamoDB table with a 30-day TTL.</p>
+    <p>The <code>/nearby</code> API endpoint returns the most recent snapshot. The dashboard Nearby Stations strip shows up to 8 of the closest stations with their current temperature and rain rate.</p>
+
+    <hr class="divider">
+
+    <h2>SPATIAL RAIN BOOST</h2>
+    <p>When nearby station data is available, the rain probability estimate is augmented with a spatial boost from upwind stations. A station is considered "upwind" if its bearing from the home station falls within ±60° of the current wind direction. The boost formula is:</p>
+    <pre><code>boost = min(0.35, √rain_rate × 0.25 / distance_mi)</code></pre>
+    <p>where <code>rain_rate</code> is in inches per hour and <code>distance_mi</code> is the straight-line distance. The boost is additive to the logistic regression base probability (capped at 0.99). The contributing station ID is surfaced in the dashboard as a "↑ boosted" annotation on the rain probability card when a boost is applied.</p>
+    <p>This is Phase 1 of the spatial rain model. Phase 2 (retraining the logistic regression with spatial features as explicit inputs) is deferred until 30+ days of nearby snapshot history accumulates.</p>
+
+    <hr class="divider">
+
     <h2>SEASONAL UHI CURVE</h2>
     <p>On every 5-minute poll, the poller calls the NOAA METAR endpoint, computes the UHI delta, and updates two stores: the <code>uhi_delta</code> field on the reading in <code>wx-readings</code>, and the per-month rolling average in <code>wx-uhi-seasonal</code>.</p>
     <p><code>wx-uhi-seasonal</code> stores one row per calendar month (01–12), keyed by station ID + month. Each row holds a capped rolling average (max 10,000 samples per month) so the curve reflects the current year's observations rather than a multi-year stale mean.</p>
@@ -283,6 +297,10 @@ label = "8.2°F above average for 9am in April"</code></pre>
           <td><code>GET /daily-summaries?days=N</code></td>
           <td>Pre-computed daily summaries from the last N days (default 30). Each entry has high/low/avg temp, total rain, max gust, avg comfort score, and prose summary.</td>
         </tr>
+        <tr>
+          <td><code>GET /nearby</code></td>
+          <td>Most recent snapshot of nearby Manhattan PWS stations.</td>
+        </tr>
       </tbody>
     </table>
     <p>All responses are JSON. CloudFront caches all endpoints for 5 minutes, keyed by path and query string. CORS is open (<code>Access-Control-Allow-Origin: *</code>).</p>
@@ -292,7 +310,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <h2>INFRASTRUCTURE</h2>
     <p>Everything runs on AWS in <code>us-east-1</code>. Estimated cost: ~$4–6/month.</p>
     <ul>
-      <li><strong>DynamoDB</strong> (on-demand, 9 tables) — <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes)</li>
+      <li><strong>DynamoDB</strong> (on-demand, 10 tables) — <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes), <code>wx-nearby-snapshots</code> (nearby PWS readings, 30-day TTL)</li>
       <li><strong>Lambda</strong> (Python 3.12, arm64, 8 functions) — <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM)</li>
       <li><strong>API Gateway HTTP API</strong> — routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, and <code>/daily-summaries</code> to the API Lambda</li>
       <li><strong>CloudFront</strong> — in front of both the API Gateway and the S3 dashboard bucket</li>
