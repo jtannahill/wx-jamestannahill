@@ -189,6 +189,20 @@ header {
 .rain-events-table th + th,
 .rain-events-table td + td { padding-left: 24px; }
 
+/* ── Nearby Stations ─────────────────────────────────────────────────────── */
+.nearby-section { margin-bottom: 48px; }
+.nearby-strip {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.nearby-chip {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 12px 14px; min-width: 100px;
+}
+.nearby-chip-id { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 6px; }
+.nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
+.nearby-chip-rain { font-size: 11px; color: #6aaa6a; margin-top: 3px; }
+.nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
 footer { border-top: 1px solid var(--border); padding-top: 24px; }
 footer p { font-size: 12px; color: var(--muted); line-height: 1.8; }
 footer a { color: var(--muted); text-decoration: underline; }

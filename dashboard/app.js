@@ -132,6 +132,11 @@ function renderCurrent(data) {
   const rp = data.rain_probability;
   document.getElementById('rain-prob').textContent = rp ? `${rp.probability}%` : '—';
   document.getElementById('rain-prob-label').textContent = rp?.label ?? '—';
+  // Spatial boost source annotation
+  const rainProbLabelEl = document.getElementById('rain-prob-label');
+  if (rainProbLabelEl && rp?.spatial_source) {
+    rainProbLabelEl.textContent = `↑ boosted · ${rp.spatial_source}`;
+  }
 
   // Urban Heat Island
   const uhi = data.uhi_delta;
@@ -450,6 +455,30 @@ function renderStationRecords(records) {
     </div>`).join('');
 }
 
+// ── Nearby Stations ───────────────────────────────────────────────────────────
+function renderNearby(stations, snapshotAt) {
+  const strip = document.getElementById('nearby-strip');
+  const meta = document.getElementById('nearby-meta');
+  if (!stations || !stations.length) {
+    document.getElementById('nearby-section').style.display = 'none';
+    return;
+  }
+  document.getElementById('nearby-section').style.display = '';
+  if (snapshotAt) meta.textContent = new Date(snapshotAt).toLocaleTimeString();
+
+  strip.innerHTML = stations.map(s => {
+    const temp = s.temp_f != null ? `${Math.round(s.temp_f)}°` : '–';
+    const rain = s.rain_rate_in_hr > 0 ? `${s.rain_rate_in_hr.toFixed(2)}" /hr` : '';
+    const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
+    return `<div class="nearby-chip">
+      <div class="nearby-chip-id">${s.station_id}</div>
+      <div class="nearby-chip-temp">${temp}</div>
+      ${rain ? `<div class="nearby-chip-rain">${rain}</div>` : ''}
+      <div class="nearby-chip-dist">${dist}</div>
+    </div>`;
+  }).join('');
+}
+
 // ── Rain Events ───────────────────────────────────────────────────────────────
 function renderRainEvents(events) {
   const section = document.getElementById('rain-events-section');
@@ -507,6 +536,7 @@ async function refresh(forceHistory = false) {
     renderCurrent(results[0]);
     renderSummary(results[0].daily_summary);
     renderStationRecords(results[0].station_records);
+    renderNearby(results[0].nearby_stations, null);
     if (results[1]) lastHistory = results[1];
     if (lastHistory) renderChart(lastHistory, currentField, currentHours);
   } catch (e) {
