@@ -48,6 +48,17 @@ class WxStack(Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
+        # --- Nearby stations snapshots (one row per 5-min poll, 30-day TTL) ---
+        self.nearby_table = dynamodb.Table(
+            self, "WxNearbySnapshots",
+            table_name="wx-nearby-snapshots",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="snapshot_at", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            time_to_live_attribute="ttl",
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
         # --- IAM policy for Secrets Manager ---
         secrets_policy = iam.PolicyStatement(
             actions=["secretsmanager:GetSecretValue"],
@@ -226,6 +237,12 @@ class WxStack(Stack):
         self.uhi_seasonal_table.grant_read_write_data(self.poller_fn)
         self.poller_fn.add_environment("UHI_SEASONAL_TABLE", self.uhi_seasonal_table.table_name)
 
+        # Poller writes nearby snapshots; API reads them
+        self.nearby_table.grant_read_write_data(self.poller_fn)
+        self.poller_fn.add_environment("NEARBY_TABLE", self.nearby_table.table_name)
+        self.nearby_table.grant_read_data(self.api_fn)
+        self.api_fn.add_environment("NEARBY_TABLE", self.nearby_table.table_name)
+
         # --- Daily summaries DynamoDB table ---
         self.daily_summaries_table = dynamodb.Table(
             self, "WxDailySummaries",
@@ -292,6 +309,7 @@ class WxStack(Stack):
         http_api.add_routes(path="/history",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/rain-events",        methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/daily-summaries",    methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/nearby", methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
 
         # --- CloudFront in front of API Gateway ---
         api_origin = origins.HttpOrigin(
