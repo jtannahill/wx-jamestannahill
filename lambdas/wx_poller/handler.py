@@ -37,7 +37,11 @@ def handler(event, context):
         print(f"Validation issues: {issues}")
 
     # --- Stuck sensor detection (query last 8 stored readings) -----------------
-    recent = _fetch_recent(mac, n=8)  # oldest-first list of floatified readings
+    try:
+        recent = _fetch_recent(mac, n=8)  # oldest-first list of floatified readings
+    except Exception as e:
+        print(f"[poller] _fetch_recent failed (non-critical): {e}")
+        recent = []
     quality_flag = None
 
     if detect_stuck(recent + [cleaned], field='tempf'):
@@ -61,7 +65,10 @@ def handler(event, context):
     if quality_flag is None and wu_key:
         nearby = fetch_nearby(wu_key, limit=20)
         if nearby:
-            _write_nearby_snapshot(mac, now, nearby)
+            try:
+                _write_nearby_snapshot(mac, now, nearby)
+            except Exception as e:
+                print(f"[poller] nearby snapshot write failed (non-critical): {e}")
 
     # --- Update rolling stats only for clean outdoor readings -----------------
     if cleaned.get('tempf') is not None and quality_flag is None:

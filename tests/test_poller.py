@@ -101,3 +101,5 @@ def test_handler_calls_fetch_nearby_and_writes_snapshot():
     assert len(nearby_calls) == 1
     stored = json.loads(nearby_calls[0][1]['Item']['stations_json'])
     assert stored[0]['station_id'] == 'KNYTEST01'
+    assert 'station_count' in nearby_calls[0][1]['Item']
+    assert 'ttl' in nearby_calls[0][1]['Item']
