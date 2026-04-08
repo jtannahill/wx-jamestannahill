@@ -93,3 +93,57 @@ def test_fetch_nearby_handles_trace_precipitation():
         result = fetch_nearby('fake_key')
     assert len(result) == 1
     assert result[0]['rain_rate_in_hr'] == 0.0  # trace → 0.0, no crash
+
+
+# ── spatial_rain_boost tests ──────────────────────────────────────────────────
+from wx_api.nearby import spatial_rain_boost
+
+def test_boost_is_zero_when_no_nearby():
+    boost, label = spatial_rain_boost([], wind_dir_deg=270)
+    assert boost == 0.0
+    assert label is None
+
+def test_boost_is_zero_when_wind_dir_none():
+    nearby = [{'bearing_deg': 270, 'distance_mi': 0.5,
+               'rain_rate_in_hr': 0.5, 'neighborhood': "Hell's Kitchen"}]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=None)
+    assert boost == 0.0
+
+def test_boost_is_zero_when_station_not_raining():
+    nearby = [{'bearing_deg': 270, 'distance_mi': 0.5,
+               'rain_rate_in_hr': 0.0, 'neighborhood': "Hell's Kitchen"}]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=270)
+    assert boost == 0.0
+
+def test_boost_is_zero_when_station_downwind():
+    # Wind from 270° (west); station to the EAST (bearing ~90°) is downwind
+    nearby = [{'bearing_deg': 90, 'distance_mi': 0.5,
+               'rain_rate_in_hr': 0.5, 'neighborhood': 'Gramercy'}]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=270)
+    assert boost == 0.0
+
+def test_boost_positive_upwind_station_raining():
+    # Wind from 270°, station to the west (bearing 270°) is raining
+    nearby = [{'bearing_deg': 270, 'distance_mi': 0.5,
+               'rain_rate_in_hr': 0.5, 'neighborhood': "Hell's Kitchen"}]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=270)
+    assert boost > 0
+    assert boost <= 0.35
+    assert label == "Hell's Kitchen"
+
+def test_boost_capped_at_035():
+    # Very close, heavy rain
+    nearby = [{'bearing_deg': 90, 'distance_mi': 0.1,
+               'rain_rate_in_hr': 2.0, 'neighborhood': 'Murray Hill'}]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=90)
+    assert boost == 0.35
+
+def test_boost_uses_closest_upwind_station():
+    nearby = [
+        {'bearing_deg': 270, 'distance_mi': 2.0,
+         'rain_rate_in_hr': 0.5, 'neighborhood': 'Upper West Side'},
+        {'bearing_deg': 270, 'distance_mi': 0.3,
+         'rain_rate_in_hr': 0.5, 'neighborhood': "Hell's Kitchen"},
+    ]
+    boost, label = spatial_rain_boost(nearby, wind_dir_deg=270)
+    assert label == "Hell's Kitchen"  # closer station wins (higher boost)
