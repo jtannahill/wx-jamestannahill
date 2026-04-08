@@ -10,6 +10,13 @@ HOME_LON = -73.984
 WU_NEARBY_URL = "https://api.weather.com/v2/pws/observations/nearby"
 
 
+def _safe_float(val, default=0.0):
+    try:
+        return float(val) if val is not None else default
+    except (ValueError, TypeError):
+        return default
+
+
 def fetch_nearby(api_key: str, limit: int = 20) -> list[dict]:
     """
     Fetch nearby WU stations. Returns a list of normalized dicts, sorted
@@ -41,30 +48,34 @@ def fetch_nearby(api_key: str, limit: int = 20) -> list[dict]:
 
     results = []
     for obs in observations:
-        imp = obs.get('imperial', {})
-        lat = obs.get('lat')
-        lon = obs.get('lon')
-        if lat is None or lon is None:
+        try:
+            imp = obs.get('imperial', {})
+            lat = obs.get('lat')
+            lon = obs.get('lon')
+            if lat is None or lon is None:
+                continue
+            lat, lon = float(lat), float(lon)
+            dist = _haversine_mi(HOME_LAT, HOME_LON, lat, lon)
+            if dist < 0.05:
+                continue
+            results.append({
+                'station_id':      obs.get('stationID', ''),
+                'neighborhood':    obs.get('neighborhood', ''),
+                'lat':             round(lat, 4),
+                'lon':             round(lon, 4),
+                'bearing_deg':     round(_bearing(HOME_LAT, HOME_LON, lat, lon), 1),
+                'distance_mi':     round(dist, 2),
+                'temp_f':          imp.get('temp'),
+                'humidity':        obs.get('humidity'),
+                'wind_speed_mph':  imp.get('windSpeed'),
+                'wind_dir':        obs.get('winddir'),
+                'rain_rate_in_hr': _safe_float(imp.get('precipRate'), 0.0),
+                'pressure_in':     imp.get('pressure'),
+                'observed_at':     obs.get('obsTimeLocal', ''),
+            })
+        except Exception as e:
+            print(f"WU nearby: skipping malformed observation: {e}")
             continue
-        lat, lon = float(lat), float(lon)
-        dist = _haversine_mi(HOME_LAT, HOME_LON, lat, lon)
-        if dist < 0.05:          # exclude home station
-            continue
-        results.append({
-            'station_id':      obs.get('stationID', ''),
-            'neighborhood':    obs.get('neighborhood', ''),
-            'lat':             round(lat, 4),
-            'lon':             round(lon, 4),
-            'bearing_deg':     round(_bearing(HOME_LAT, HOME_LON, lat, lon), 1),
-            'distance_mi':     round(dist, 2),
-            'temp_f':          imp.get('temp'),
-            'humidity':        obs.get('humidity'),
-            'wind_speed_mph':  imp.get('windSpeed'),
-            'wind_dir':        obs.get('winddir'),
-            'rain_rate_in_hr': float(imp.get('precipRate') or 0.0),
-            'pressure_in':     imp.get('pressure'),
-            'observed_at':     obs.get('obsTimeLocal', ''),
-        })
 
     results.sort(key=lambda s: s['distance_mi'])
     return results

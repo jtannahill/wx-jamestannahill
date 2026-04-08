@@ -70,3 +70,26 @@ def test_fetch_nearby_excludes_home_station():
     with patch('wx_poller.nearby.requests.get', return_value=mock_resp):
         result = fetch_nearby('fake_key')
     assert result == []
+
+def test_fetch_nearby_handles_trace_precipitation():
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        'observations': [
+            {
+                'stationID': 'KNYTEST01',
+                'neighborhood': 'Hell\'s Kitchen',
+                'lat': 40.760, 'lon': -73.990,
+                'winddir': 90, 'humidity': 42,
+                'obsTimeLocal': '2026-04-08 12:00:00',
+                'imperial': {
+                    'temp': 64, 'windSpeed': 8, 'windGust': 12,
+                    'pressure': 30.22, 'precipRate': 'T',  # WU trace value
+                },
+            }
+        ]
+    }
+    with patch('wx_poller.nearby.requests.get', return_value=mock_resp):
+        result = fetch_nearby('fake_key')
+    assert len(result) == 1
+    assert result[0]['rain_rate_in_hr'] == 0.0  # trace → 0.0, no crash
