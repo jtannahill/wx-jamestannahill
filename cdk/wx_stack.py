@@ -94,7 +94,13 @@ class WxStack(Stack):
             return fn
 
         # --- Lambdas ---
-        self.poller_fn = make_lambda("WxPoller", "wx_poller.handler", timeout=30)
+        self.poller_fn = make_lambda("WxPoller", "wx_poller.handler", timeout=30,
+                                     extra_env={"DASHBOARD_BUCKET": "wx-jamestannahill-dashboard"})
+        # Grant poller write access to dashboard bucket (for OG image)
+        self.poller_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:PutObject"],
+            resources=["arn:aws:s3:::wx-jamestannahill-dashboard/og.png"],
+        ))
         poller_rule = events.Rule(
             self, "WxPollerSchedule",
             schedule=events.Schedule.rate(Duration.minutes(5)),
@@ -106,6 +112,172 @@ class WxStack(Stack):
         self.bootstrap_fn = make_lambda("WxBootstrap", "wx_bootstrap.handler",
                                          memory=256, timeout=300)
 
+        # --- Alerts DynamoDB table ---
+        self.alerts_table = dynamodb.Table(
+            self, "WxAlerts",
+            table_name="wx-alerts",
+            partition_key=dynamodb.Attribute(name="alert_type", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Alerter Lambda ---
+        self.alerter_fn = make_lambda(
+            "WxAlerter", "wx_alerter.handler",
+            timeout=30,
+            extra_env={
+                "ALERTS_TABLE": self.alerts_table.table_name,
+                "ALERT_FROM":   "wx@jamestannahill.com",
+                "ALERT_TO":     "james@jamestannahill.com",
+            }
+        )
+        self.alerts_table.grant_read_write_data(self.alerter_fn)
+        self.alerter_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["ses:SendEmail"],
+            resources=["*"],
+        ))
+        alerter_rule = events.Rule(
+            self, "WxAlerterSchedule",
+            schedule=events.Schedule.rate(Duration.minutes(15)),
+        )
+        alerter_rule.add_target(targets.LambdaFunction(self.alerter_fn))
+
+        # --- Forecasts DynamoDB table ---
+        self.forecasts_table = dynamodb.Table(
+            self, "WxForecasts",
+            table_name="wx-forecasts",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Forecast accuracy DynamoDB table ---
+        self.accuracy_table = dynamodb.Table(
+            self, "WxForecastAccuracy",
+            table_name="wx-forecast-accuracy",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="evaluated_at", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- UHI seasonal DynamoDB table ---
+        self.uhi_seasonal_table = dynamodb.Table(
+            self, "WxUhiSeasonal",
+            table_name="wx-uhi-seasonal",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="month", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- ML models DynamoDB table ---
+        self.ml_models_table = dynamodb.Table(
+            self, "WxMlModels",
+            table_name="wx-ml-models",
+            partition_key=dynamodb.Attribute(name="model_id", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Forecaster Lambda (memory=512 for the 90-day scan) ---
+        self.forecaster_fn = make_lambda(
+            "WxForecaster", "wx_forecaster.handler",
+            memory=512, timeout=120,
+            extra_env={
+                "FORECASTS_TABLE": self.forecasts_table.table_name,
+                "ACCURACY_TABLE":  self.accuracy_table.table_name,
+            },
+        )
+        self.forecasts_table.grant_read_write_data(self.forecaster_fn)
+        self.accuracy_table.grant_read_write_data(self.forecaster_fn)
+        forecaster_rule = events.Rule(
+            self, "WxForecasterSchedule",
+            schedule=events.Schedule.rate(Duration.minutes(30)),
+        )
+        forecaster_rule.add_target(targets.LambdaFunction(self.forecaster_fn))
+
+        # --- ML Fitter Lambda (weekly, 900s for 90-day scan + training) ---
+        self.ml_fitter_fn = make_lambda(
+            "WxMlFitter", "wx_ml_fitter.handler",
+            memory=512, timeout=900,
+            extra_env={"MODELS_TABLE": self.ml_models_table.table_name},
+        )
+        self.ml_models_table.grant_read_write_data(self.ml_fitter_fn)
+        ml_fitter_rule = events.Rule(
+            self, "WxMlFitterSchedule",
+            schedule=events.Schedule.cron(hour="3", minute="0", week_day="SUN"),
+        )
+        ml_fitter_rule.add_target(targets.LambdaFunction(self.ml_fitter_fn))
+
+        # Allow the API Lambda to read forecasts, accuracy, UHI seasonal, and ML models
+        self.forecasts_table.grant_read_data(self.api_fn)
+        self.accuracy_table.grant_read_data(self.api_fn)
+        self.uhi_seasonal_table.grant_read_data(self.api_fn)
+        self.ml_models_table.grant_read_data(self.api_fn)
+
+        # Pass table names to the API Lambda
+        self.api_fn.add_environment("FORECASTS_TABLE",    self.forecasts_table.table_name)
+        self.api_fn.add_environment("ACCURACY_TABLE",     self.accuracy_table.table_name)
+        self.api_fn.add_environment("UHI_SEASONAL_TABLE", self.uhi_seasonal_table.table_name)
+        self.api_fn.add_environment("MODELS_TABLE",       self.ml_models_table.table_name)
+
+        # Allow the poller to write UHI seasonal data
+        self.uhi_seasonal_table.grant_read_write_data(self.poller_fn)
+        self.poller_fn.add_environment("UHI_SEASONAL_TABLE", self.uhi_seasonal_table.table_name)
+
+        # --- Daily summaries DynamoDB table ---
+        self.daily_summaries_table = dynamodb.Table(
+            self, "WxDailySummaries",
+            table_name="wx-daily-summaries",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="date", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Station records DynamoDB table ---
+        self.station_records_table = dynamodb.Table(
+            self, "WxStationRecords",
+            table_name="wx-station-records",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="month", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Summarizer Lambda (daily at 05:00 UTC = midnight ET) ---
+        self.summarizer_fn = make_lambda(
+            "WxSummarizer", "wx_summarizer.handler",
+            memory=256, timeout=300,
+            extra_env={"SUMMARIES_TABLE": self.daily_summaries_table.table_name},
+        )
+        self.daily_summaries_table.grant_read_write_data(self.summarizer_fn)
+        summarizer_rule = events.Rule(
+            self, "WxSummarizerSchedule",
+            schedule=events.Schedule.cron(hour="5", minute="0"),
+        )
+        summarizer_rule.add_target(targets.LambdaFunction(self.summarizer_fn))
+
+        # --- Records tracker Lambda (weekly, Sunday 02:00 UTC) ---
+        self.records_fn = make_lambda(
+            "WxRecordsTracker", "wx_records_tracker.handler",
+            memory=256, timeout=300,
+            extra_env={"RECORDS_TABLE": self.station_records_table.table_name},
+        )
+        self.station_records_table.grant_read_write_data(self.records_fn)
+        records_rule = events.Rule(
+            self, "WxRecordsTrackerSchedule",
+            schedule=events.Schedule.cron(hour="2", minute="0", week_day="SUN"),
+        )
+        records_rule.add_target(targets.LambdaFunction(self.records_fn))
+
+        # Allow the API Lambda to read summaries and records
+        self.daily_summaries_table.grant_read_data(self.api_fn)
+        self.station_records_table.grant_read_data(self.api_fn)
+        self.api_fn.add_environment("SUMMARIES_TABLE", self.daily_summaries_table.table_name)
+        self.api_fn.add_environment("RECORDS_TABLE",   self.station_records_table.table_name)
+
         # --- API Gateway HTTP API ---
         http_api = apigwv2.HttpApi(
             self, "WxHttpApi",
@@ -116,8 +288,10 @@ class WxStack(Stack):
             ),
         )
         lambda_integration = integrations.HttpLambdaIntegration("WxApiIntegration", self.api_fn)
-        http_api.add_routes(path="/current", methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
-        http_api.add_routes(path="/history", methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/current",           methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/history",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/rain-events",        methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/daily-summaries",    methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
 
         # --- CloudFront in front of API Gateway ---
         api_origin = origins.HttpOrigin(
@@ -129,6 +303,7 @@ class WxStack(Stack):
             default_ttl=Duration.minutes(5),
             min_ttl=Duration.seconds(0),
             max_ttl=Duration.minutes(5),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
         )
         self.api_distribution = cloudfront.Distribution(
             self, "WxApiDistribution",

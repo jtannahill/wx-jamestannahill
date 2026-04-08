@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wx.jamestannahill.com — How It Works</title>
+  <meta name="description" content="Technical documentation: how weather data is collected, processed, and served at wx.jamestannahill.com.">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .docs-body { max-width: 680px; }
+    h1 { font-size: 36px; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 8px; }
+    h2 { font-size: 15px; letter-spacing: 0.12em; color: var(--muted); margin: 48px 0 20px; font-weight: 500; }
+    p { font-size: 15px; line-height: 1.75; color: #ccc; margin-bottom: 16px; }
+    .lead { font-size: 17px; line-height: 1.7; color: var(--text); margin-bottom: 0; }
+    ul { padding-left: 20px; margin-bottom: 16px; }
+    li { font-size: 15px; line-height: 1.75; color: #ccc; }
+    code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      color: var(--accent);
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 20px 24px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: 13px; line-height: 1.6; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+    .back-link { font-size: 12px; letter-spacing: 0.08em; color: var(--muted); text-decoration: none; }
+    .back-link:hover { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { font-size: 14px; color: #ccc; padding: 8px 12px; border-bottom: 1px solid #1a1a1a; vertical-align: top; }
+    td code { font-size: 12px; }
+    ol li { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <main class="docs-body">
+    <header>
+      <a class="back-link" href="/">← wx.jamestannahill.com</a>
+    </header>
+
+    <section style="margin: 48px 0 56px;">
+      <h1>How It Works</h1>
+      <p class="lead">wx.jamestannahill.com publishes live hyperlocal weather from a private station in Midtown Manhattan. Here's the full data pipeline — from physical sensor to dashboard.</p>
+    </section>
+
+    <hr class="divider">
+
+    <h2>DATA COLLECTION</h2>
+    <p>The station is an <strong>Ambient Weather WS-2902</strong> mounted at the property. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway.</p>
+    <p>A scheduled AWS Lambda (<code>wx-poller</code>) fires every 5 minutes via EventBridge and calls the Ambient Weather REST API to fetch the latest reading:</p>
+    <pre><code>GET https://api.ambientweather.net/v1/devices/{mac}
+    ?apiKey=...&applicationKey=...&limit=1</code></pre>
+    <p>Each reading includes:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>tempf</code></td><td>Outdoor temperature (°F)</td></tr>
+        <tr><td><code>feelsLike</code></td><td>Feels-like temperature (wind chill / heat index)</td></tr>
+        <tr><td><code>humidity</code></td><td>Relative humidity (%)</td></tr>
+        <tr><td><code>dewPoint</code></td><td>Dew point temperature (°F)</td></tr>
+        <tr><td><code>windspeedmph</code></td><td>10-minute average wind speed (mph)</td></tr>
+        <tr><td><code>windgustmph</code></td><td>Peak wind gust in the last 10 minutes (mph)</td></tr>
+        <tr><td><code>winddir</code></td><td>Wind direction (0–360°)</td></tr>
+        <tr><td><code>baromrelin</code></td><td>Relative barometric pressure (inHg)</td></tr>
+        <tr><td><code>solarradiation</code></td><td>Solar radiation (W/m²)</td></tr>
+        <tr><td><code>uv</code></td><td>UV index (0–11+)</td></tr>
+        <tr><td><code>hourlyrainin</code></td><td>Rainfall rate in the current hour (in/hr)</td></tr>
+        <tr><td><code>dailyrainin</code></td><td>Total rainfall since local midnight (in)</td></tr>
+      </tbody>
+    </table>
+    <p>On each poll, the poller also fetches the current METAR UHI delta from NOAA (see <em>Urban Heat Island</em> below) and appends it as a <code>uhi_delta</code> field on the reading before storing it. Raw readings are written to DynamoDB (<code>wx-readings</code>) with a 90-day TTL. The poller also generates and uploads a fresh OG image (<code>og.png</code>) to S3 on each run.</p>
+
+    <hr class="divider">
+
+    <h2>SOURCE VALIDATION</h2>
+    <p>Before storing a reading, the poller runs two quality checks:</p>
+    <ul>
+      <li><strong>Range check</strong> — each field is tested against physical bounds (e.g., temperature −40°F to 140°F, humidity 0–100%). Fields that fall outside the bounds are nulled and the reading is flagged <code>range_error</code>.</li>
+      <li><strong>Stuck sensor detection</strong> — if the last 6 temperature readings are identical, the reading is flagged <code>stuck</code>. This catches a common failure mode in home weather stations where the outdoor sensor freezes on a stale value.</li>
+    </ul>
+    <p>Flagged readings are still stored in <code>wx-readings</code> so the history is complete, but they are excluded from baseline updates. The dashboard shows a banner when the station data is stale or suspect.</p>
+
+    <hr class="divider">
+
+    <h2>HISTORICAL BACKFILL — WEATHER UNDERGROUND</h2>
+    <p>When the station was first set up, the baseline table had no station data. To bootstrap it with real hyperlocal history, a one-time backfill script fetched 90 days of 5-minute readings from <strong>Weather Underground's PWS history API</strong> for the nearest private station (KNYNEWYO2140):</p>
+    <pre><code>GET https://api.weather.com/v2/pws/history/all
+    ?stationId=KNYNEWYO2140&format=json&units=e
+    &date=20260115&apiKey=...</code></pre>
+    <p>This produced <strong>24,914 readings</strong> going back 90 days, which were written to <code>wx-readings</code> and used to seed the <code>wx-daily-stats</code> rolling averages. The baseline is now grounded in real local station data rather than climate reanalysis alone.</p>
+
+    <hr class="divider">
+
+    <h2>BASELINES — OPEN-METEO ERA5</h2>
+    <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong> — actual measured atmospheric data going back to 1940, free and public.</p>
+    <p>A bootstrap Lambda fetches the 14th of each month for 2019–2023 (5 years × 12 months) at the station's coordinates and averages the hourly values into per-month-per-hour climate normals:</p>
+    <pre><code>GET https://archive-api.open-meteo.com/v1/archive
+    ?latitude=40.7549&longitude=-73.984
+    &start_date=2021-04-14&end_date=2021-04-14
+    &hourly=temperature_2m,relativehumidity_2m,
+            windspeed_10m,surface_pressure
+    &temperature_unit=fahrenheit&windspeed_unit=mph</code></pre>
+    <p>This produces 288 baseline slots (12 months × 24 hours) stored in <code>wx-daily-stats</code>, weighted as 288 samples. Real station readings blend in via a rolling weighted average — after a few months the baselines are fully derived from the station itself.</p>
+
+    <hr class="divider">
+
+    <h2>ANOMALY SCORING</h2>
+    <p>On every <code>/current</code> request, the API looks up the baseline for the current month and hour (New York local time) and computes a delta:</p>
+    <pre><code>delta = current_value − rolling_avg_value
+label = "8.2°F above average for 9am in April"</code></pre>
+    <p>Anomalies are computed for temperature, humidity, wind speed, and UV index. The dashboard surfaces the most notable one as the headline, with a tooltip showing the number of observations behind the baseline. Baselines are keyed by <code>MM-HH</code> (month + local hour).</p>
+
+    <hr class="divider">
+
+    <h2>WEATHER ALERTS</h2>
+    <p>A scheduled Lambda (<code>wx-alerter</code>) runs every 15 minutes and evaluates the latest reading against five anomaly thresholds:</p>
+    <table>
+      <thead><tr><th>Alert</th><th>Condition</th><th>Cooldown</th></tr></thead>
+      <tbody>
+        <tr><td>Unusually warm</td><td>Temp &gt; baseline avg + 10°F</td><td>2 hours</td></tr>
+        <tr><td>Unusually cold</td><td>Temp &lt; baseline avg − 10°F</td><td>2 hours</td></tr>
+        <tr><td>High wind gust</td><td>Gust &gt; avg wind + 20 mph <em>and</em> &gt; 25 mph absolute</td><td>1 hour</td></tr>
+        <tr><td>Rain started</td><td>Hourly rain &gt; 0.01"/hr</td><td>30 minutes</td></tr>
+        <tr><td>Rapid pressure drop</td><td>Pressure drops &gt; 0.08" in ~1 hour</td><td>2 hours</td></tr>
+      </tbody>
+    </table>
+    <p>Wind gust thresholds are statistically calibrated — the alert fires only when the gust is significantly above the baseline average wind for that hour, not just above a fixed value. Alert state and debounce timestamps are persisted in <code>wx-alerts</code>. Triggered alerts are delivered via SES email.</p>
+
+    <hr class="divider">
+
+    <h2>ML SIGNALS</h2>
+    <p>Five proprietary signals are computed on every <code>/current</code> request. Each is specific to this station's location, baseline, and accumulated history.</p>
+    <table>
+      <thead><tr><th>Signal</th><th>Method</th><th>Output</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Comfort Score</strong></td>
+          <td>Composite of feels-like deviation from 71°F, humidity, wind speed, UV, and rain rate. Season-weighted (UV matters more in summer, wind in winter). Adjusted by temperature anomaly vs. this station's rolling baseline.</td>
+          <td>0–100 integer + label (Excellent / Good / Fair / Poor / Harsh)</td>
+        </tr>
+        <tr>
+          <td><strong>Percentile Rank</strong></td>
+          <td>Current temperature expressed as a percentile against this station's historical distribution for the same month. Uses a normal CDF approximation with season-calibrated standard deviations (winter σ=9.5°F, summer σ=6.0°F).</td>
+          <td>1st–99th percentile + label ("one of the warmest days on record here")</td>
+        </tr>
+        <tr>
+          <td><strong>Rain Probability</strong></td>
+          <td>Logistic regression: <code>p = σ(w·x + b)</code>. Features: humidity (normalized), 1-hour pressure trend, dew-point depression, sin/cos of hour-of-day. Coefficients fitted weekly against labeled station history by <code>wx-ml-fitter</code> (see below). Persistence boost if currently raining.</td>
+          <td>1–99% + label (Unlikely / Slight chance / Possible / Likely / Very likely)</td>
+        </tr>
+        <tr>
+          <td><strong>Urban Heat Island (UHI)</strong></td>
+          <td>This station's temperature minus the average of live METAR readings at KJFK, KLGA, and KEWR via NOAA <code>aviationweather.gov</code>. Fetched and persisted on each 5-minute poll. Per-month rolling averages accumulate in <code>wx-uhi-seasonal</code> for the seasonal curve.</td>
+          <td>±°F delta + direction label + typical delta for current month</td>
+        </tr>
+        <tr>
+          <td><strong>Analog Forecast</strong></td>
+          <td>Nearest-neighbor pattern matching on 90 days of hourly data. Pre-computed every 30 minutes by <code>wx-forecaster</code> (see below). The dashboard reports running forecast accuracy (MAE) as evaluations accumulate.</td>
+          <td>+1h / +2h / +3h for temp, humidity, wind, pressure + confidence %</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr class="divider">
+
+    <h2>RAIN PROBABILITY MODEL FITTING</h2>
+    <p>A scheduled Lambda (<code>wx-ml-fitter</code>) runs every Sunday at 3:00 UTC. It scans all 90-day readings, labels each reading with whether measurable rain (<code>hourlyrainin &gt; 0.01</code>) occurred in any reading within the following 60 minutes, then fits logistic regression via gradient descent with L2 regularization (300 epochs, learning rate 0.05).</p>
+    <p>Rain events are rare (~8–9% of readings), so training uses <strong>class weighting</strong>: positive examples (rain) are upweighted by <code>n_neg / n_pos</code>. This produces a recall-biased model — appropriate for weather, where a missed rain event is worse than a false alarm.</p>
+    <p>Fitted weights are stored in <code>wx-ml-models</code>. On the next <code>wx-api</code> cold start, <code>ml.py</code> loads them and uses them for all subsequent calls in that warm instance. The model is only stored if F1 ≥ 0.05; otherwise the heuristic coefficients remain active. Training metrics (accuracy, precision, recall, F1, confusion matrix) are stored alongside the weights.</p>
+    <p>Current model: <strong>24,348 training examples, F1=0.396, recall=82%, precision=26%</strong>.</p>
+
+    <hr class="divider">
+
+    <h2>SEASONAL UHI CURVE</h2>
+    <p>On every 5-minute poll, the poller calls the NOAA METAR endpoint, computes the UHI delta, and updates two stores: the <code>uhi_delta</code> field on the reading in <code>wx-readings</code>, and the per-month rolling average in <code>wx-uhi-seasonal</code>.</p>
+    <p><code>wx-uhi-seasonal</code> stores one row per calendar month (01–12), keyed by station ID + month. Each row holds a capped rolling average (max 10,000 samples per month) so the curve reflects the current year's observations rather than a multi-year stale mean.</p>
+    <p>The dashboard shows the typical UHI delta for the current month once at least 10 readings exist for that month. The full 12-month curve is available in the <code>/current</code> API response as <code>uhi_seasonal_curve[]</code>.</p>
+
+    <hr class="divider">
+
+    <h2>ANALOG FORECAST</h2>
+    <p>A scheduled Lambda (<code>wx-forecaster</code>) runs every 30 minutes and produces a 3-hour forecast from historical pattern matching. The result is pre-computed and served synchronously by the API.</p>
+    <p><strong>Algorithm:</strong></p>
+    <ol style="padding-left:20px;margin-bottom:16px;">
+      <li style="font-size:15px;line-height:1.75;color:#ccc;">Fetch all 90-day readings and bucket into 1-hour averages (~2,100 hourly buckets across 4 fields).</li>
+      <li style="font-size:15px;line-height:1.75;color:#ccc;">The <em>current fingerprint</em> is the last 6 hourly buckets, normalized to [0,1] within physical bounds for Midtown Manhattan.</li>
+      <li style="font-size:15px;line-height:1.75;color:#ccc;">For every historical 6-hour window with at least 50% field coverage, compute normalized Euclidean distance to the current fingerprint.</li>
+      <li style="font-size:15px;line-height:1.75;color:#ccc;">Take the top-5 closest analogs. Average their subsequent 3-hour trajectories into an ensemble forecast.</li>
+    </ol>
+    <p>Confidence (0–100%) reflects how closely the analogs matched: lower average distance → higher confidence. The best-matching analog date is shown for interpretability. The model improves continuously as new readings expand the pool of candidates.</p>
+
+    <hr class="divider">
+
+    <h2>FORECAST ACCURACY TRACKING</h2>
+    <p>On each run, <code>wx-forecaster</code> first reads the previous forecast from <code>wx-forecasts</code>. If that forecast is between 55 and 240 minutes old — meaning actual hourly readings are available for the +1h, +2h, and +3h windows — it computes mean absolute error (MAE) for all four forecast fields against the actual readings.</p>
+    <p>Each evaluation is written to <code>wx-forecast-accuracy</code> as a timestamped row. A <code>running</code> row in the same table accumulates the incremental mean across all evaluations. Once 5+ evaluations exist, the dashboard shows the running +1h temperature MAE alongside the confidence percentage.</p>
+
+    <hr class="divider">
+
+    <h2>DAILY SUMMARIES</h2>
+    <p>A scheduled Lambda (<code>wx-summarizer</code>) runs daily at 05:00 UTC (midnight ET). It processes the last 30 calendar days idempotently — safe to rerun without duplicating data. For each day it computes high/low/average temperature, total rainfall, max wind gust, and average comfort score, then generates a 2–3 sentence prose description of the day.</p>
+    <p>Prose generation is deterministic — it selects sentence templates based on temperature spread, rain event count and peak intensity, and notable wind. Rain event detection parses the 5-minute readings to find contiguous rain periods (rate &gt; 0.01"/hr), grouping them by start time, duration, total accumulation, and peak rate.</p>
+    <p>The most recent summary appears on the dashboard beneath the hero section. The full 30-day series is also used to populate the <strong>Comfort Calendar</strong> — a heatmap grid where each day is colored from red (0/100) to green (85+/100) based on the daily average comfort score.</p>
+    <p>Results are stored in <code>wx-daily-summaries</code> (keyed by station_id + date) and exposed via <code>GET /daily-summaries</code>.</p>
+
+    <hr class="divider">
+
+    <h2>STATION RECORDS</h2>
+    <p>A scheduled Lambda (<code>wx-records-tracker</code>) runs weekly on Sunday at 02:00 UTC. It scans all 90-day clean readings (no <code>quality_flag</code>), groups them by local calendar month, and computes per-month extremes:</p>
+    <table>
+      <thead><tr><th>Record</th><th>Field</th></tr></thead>
+      <tbody>
+        <tr><td>Highest temperature</td><td><code>temp_high</code> + date</td></tr>
+        <tr><td>Lowest temperature</td><td><code>temp_low</code> + date</td></tr>
+        <tr><td>Max wind gust</td><td><code>max_gust</code> + date</td></tr>
+        <tr><td>Peak rain rate</td><td><code>max_rain_rate</code> + date (only recorded if &gt; 0.01"/hr)</td></tr>
+        <tr><td>Lowest pressure</td><td><code>min_pressure</code> + date</td></tr>
+        <tr><td>Highest pressure</td><td><code>max_pressure</code> + date</td></tr>
+      </tbody>
+    </table>
+    <p>Records are stored in <code>wx-station-records</code> (keyed by station_id + month). The current month's records are included in every <code>/current</code> response and shown in the Station Records section of the dashboard. As the station accumulates history across multiple years, these records will reflect the full observed range for each calendar month.</p>
+
+    <hr class="divider">
+
+    <h2>RAIN EVENTS</h2>
+    <p>The <code>GET /rain-events</code> endpoint scans recent readings on-demand and parses them into discrete rain events. A rain event begins when <code>hourlyrainin &gt; 0.01</code> (in/hr) and ends when the rate returns to zero for a 5-minute interval. For each event the API returns:</p>
+    <ul>
+      <li><strong>start</strong> — ISO timestamp of the first wet reading</li>
+      <li><strong>duration_min</strong> — total length of the rain event in minutes (5-minute resolution)</li>
+      <li><strong>total_in</strong> — accumulated rainfall in inches (<code>sum(rates) × 5/60</code>)</li>
+      <li><strong>peak_rate</strong> — highest hourly rate observed during the event (in/hr)</li>
+    </ul>
+    <p>The dashboard shows the last 30 days of events in a table, sorted most recent first. Small events (&lt;0.01") that result from sensor noise are naturally excluded by the rate threshold.</p>
+
+    <hr class="divider">
+
+    <h2>CHART ANOMALY BANDS</h2>
+    <p>In addition to the dotted baseline overlay, the history chart shows a shaded ±1σ band for each metric. The upper and lower edges of the band are <code>baseline ± std_dev</code>, where the standard deviation is computed incrementally by the poller using <strong>Welford's online algorithm</strong>:</p>
+    <pre><code>new_var = (old_var × n + (x − old_mean) × (x − new_mean)) / (n + 1)</code></pre>
+    <p>This allows variance to be updated in O(1) per reading without storing all historical values. Once the rolling sample count reaches 8,640 (30 days × 288 readings/day), the algorithm transitions to exponential moving average variance to prevent very old data from dominating:</p>
+    <pre><code>new_var = (1 − α) × old_var + α × (x − old_mean)²</code></pre>
+    <p>The resulting <code>std_{field}</code> values are stored per MM-HH baseline slot and attached to history readings by the API. The dashboard renders the band as a transparent fill between the upper and lower edges using Chart.js's <code>fill: '+1'</code> dataset pairing.</p>
+
+    <hr class="divider">
+
+    <h2>DOWNSAMPLING FOR LONGER RANGES</h2>
+    <p>The <code>/history</code> endpoint accepts up to 720 hours (30 days). To keep payloads manageable, readings are automatically bucketed:</p>
+    <ul>
+      <li><strong>≤24h</strong> — raw 5-minute readings (~288 points)</li>
+      <li><strong>25–168h (7d)</strong> — hourly averages (~168 points)</li>
+      <li><strong>&gt;168h (30d)</strong> — daily averages (~30 points)</li>
+    </ul>
+    <p>Numeric fields are averaged within each bucket. The timestamp is the floor of the bucket boundary. Per-slot baselines are batch-fetched from <code>wx-daily-stats</code> and attached to each reading so the chart can overlay the historical normal line.</p>
+
+    <hr class="divider">
+
+    <h2>API</h2>
+    <p>The API is public and read-only. No authentication required.</p>
+    <table>
+      <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="https://api.wx.jamestannahill.com/current" target="_blank"><code>GET /current</code></a></td>
+          <td>Latest reading with all ML signals: condition label, anomaly, percentile rank, comfort score, rain probability, UHI delta, seasonal UHI curve, analog forecast with accuracy, yesterday's daily summary, and current-month station records</td>
+        </tr>
+        <tr>
+          <td><code>GET /history?hours=N</code></td>
+          <td>Last N hours of readings (default 24, max 720). Downsampled for longer ranges. Each reading includes <code>baseline_{field}</code> and <code>baseline_std_{field}</code> values for chart overlay and ±1σ bands.</td>
+        </tr>
+        <tr>
+          <td><code>GET /rain-events?days=N</code></td>
+          <td>Parsed rain events from the last N days (default 30). Each event has <code>start</code>, <code>duration_min</code>, <code>total_in</code>, <code>peak_rate</code>.</td>
+        </tr>
+        <tr>
+          <td><code>GET /daily-summaries?days=N</code></td>
+          <td>Pre-computed daily summaries from the last N days (default 30). Each entry has high/low/avg temp, total rain, max gust, avg comfort score, and prose summary.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>All responses are JSON. CloudFront caches all endpoints for 5 minutes, keyed by path and query string. CORS is open (<code>Access-Control-Allow-Origin: *</code>).</p>
+
+    <hr class="divider">
+
+    <h2>INFRASTRUCTURE</h2>
+    <p>Everything runs on AWS in <code>us-east-1</code>. Estimated cost: ~$4–6/month.</p>
+    <ul>
+      <li><strong>DynamoDB</strong> (on-demand, 9 tables) — <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes)</li>
+      <li><strong>Lambda</strong> (Python 3.12, arm64, 8 functions) — <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM)</li>
+      <li><strong>API Gateway HTTP API</strong> — routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, and <code>/daily-summaries</code> to the API Lambda</li>
+      <li><strong>CloudFront</strong> — in front of both the API Gateway and the S3 dashboard bucket</li>
+      <li><strong>S3</strong> — static dashboard files and the auto-generated OG image</li>
+      <li><strong>EventBridge</strong> — triggers all scheduled Lambdas</li>
+      <li><strong>SES</strong> — outbound email delivery for weather alerts</li>
+      <li><strong>Secrets Manager</strong> — Ambient Weather API keys and station config</li>
+    </ul>
+
+    <footer style="margin-top: 64px;">
+      <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
+      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="/">Dashboard</a> &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a></p>
+    </footer>
+  </main>
+</body>
+</html>

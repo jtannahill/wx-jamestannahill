@@ -1,48 +1,33 @@
 import os
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
-from wx_bootstrap.weatherkit import build_jwt, fetch_historical_comparisons, parse_comparisons
+from wx_bootstrap.openmeteo import fetch_month_normals
 
-BASELINES_TABLE = os.environ.get('BASELINES_TABLE', 'wx-baselines')
 STATS_TABLE = os.environ.get('STATS_TABLE', 'wx-daily-stats')
 
-MONTHS = [f"{m:02d}" for m in range(1, 13)]
+MONTHS = list(range(1, 13))
 
 
 def handler(event, context):
-    creds = get_secret('weatherkit/credentials')
     station = get_secret('ambient-weather/station-config')
-
-    token = build_jwt(
-        team_id=creds['team_id'],
-        key_id=creds['key_id'],
-        service_id=creds['service_id'],
-        private_key_pem=creds['private_key'],
-    )
-
     lat = station['latitude']
     lon = station['longitude']
     station_id = station['mac_address']
-    baselines_table = get_table(BASELINES_TABLE)
+
     stats_table = get_table(STATS_TABLE)
 
     for month in MONTHS:
-        print(f"Fetching WeatherKit baselines for month {month}...")
+        print(f"Fetching Open-Meteo ERA5 normals for month {month:02d}...")
         try:
-            response = fetch_historical_comparisons(lat, lon, token)
-            averages = parse_comparisons(response)
+            hourly_normals = fetch_month_normals(lat, lon, month)
         except Exception as e:
-            print(f"WeatherKit failed for month {month}: {e}")
+            print(f"Open-Meteo failed for month {month:02d}: {e}")
             continue
 
-        baselines_table.put_item(Item={
-            'station_id': station_id,
-            'month': month,
-            **{k: _decimal(v) for k, v in averages.items()},
-        })
+        for hour, normals in hourly_normals.items():
+            month_hour = f"{month:02d}-{hour:02d}"
 
-        for hour in range(24):
-            month_hour = f"{month}-{hour:02d}"
+            # Seed wx-daily-stats only if slot is empty (don't overwrite real station data)
             stats_resp = stats_table.get_item(
                 Key={'station_id': station_id, 'month_hour': month_hour}
             )
@@ -50,16 +35,12 @@ def handler(event, context):
                 stats_table.put_item(Item={
                     'station_id': station_id,
                     'month_hour': month_hour,
-                    'avg_tempf': _decimal(averages['avg_tempf']),
-                    'avg_feelsLike': _decimal(averages['avg_tempf']),
-                    'avg_humidity': _decimal(averages['avg_humidity']),
-                    'avg_windspeedmph': _decimal(averages.get('avg_windspeedmph', 0)),
-                    'avg_baromrelin': _decimal(29.92),
-                    'avg_uv': _decimal(0),
-                    'sample_count': 0,
-                    'source': 'weatherkit',
+                    **{k: _decimal(v) for k, v in normals.items()},
+                    'sample_count': 288,  # Weight ERA5 as ~1 day of readings so real data blends in gradually
+                    'source': 'open-meteo-era5',
                 })
-        print(f"Month {month}: seeded baselines + 24 wx-daily-stats slots")
+
+        print(f"Month {month:02d}: seeded {len(hourly_normals)} hour slots")
 
     print("Bootstrap complete.")
 

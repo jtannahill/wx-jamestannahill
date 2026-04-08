@@ -56,6 +56,10 @@
       <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
     </header>
 
+    <div class="stale-banner" id="stale-banner" hidden>
+      <span id="stale-msg">Station data may be delayed</span>
+    </div>
+
     <section class="hero">
       <div class="temp-block">
         <span class="temp" id="temp">—</span>
@@ -64,6 +68,12 @@
       <div class="feels-like" id="feels-like">Feels like —°F</div>
       <div class="condition" id="condition">—</div>
       <div class="anomaly-headline" id="anomaly-headline">—</div>
+      <div class="percentile-rank" id="percentile-rank"></div>
+    </section>
+
+    <section class="summary-section" id="summary-section" hidden>
+      <p class="summary-date" id="summary-date"></p>
+      <p class="summary-text" id="summary-text"></p>
     </section>
 
     <section class="conditions-grid">
@@ -97,6 +107,46 @@
         <div class="card-value" id="wind-gust">—</div>
         <div class="card-sub" id="wind-dir">—</div>
       </div>
+      <div class="card">
+        <div class="card-label has-tooltip" data-tooltip="Microclimate Comfort Score (0–100). Composite of feels-like temperature deviation from 71°F ideal, humidity, wind speed, UV index, and rain rate. Season-weighted and adjusted for anomalies vs. this station's own baseline.">COMFORT</div>
+        <div class="card-value" id="comfort-score">—</div>
+        <div class="card-sub" id="comfort-label">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label has-tooltip" data-tooltip="Probability of rain in the next 60 minutes. Logistic regression on humidity, 1-hour pressure trend, dew-point depression, and hour-of-day. Heuristic coefficients calibrated for NYC (~120 rain days/yr). Boosts automatically if rain is currently falling.">RAIN NEXT HR</div>
+        <div class="card-value" id="rain-prob">—</div>
+        <div class="card-sub" id="rain-prob-label">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label has-tooltip" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
+        <div class="card-value" id="uhi-delta">—</div>
+        <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
+        <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px;color:#555"></div>
+      </div>
+    </section>
+
+    <section class="comfort-calendar-section" id="comfort-calendar-section" hidden>
+      <div class="section-header">
+        <span class="section-title">COMFORT CALENDAR</span>
+        <span class="section-meta" id="comfort-meta">30-day history</span>
+      </div>
+      <div class="comfort-grid" id="comfort-grid"></div>
+    </section>
+
+    <section class="forecast-section" id="forecast-section" hidden>
+      <div class="forecast-header">
+        <span class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</span>
+        <span class="forecast-meta" id="forecast-meta"></span>
+      </div>
+      <div class="forecast-grid" id="forecast-grid"></div>
+    </section>
+
+    <section class="records-section" id="records-section" hidden>
+      <div class="section-header">
+        <span class="section-title">STATION RECORDS</span>
+        <span class="section-meta" id="records-month"></span>
+      </div>
+      <div class="records-grid" id="records-grid"></div>
     </section>
 
     <section class="chart-section">
@@ -106,6 +156,7 @@
           <button class="chart-btn" data-field="humidity">Humidity</button>
           <button class="chart-btn" data-field="windspeedmph">Wind</button>
           <button class="chart-btn" data-field="baromrelin">Pressure</button>
+          <button class="chart-btn" data-field="uhi_delta">Urban Heat</button>
         </div>
         <div class="chart-controls-row range-row">
           <button class="range-btn active" data-hours="24">24h</button>
@@ -114,6 +165,11 @@
         </div>
       </div>
       <canvas id="wx-chart" height="80"></canvas>
+    </section>
+
+    <section class="rain-events-section" id="rain-events-section" hidden>
+      <div class="section-title">RECENT RAIN EVENTS</div>
+      <table class="rain-events-table" id="rain-events-table"></table>
     </section>
 
     <footer>
