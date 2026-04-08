@@ -8,6 +8,7 @@ from shared.dynamodb import get_table
 from shared.uhi import fetch_uhi
 from wx_poller.og_image import generate_og
 from wx_poller.validation import validate_reading, detect_stuck
+from wx_poller.nearby import fetch_nearby
 
 STATION_TZ = ZoneInfo('America/New_York')
 
@@ -23,6 +24,7 @@ def handler(event, context):
     creds   = get_secret('ambient-weather/api-keys')
     station = get_secret('ambient-weather/station-config')
     mac     = station['mac_address']
+    wu_key  = creds.get('wu_api_key', '')
 
     raw = fetch_reading(mac, creds['api_key'], creds['application_key'])
     if not raw:
@@ -54,6 +56,12 @@ def handler(event, context):
     # --- Write to DynamoDB (always store, even if flagged) ---------------------
     now = datetime.now(timezone.utc)
     _write_reading(mac, now, cleaned, quality_flag=quality_flag, uhi_delta=uhi_delta)
+
+    # --- Fetch and store nearby WU stations (non-critical) --------------------
+    if quality_flag is None and wu_key:
+        nearby = fetch_nearby(wu_key, limit=20)
+        if nearby:
+            _write_nearby_snapshot(mac, now, nearby)
 
     # --- Update rolling stats only for clean outdoor readings -----------------
     if cleaned.get('tempf') is not None and quality_flag is None:
@@ -217,6 +225,19 @@ def _update_uhi_seasonal(station_id: str, month: str, delta: float):
         'avg_delta':    _decimal(new_avg),
         'sample_count': count + 1,
         'updated_at':   datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def _write_nearby_snapshot(station_id: str, now, nearby: list):
+    """Write the latest nearby station snapshot to wx-nearby-snapshots."""
+    import json as _json
+    table = get_table(os.environ.get('NEARBY_TABLE', 'wx-nearby-snapshots'))
+    table.put_item(Item={
+        'station_id':    station_id,
+        'snapshot_at':   now.isoformat(),
+        'stations_json': _json.dumps(nearby),
+        'station_count': len(nearby),
+        'ttl':           int(__import__('time').time()) + (30 * 86400),
     })
 
 
