@@ -125,10 +125,12 @@ def _sigmoid(x: float) -> float:
         return 0.0 if x < 0 else 1.0
 
 
-def rain_probability(reading: dict, recent_readings: list) -> dict:
+def rain_probability(reading: dict, recent_readings: list, nearby: list | None = None) -> dict:
     """
-    Returns {'probability': 0-100, 'label': str, 'coeff_source': str}.
+    Returns {'probability': 0-100, 'label': str, 'coeff_source': str,
+             'spatial_boost': float, 'spatial_source': str|None}.
     recent_readings: newest-first list (from DynamoDB query).
+    nearby: optional list of nearby station dicts for spatial rain boost.
     """
     global _rain_w, _rain_b
     if _rain_w is None:
@@ -172,7 +174,19 @@ def rain_probability(reading: dict, recent_readings: list) -> dict:
     if rain_now > 0.01:
         z += 2.5
 
-    prob = max(1, min(99, round(_sigmoid(z) * 100)))
+    base_prob = _sigmoid(z)
+
+    # Spatial boost from nearby upwind stations
+    spatial_boost_val = 0.0
+    spatial_source = None
+    if nearby:
+        from wx_api.nearby import spatial_rain_boost
+        wind_dir = reading.get('winddir', 0) or 0
+        spatial_boost_val, spatial_source = spatial_rain_boost(nearby, wind_dir)
+        if spatial_boost_val > 0:
+            base_prob = min(0.99, base_prob + spatial_boost_val)
+
+    prob = max(1, min(99, round(base_prob * 100)))
 
     if   prob <  10: label = 'Unlikely'
     elif prob <  30: label = 'Slight chance'
@@ -180,4 +194,10 @@ def rain_probability(reading: dict, recent_readings: list) -> dict:
     elif prob <  75: label = 'Likely'
     else:            label = 'Very likely'
 
-    return {'probability': prob, 'label': label, 'coeff_source': _coeff_source}
+    return {
+        'probability':    prob,
+        'label':          label,
+        'coeff_source':   _coeff_source,
+        'spatial_boost':  round(spatial_boost_val, 3),
+        'spatial_source': spatial_source,
+    }
