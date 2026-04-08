@@ -48,9 +48,13 @@ def handler(event, context):
         days = int(params.get('days', 90))
         return _daily_summaries_route(min(days, 365))
     elif path == '/nearby':
-        station = get_secret(STATION_SECRET)
-        station_id = station['mac_address']
-        return _resp(200, nearby_route(station_id))
+        try:
+            station = get_secret(STATION_SECRET)
+            station_id = station['mac_address']
+            return _resp(200, nearby_route(station_id))
+        except Exception as e:
+            print(f"Nearby route error: {e}")
+            return _resp(500, {'error': 'nearby unavailable'})
     else:
         return _resp(404, {"error": "Not found"})
 
