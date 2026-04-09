@@ -1,0 +1,61 @@
+# wx.jamestannahill.com — Full Content Index
+
+## Station Identity
+wx.jamestannahill.com is a live personal weather station dashboard for Midtown Manhattan, New York City.
+Station ID: KNYNEWYO2140 (Ambient Weather network)
+Location: 40.75°N 73.98°W (Midtown Manhattan)
+Hardware: Ambient Weather WS-2902 series
+Data resolution: 5-minute intervals
+Coverage: 2024–present
+
+## Data Fields
+All fields available via API:
+- tempf: Temperature (°F)
+- humidity: Relative humidity (%)
+- windspeedmph: Wind speed (mph)
+- windgustmph: Wind gust (mph)
+- winddir: Wind direction (degrees)
+- baromrelin: Barometric pressure (inHg, relative)
+- uvi: UV index (0–11+)
+- solarradiation: Solar radiation (W/m²)
+- hourlyrainin: Hourly rainfall (inches)
+- dailyrainin: Daily rainfall (inches)
+- dewPoint: Dew point (°F)
+- feelsLike: Feels-like temperature (°F)
+- comfort_score: Microclimate Comfort Score (0–100, computed)
+- rain_prob: Rain probability next 60 min (%, computed)
+- uhi_delta: Urban Heat Island delta vs JFK/LGA/EWR airports (°F, computed)
+
+## API Endpoints
+- GET https://api.wx.jamestannahill.com/current — Latest observation (all fields + computed)
+- GET https://api.wx.jamestannahill.com/history?hours=24 — History for past N hours
+- GET https://api.wx.jamestannahill.com/records — 30-day station records
+- GET https://api.wx.jamestannahill.com/analog — Analog forecast (next 3 hours)
+- GET https://api.wx.jamestannahill.com/rain-events — Recent rain events
+- GET https://api.wx.jamestannahill.com/nearby — Nearby Ambient Weather stations
+
+## Computed Metrics
+### Comfort Score (0–100)
+Composite of: feels-like deviation from 71°F ideal, humidity, wind speed, UV index, rain rate. Season-weighted and compared to this station's own 90-day baseline.
+
+### Rain Probability
+Logistic regression on: humidity, 1-hour pressure trend, dew-point depression, hour-of-day. Calibrated for NYC (~120 rain days/year). Auto-boosted if rain currently falling.
+
+### Urban Heat Island Delta
+This Midtown station minus average of JFK, LGA, EWR ASOS readings via NOAA aviationweather.gov API. Positive = Midtown warmer than surrounding airports.
+
+### Analog Forecast
+Nearest-neighbor pattern matching on 90 days of 5-minute data. Finds 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes.
+
+## Pages
+- / — Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations)
+- /docs.html — Technical documentation (how it works, data sources, methodology, API reference)
+
+## Data Sources
+- Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHouz aggregator
+- Airport ASOS: NOAA aviationweather.gov (JFK, LGA, EWR) for UHI delta
+- Daily forecast: Apple WeatherKit (tomorrow's conditions)
+
+## License
+Station data: CC BY 4.0
+Owner: James Tannahill (https://jamestannahill.com)

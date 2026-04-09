@@ -1,7 +1,7 @@
 const API_BASE = 'https://api.wx.jamestannahill.com';
 const REFRESH_MS = 5 * 60 * 1000;
 
-let chart = null;
+let uplot = null;
 let currentField = 'tempf';
 let currentHours = 24;
 let lastHistory = null;
@@ -24,30 +24,6 @@ function fmt(val, decimals = 1) {
   return Number(val).toFixed(decimals);
 }
 
-// ── Custom plugin: vertical "now" cursor ──────────────────────────────────────
-const nowCursorPlugin = {
-  id: 'nowCursor',
-  afterDraw(chart) {
-    const idx = chart._nowIndex;
-    if (idx == null) return;
-    const meta = chart.getDatasetMeta(0);
-    if (!meta.data[idx]) return;
-    const x = meta.data[idx].x;
-    const { top, bottom } = chart.chartArea;
-    const ctx = chart.ctx;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.20)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 5]);
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
-    ctx.stroke();
-    ctx.restore();
-  }
-};
-Chart.register(nowCursorPlugin);
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtChartLabel(ts, hours) {
   const d = new Date(ts);
@@ -57,14 +33,21 @@ function fmtChartLabel(ts, hours) {
   return `${h === 0 ? 12 : h > 12 ? h - 12 : h}${ampm}`;
 }
 
-function findNowIndex(readings) {
-  const now = Date.now();
-  let best = 0, bestDiff = Infinity;
-  readings.forEach((r, i) => {
-    const diff = Math.abs(new Date(r.timestamp).getTime() - now);
-    if (diff < bestDiff) { bestDiff = diff; best = i; }
-  });
-  return best;
+// ── Cache (stale-while-revalidate) ───────────────────────────────────────────
+const CACHE_TTL = 10 * 60 * 1000; // evict entries older than 10 min
+
+function cacheGet(key) {
+  try {
+    const raw = localStorage.getItem('wx_' + key);
+    if (!raw) return null;
+    const { d, t } = JSON.parse(raw);
+    if (Date.now() - t > CACHE_TTL) { localStorage.removeItem('wx_' + key); return null; }
+    return d;
+  } catch { return null; }
+}
+
+function cacheSet(key, data) {
+  try { localStorage.setItem('wx_' + key, JSON.stringify({ d: data, t: Date.now() })); } catch {}
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -220,175 +203,295 @@ function renderForecast(forecast) {
   }).join('');
 }
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
+// ── Chart (uPlot) ─────────────────────────────────────────────────────────────
+function makeTooltipPlugin(readings, hours, activeField) {
+  let el;
+  return {
+    hooks: {
+      init: [u => {
+        el = document.createElement('div');
+        el.className = 'wx-tooltip';
+        el.hidden = true;
+        u.over.style.overflow = 'visible';
+        u.over.appendChild(el);
+      }],
+      setCursor: [u => {
+        const { left, idx } = u.cursor;
+        if (idx == null || idx < 0 || left < 0) { el.hidden = true; return; }
+        const r = readings[idx];
+        if (!r) { el.hidden = true; return; }
+
+        const active = v => `<span class="wxt-active">${v}</span>`;
+        const rows = [];
+        rows.push(`<div class="wxt-time">${fmtChartLabel(new Date(r.timestamp).getTime(), hours)}</div>`);
+        if (r.tempf        != null) rows.push(`<div>Temp&ensp;${activeField==='tempf'        ? active(r.tempf.toFixed(1)+'°F')        : r.tempf.toFixed(1)+'°F'}</div>`);
+        if (r.humidity     != null) rows.push(`<div>RH&emsp;&ensp;${activeField==='humidity'    ? active(r.humidity.toFixed(0)+'%')       : r.humidity.toFixed(0)+'%'}</div>`);
+        if (r.windspeedmph != null) rows.push(`<div>Wind&ensp;${activeField==='windspeedmph'  ? active(r.windspeedmph.toFixed(1)+' mph') : r.windspeedmph.toFixed(1)+' mph'}</div>`);
+        if (r.baromrelin   != null) rows.push(`<div>Pres&ensp;${activeField==='baromrelin'    ? active(r.baromrelin.toFixed(2)+'"')      : r.baromrelin.toFixed(2)+'"'}</div>`);
+        if (r.uhi_delta    != null) rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active((r.uhi_delta>=0?'+':'')+r.uhi_delta.toFixed(1)+'°F') : (r.uhi_delta>=0?'+':'')+r.uhi_delta.toFixed(1)+'°F'}</div>`);
+        if ((r.hourlyrainin??0) > 0.005) rows.push(`<div>Rain&ensp;${r.hourlyrainin.toFixed(2)}"/hr</div>`);
+
+        el.innerHTML = rows.join('');
+        el.hidden = false;
+
+        // Flip left/right so tooltip stays inside the chart
+        const overW = u.over.offsetWidth;
+        const tipW  = el.offsetWidth || 130;
+        const flip  = left + tipW + 18 > overW;
+        el.style.left  = flip ? 'auto' : `${left + 14}px`;
+        el.style.right = flip ? `${overW - left + 14}px` : 'auto';
+        el.style.top   = '6px';
+      }]
+    }
+  };
+}
+
+function makeBgPlugin(baseData) {
+  return {
+    hooks: {
+      drawClear: [u => {
+        const { ctx, bbox } = u;
+        ctx.save();
+        ctx.fillStyle = '#0e0e0e';
+        ctx.fillRect(bbox.left, bbox.top, bbox.width, bbox.height);
+        ctx.restore();
+      }],
+      draw: [u => {
+        // Draw baseline as dashed line (series 4 data = index 4)
+        const xs   = u.data[0];
+        const base = u.data[4];
+        if (!xs || !base) return;
+        const { ctx, bbox } = u;
+        ctx.save();
+        ctx.setLineDash([4, 6]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+        ctx.lineWidth   = 1;
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < xs.length; i++) {
+          if (base[i] == null) { started = false; continue; }
+          const px = Math.round(u.valToPos(xs[i],    'x', true));
+          const py = Math.round(u.valToPos(base[i],  'y', true));
+          if (!started) { ctx.moveTo(px, py); started = true; }
+          else           ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }],
+    }
+  };
+}
+
+function makeNowLinePlugin() {
+  return {
+    hooks: {
+      draw: [u => {
+        const xs = u.data[0];
+        if (!xs || xs.length < 2) return;
+        const nowS = Date.now() / 1000;
+        if (nowS < xs[0] || nowS > xs[xs.length - 1] + 7200) return;
+        let best = 0, bestD = Infinity;
+        xs.forEach((t, i) => { const d = Math.abs(t - nowS); if (d < bestD) { bestD = d; best = i; } });
+        const x = Math.round(u.valToPos(xs[best], 'x', true));
+        const { ctx, bbox } = u;
+        ctx.save();
+        ctx.setLineDash([4, 5]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, bbox.top);
+        ctx.lineTo(x, bbox.top + bbox.height);
+        ctx.stroke();
+        ctx.restore();
+      }]
+    }
+  };
+}
+
 function renderChart(history, field, hours) {
-  const ctx = document.getElementById('wx-chart').getContext('2d');
-  const cfg = FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 };
+  if (!history?.readings?.length) return;
+  // Defer one frame so the browser has laid out the page before uPlot measures clientWidth
+  requestAnimationFrame(() => _renderChart(history, field, hours));
+}
+
+function _renderChart(history, field, hours) {
+  const cfg      = FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 };
   const readings = history.readings;
+  const wrap     = document.getElementById('wx-chart-wrap');
 
-  const labels     = readings.map(r => fmtChartLabel(r.timestamp, hours));
-  const values     = readings.map(r => r[field] ?? null);
-  const baselines  = readings.map(r => r[`baseline_${field}`] ?? null);
-  const upperSigma = readings.map(r => {
-    const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`];
-    return (b != null && s != null) ? b + s : null;
-  });
-  const lowerSigma = readings.map(r => {
-    const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`];
-    return (b != null && s != null) ? b - s : null;
-  });
-  const rainValues = readings.map(r => r.hourlyrainin ?? null);
-  const maxRain    = Math.max(...rainValues.filter(v => v != null), 0.01);
-  const nowIndex   = hours <= 168 ? findNowIndex(readings) : null;
-  const yCallback  = v => `${Number(v).toFixed(cfg.decimals)}${cfg.unit}`;
+  // Columnar data arrays (uPlot format)
+  const ts      = readings.map(r => new Date(r.timestamp).getTime() / 1000);
+  const vals    = readings.map(r => r[field] ?? null);
+  const base    = readings.map(r => r[`baseline_${field}`] ?? null);
+  const upper   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b+s : null; });
+  const lower   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b-s : null; });
+  const rain    = readings.map(r => r.hourlyrainin ?? null);
+  const maxRain = Math.max(...rain.filter(v => v != null), 0.01);
 
-  // Build crosshair tooltip labels from raw readings
-  function buildTooltipLines(dataIndex) {
-    const r = readings[dataIndex];
-    if (!r) return [];
-    const lines = [];
-    if (r.tempf        != null) lines.push(`Temp  ${Number(r.tempf).toFixed(1)}°F`);
-    if (r.humidity     != null) lines.push(`RH    ${Number(r.humidity).toFixed(0)}%`);
-    if (r.windspeedmph != null) lines.push(`Wind  ${Number(r.windspeedmph).toFixed(1)} mph`);
-    if (r.baromrelin   != null) lines.push(`Pres  ${Number(r.baromrelin).toFixed(2)}"`);
-    if (r.uhi_delta    != null) lines.push(`UHI   ${r.uhi_delta >= 0 ? '+' : ''}${Number(r.uhi_delta).toFixed(1)}°F`);
-    if (r.hourlyrainin  > 0.005) lines.push(`Rain  ${Number(r.hourlyrainin).toFixed(2)}"/hr`);
-    return lines;
+  if (uplot) { uplot.destroy(); uplot = null; }
+
+  const W = wrap.clientWidth || (window.innerWidth - 48);
+
+  uplot = new uPlot({
+    width:  W,
+    height: window.innerWidth < 480 ? 180 : 220,
+    cursor: {
+      y:    false,
+      drag: { x: false, y: false },
+      points: { size: 0 },
+    },
+    legend: { show: false },
+    axes: [
+      {
+        // x — time
+        stroke: '#666',
+        ticks:  { stroke: '#252525', width: 1, size: 4 },
+        grid:   { stroke: '#1e1e1e', width: 1 },
+        values: (u, ticks) => ticks.map(v => {
+          if (v == null) return null;
+          const d = new Date(v * 1000);
+          if (hours > 24) return `${d.getMonth()+1}/${d.getDate()}`;
+          const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
+          return `${h===0?12:h>12?h-12:h}${ap}`;
+        }),
+        font:  '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
+        size:  28,
+        gap:   6,
+      },
+      {
+        // y — main field
+        stroke: '#666',
+        ticks:  { stroke: '#252525', width: 1, size: 4 },
+        grid:   { stroke: '#1e1e1e', width: 1 },
+        values: (u, ticks) => ticks.map(v => v != null ? `${Number(v).toFixed(cfg.decimals)}${cfg.unit}` : null),
+        font:   '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
+        size:   window.innerWidth < 480 ? 48 : 56,
+        gap:    6,
+      },
+      { show: false, scale: 'rain' },
+    ],
+    scales: {
+      x:    {},
+      y:    { auto: true },
+      rain: { range: [0, maxRain * 14] },
+    },
+    series: [
+      {},   // x timestamps
+      {
+        // 1 — main field line
+        stroke: '#c8b97a',
+        width:  2,
+        fill:   'rgba(200,185,122,0.08)',
+      },
+      {
+        // 2 — upper σ (band anchor — rendered transparent)
+        stroke: 'rgba(0,0,0,0)',
+        width:  0,
+        fill:   'rgba(0,0,0,0)',
+      },
+      {
+        // 3 — lower σ (band anchor — rendered transparent)
+        stroke: 'rgba(0,0,0,0)',
+        width:  0,
+        fill:   'rgba(0,0,0,0)',
+      },
+      {
+        // 4 — baseline (drawn dashed via plugin, series itself invisible)
+        stroke: 'rgba(0,0,0,0)',
+        width:  0,
+        fill:   'rgba(0,0,0,0)',
+      },
+      {
+        // 5 — rain (subtle filled area on secondary scale)
+        scale:  'rain',
+        stroke: 'rgba(90,140,210,0.7)',
+        fill:   'rgba(90,140,210,0.20)',
+        width:  1,
+      },
+    ],
+    bands: [
+      { series: [2, 3], fill: 'rgba(110,120,150,0.09)' }
+    ],
+    plugins: [
+      makeBgPlugin(),
+      makeTooltipPlugin(readings, hours, field),
+      makeNowLinePlugin(),
+    ],
+  }, [ts, vals, upper, lower, base, rain], wrap);
+}
+
+// Resize chart with window
+const _chartWrap = document.getElementById('wx-chart-wrap');
+new ResizeObserver(() => {
+  if (uplot) uplot.setSize({ width: _chartWrap.clientWidth, height: window.innerWidth < 480 ? 180 : 220 });
+}).observe(_chartWrap);
+
+// ── Tomorrow forecast (WeatherKit) ───────────────────────────────────────────
+function renderTomorrow(nws, attr) {
+  const section = document.getElementById('tomorrow-section');
+  if (!nws || !nws.detailed) { section.hidden = true; return; }
+  document.getElementById('tomorrow-date').textContent = nws.name.toUpperCase();
+  document.getElementById('tomorrow-text').textContent = nws.detailed;
+  section.hidden = false;
+
+  // Swap in Apple's official logo + link if attribution data is available
+  const tag = document.getElementById('wk-attr-tag');
+  if (tag && attr) {
+    const logoUrl  = attr.logo_dark_2x || attr.logo_square_2x;
+    const legalUrl = attr.legal_url || 'https://weatherkit.apple.com/legal-attribution.html';
+    tag.outerHTML = `<a id="wk-attr-tag" href="${legalUrl}" target="_blank" rel="noopener"
+      class="source-tag source-external has-tooltip"
+      style="display:inline-flex;align-items:center;gap:5px;text-decoration:none"
+      data-tooltip="Weather data provided by Apple WeatherKit. Tap to view data sources and legal attribution."
+      >${logoUrl ? `<img src="${logoUrl}" alt="Apple Weather" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">` : ''}WEATHERKIT</a>`;
+  }
+}
+
+// ── Today so far ─────────────────────────────────────────────────────────────
+function renderTodayContext(current, history) {
+  const section = document.getElementById('today-section');
+  const textEl  = document.getElementById('today-text');
+  if (!history || !history.readings) { section.hidden = true; return; }
+
+  // Filter to readings in the browser's local "today"
+  const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const todayReadings = history.readings.filter(r =>
+    new Date(r.timestamp).toLocaleDateString('en-CA') === todayStr
+  );
+  if (todayReadings.length < 3) { section.hidden = true; return; }
+
+  const temps = todayReadings.map(r => r.tempf).filter(v => v != null);
+  const gusts = todayReadings.map(r => r.windgustmph).filter(v => v != null);
+  const high     = temps.length  ? Math.round(Math.max(...temps))  : null;
+  const low      = temps.length  ? Math.round(Math.min(...temps))  : null;
+  const maxGust  = gusts.length  ? Math.round(Math.max(...gusts))  : null;
+  const rain     = current.dailyrainin ?? 0;
+
+  const sentences = [];
+
+  // Temp range
+  if (high != null && low != null) {
+    sentences.push(high - low < 3
+      ? `Temperatures holding near ${Math.round((high + low) / 2)}°F.`
+      : `Temperatures ranging from ${low}°F to ${high}°F so far.`);
   }
 
-  if (chart) {
-    // Fast in-place update — no destroy/recreate
-    // Datasets: 0=main, 1=upperSigma, 2=lowerSigma, 3=baseline, 4=rain
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = values;
-    chart.data.datasets[1].data = upperSigma;
-    chart.data.datasets[2].data = lowerSigma;
-    chart.data.datasets[3].data = baselines;
-    chart.data.datasets[4].data = rainValues;
-    chart.options.scales.y.ticks.callback = yCallback;
-    chart.options.scales.yRain.max = maxRain * 14;
-    chart._nowIndex = nowIndex;
-    chart._buildTooltipLines = buildTooltipLines;
-    chart._hours = hours;
-    chart.update('none');
-    return;
+  // Wind gusts
+  if (maxGust != null && maxGust >= 15) sentences.push(`Wind gusts to ${maxGust} mph.`);
+
+  // Rain
+  if (rain > 0.01) sentences.push(`${rain.toFixed(2)}" of rain since midnight.`);
+
+  // Anomaly — only if notable (≥5°F delta)
+  const anomaly = current.anomalies?.temp;
+  if (anomaly && Math.abs(anomaly.delta) >= 5) {
+    const cap = anomaly.label[0].toUpperCase() + anomaly.label.slice(1);
+    sentences.push(cap + '.');
   }
 
-  chart = new Chart(ctx, {
-    data: {
-      labels,
-      datasets: [
-        {
-          // 0 — main field line with anomaly fill vs baseline
-          type: 'line',
-          data: values,
-          borderColor: '#c8b97a',
-          borderWidth: 1.5,
-          pointRadius: 0,
-          tension: 0.3,
-          spanGaps: true,
-          order: 1,
-          fill: {
-            target: 3,  // fill vs baseline (dataset 3)
-            above: 'rgba(200,185,122,0.10)',
-            below: 'rgba(100,140,220,0.08)',
-          },
-        },
-        {
-          // 1 — upper ±1σ band edge
-          type: 'line',
-          data: upperSigma,
-          borderColor: 'transparent',
-          borderWidth: 0,
-          pointRadius: 0,
-          tension: 0.3,
-          spanGaps: true,
-          order: 4,
-          fill: '+1',  // fill to dataset 2 (lower sigma)
-          backgroundColor: 'rgba(120,130,160,0.07)',
-        },
-        {
-          // 2 — lower ±1σ band edge
-          type: 'line',
-          data: lowerSigma,
-          borderColor: 'transparent',
-          borderWidth: 0,
-          pointRadius: 0,
-          tension: 0.3,
-          spanGaps: true,
-          order: 5,
-          fill: false,
-        },
-        {
-          // 3 — baseline dotted line
-          type: 'line',
-          data: baselines,
-          borderColor: 'rgba(255,255,255,0.18)',
-          borderWidth: 1,
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0.3,
-          spanGaps: true,
-          fill: false,
-          order: 2,
-        },
-        {
-          // 4 — rain bars (secondary axis, tiny at bottom)
-          type: 'bar',
-          data: rainValues,
-          backgroundColor: 'rgba(100,150,220,0.40)',
-          borderWidth: 0,
-          yAxisID: 'yRain',
-          order: 3,
-          barPercentage: 0.9,
-          categoryPercentage: 1.0,
-        },
-      ],
-    },
-    options: {
-      animation: false,
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: items => {
-              const r = readings[items[0].dataIndex];
-              return r ? fmtChartLabel(r.timestamp, chart._hours) : '';
-            },
-            label: item => {
-              if (item.datasetIndex !== 0) return null;
-              return chart._buildTooltipLines(item.dataIndex);
-            },
-          },
-        },
-        nowCursor: {},
-      },
-      scales: {
-        x: {
-          ticks: { color: '#666', font: { size: 11 }, maxTicksLimit: 8 },
-          grid: { color: '#1a1a1a' },
-        },
-        y: {
-          ticks: { color: '#666', font: { size: 11 }, callback: yCallback },
-          grid: { color: '#1a1a1a' },
-        },
-        yRain: {
-          type: 'linear',
-          position: 'right',
-          min: 0,
-          max: maxRain * 14,
-          grid: { display: false },
-          ticks: { display: false },
-        },
-      },
-    },
-  });
-
-  chart._nowIndex = nowIndex;
-  chart._buildTooltipLines = buildTooltipLines;
-  chart._hours = hours;
+  if (!sentences.length) { section.hidden = true; return; }
+  textEl.textContent = sentences.join(' ');
+  section.hidden = false;
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
@@ -436,7 +539,7 @@ function renderStationRecords(records) {
   if (!records) { section.hidden = true; return; }
   section.hidden = false;
 
-  document.getElementById('records-month').textContent = records.month_name || '';
+  document.getElementById('records-month').textContent = records.scope === 'all-time' ? 'all time' : (records.month_name || '');
 
   const items = [];
   if (records.temp_high    != null) items.push({ label: 'HIGH TEMP',     value: `${records.temp_high}°F`,     date: records.temp_high_at });
@@ -507,6 +610,12 @@ function renderRainEvents(events) {
 // ── Secondary data (rain events + comfort calendar) ───────────────────────────
 let secondaryLoaded = false;
 async function loadSecondaryData() {
+  // Render from cache instantly
+  const cachedEvents = cacheGet('rain_events');
+  const cachedSummaries = cacheGet('daily_summaries');
+  if (cachedEvents)    renderRainEvents(cachedEvents);
+  if (cachedSummaries) renderComfortCalendar(cachedSummaries);
+
   try {
     const [evResp, sumResp] = await Promise.all([
       fetch(`${API_BASE}/rain-events?days=30`),
@@ -514,10 +623,12 @@ async function loadSecondaryData() {
     ]);
     if (evResp.ok) {
       const d = await evResp.json();
+      cacheSet('rain_events', d.events || []);
       renderRainEvents(d.events || []);
     }
     if (sumResp.ok) {
       const d = await sumResp.json();
+      cacheSet('daily_summaries', d.summaries || []);
       renderComfortCalendar(d.summaries || []);
     }
     secondaryLoaded = true;
@@ -531,13 +642,21 @@ async function refresh(forceHistory = false) {
   try {
     const fetches = [fetchCurrent()];
     if (forceHistory || !lastHistory) fetches.push(fetchHistory(currentHours));
-    const results = await Promise.all(fetches);
-    renderCurrent(results[0]);
-    renderSummary(results[0].daily_summary);
-    renderStationRecords(results[0].station_records);
-    renderNearby(results[0].nearby_stations, null);
-    if (results[1]) lastHistory = results[1];
+    const [current, history] = await Promise.all(fetches);
+
+    cacheSet('current', current);
+    renderCurrent(current);
+    renderTomorrow(current.nws_tomorrow, current.wk_attribution);
+    renderSummary(current.daily_summary);
+    renderStationRecords(current.station_records);
+    renderNearby(current.nearby_stations, null);
+
+    if (history) {
+      cacheSet('history_' + currentHours, history);
+      lastHistory = history;
+    }
     if (lastHistory) renderChart(lastHistory, currentField, currentHours);
+    renderTodayContext(current, lastHistory);
   } catch (e) {
     console.error('Refresh failed:', e);
   }
@@ -558,10 +677,15 @@ document.querySelectorAll('.range-btn').forEach(btn => {
     document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentHours = parseInt(btn.dataset.hours, 10);
-    lastHistory = null;
-    const history = await fetchHistory(currentHours);
-    lastHistory = history;
-    renderChart(lastHistory, currentField, currentHours);
+    // Show cached range immediately if available
+    const cached = cacheGet('history_' + currentHours);
+    if (cached) { lastHistory = cached; renderChart(lastHistory, currentField, currentHours); }
+    try {
+      const history = await fetchHistory(currentHours);
+      cacheSet('history_' + currentHours, history);
+      lastHistory = history;
+      renderChart(lastHistory, currentField, currentHours);
+    } catch (e) { console.error('Range fetch failed:', e); }
   });
 });
 
@@ -595,7 +719,87 @@ function enableMobileTooltip(el) {
 document.getElementById('anomaly-headline') && enableMobileTooltip(document.getElementById('anomaly-headline'));
 document.querySelectorAll('.has-tooltip').forEach(enableMobileTooltip);
 
+// ── KPI card click-ins ────────────────────────────────────────────────────────
+document.querySelectorAll('.card[data-chart-field]').forEach(card => {
+  card.addEventListener('click', () => {
+    const field = card.dataset.chartField;
+    document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.chart-btn[data-field="${field}"]`);
+    if (btn) btn.classList.add('active');
+    currentField = field;
+    if (lastHistory) renderChart(lastHistory, currentField, currentHours);
+    document.querySelector('.chart-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+document.querySelectorAll('.card[data-scroll-to]').forEach(card => {
+  card.addEventListener('click', () => {
+    const el = document.getElementById(card.dataset.scrollTo);
+    if (el && !el.hidden) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
-refresh(true);
-loadSecondaryData();
+let _bootCurrent = null;
+
+async function boot() {
+  // Phase 0 — paint from cache instantly (0ms on repeat visits)
+  const cc = cacheGet('current');
+  const ch = cacheGet('history_' + currentHours);
+  if (cc) {
+    _bootCurrent = cc;
+    renderCurrent(cc);
+    renderTomorrow(cc.nws_tomorrow, cc.wk_attribution);
+    renderSummary(cc.daily_summary);
+    renderStationRecords(cc.station_records);
+    renderNearby(cc.nearby_stations, null);
+  }
+  if (ch) {
+    lastHistory = ch;
+    renderChart(ch, currentField, currentHours);
+    if (cc) renderTodayContext(cc, ch);
+  }
+
+  // Phase 1 — fetch current + history in parallel (not sequential)
+  const [rCur, rHist] = await Promise.allSettled([
+    fetchCurrent(),
+    fetchHistory(currentHours),
+  ]);
+
+  if (rCur.status === 'fulfilled') {
+    const cur = rCur.value;
+    cacheSet('current', cur);
+    _bootCurrent = cur;
+    renderCurrent(cur);
+    renderTomorrow(cur.nws_tomorrow, cur.wk_attribution);
+    renderSummary(cur.daily_summary);
+    renderStationRecords(cur.station_records);
+    renderNearby(cur.nearby_stations, null);
+  } else {
+    console.error('Current fetch failed:', rCur.reason);
+  }
+
+  if (rHist.status === 'fulfilled') {
+    const hist = rHist.value;
+    cacheSet('history_' + currentHours, hist);
+    lastHistory = hist;
+    renderChart(hist, currentField, currentHours);
+    if (_bootCurrent) renderTodayContext(_bootCurrent, lastHistory);
+  } else {
+    console.error('History fetch failed:', rHist.reason);
+  }
+
+  // Phase 2 — secondary data (rain events + calendar), also cached
+  loadSecondaryData();
+}
+boot();
 setInterval(refresh, REFRESH_MS);
+
+// Scroll reveal
+(function initScrollReveal() {
+  if (!('IntersectionObserver' in window)) return;
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.sr').forEach(el => obs.observe(el));
+})();

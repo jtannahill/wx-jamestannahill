@@ -9,6 +9,9 @@
   <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="canonical" href="https://wx.jamestannahill.com">
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <!-- Open Graph -->
   <meta property="og:site_name" content="wx.jamestannahill.com">
   <meta property="og:title" content="wx.jamestannahill.com — Midtown Manhattan Weather">
@@ -32,21 +35,69 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "wx.jamestannahill.com",
-    "url": "https://wx.jamestannahill.com",
-    "description": "Live hyperlocal weather data from a private station in Midtown Manhattan, New York",
-    "author": {
-      "@type": "Person",
-      "name": "James Tannahill",
-      "url": "https://www.jamestannahill.com"
-    }
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://wx.jamestannahill.com/#website",
+        "name": "wx.jamestannahill.com",
+        "url": "https://wx.jamestannahill.com",
+        "description": "Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes.",
+        "author": { "@id": "https://wx.jamestannahill.com/#person" }
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://wx.jamestannahill.com/#app",
+        "name": "wx.jamestannahill.com Weather Dashboard",
+        "url": "https://wx.jamestannahill.com",
+        "applicationCategory": "WeatherApplication",
+        "operatingSystem": "Web",
+        "description": "Real-time personal weather station dashboard for Midtown Manhattan. Live temperature, humidity, wind, pressure, UV, rainfall, comfort score, rain probability, urban heat island delta, analog forecast, and 30-day station records.",
+        "author": { "@id": "https://wx.jamestannahill.com/#person" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      },
+      {
+        "@type": "Dataset",
+        "@id": "https://wx.jamestannahill.com/#dataset",
+        "name": "Midtown Manhattan Hyperlocal Weather Data",
+        "description": "5-minute resolution personal weather station data from Midtown Manhattan (40.75°N 73.98°W). Fields: temperature, humidity, wind speed/direction/gust, barometric pressure, UV index, solar radiation, hourly/daily rainfall, dew point, feels-like, comfort score, rain probability, urban heat island delta.",
+        "url": "https://api.wx.jamestannahill.com/current",
+        "spatialCoverage": {
+          "@type": "Place",
+          "name": "Midtown Manhattan, New York",
+          "geo": { "@type": "GeoCoordinates", "latitude": 40.75, "longitude": -73.98 }
+        },
+        "temporalCoverage": "2024/..",
+        "measurementTechnique": "Personal Weather Station (Ambient Weather KNYNEWYO2140)",
+        "creator": { "@id": "https://wx.jamestannahill.com/#person" },
+        "license": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      {
+        "@type": "Person",
+        "@id": "https://wx.jamestannahill.com/#person",
+        "name": "James Tannahill",
+        "url": "https://jamestannahill.com"
+      }
+    ]
   }
   </script>
-  <!-- Sitemap reference -->
-  <link rel="sitemap" type="application/xml" href="/sitemap-index.xml">
+  <!-- Sitemap + AI discoverability -->
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+  <link rel="ai" href="/llms.txt">
+  <!-- Resource hints — start connections before the parser reaches them -->
+  <link rel="preconnect" href="https://fonts.jamestannahill.com" crossorigin>
+  <link rel="preconnect" href="https://api.wx.jamestannahill.com" crossorigin>
+  <!-- Font CSS loaded as a first-class link (avoids @import blocking penalty) -->
+  <link rel="stylesheet" href="https://fonts.jamestannahill.com/nhg-display.css">
+  <link rel="stylesheet" href="uplot.min.css">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WRDEHD4QYL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WRDEHD4QYL');
+  </script>
 </head>
 <body>
   <main>
@@ -71,23 +122,46 @@
       <div class="percentile-rank" id="percentile-rank"></div>
     </section>
 
+    <section class="summary-section tomorrow-section" id="tomorrow-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" id="tomorrow-date" style="margin:0"></p>
+        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" style="display:inline-flex;align-items:center;gap:5px" data-tooltip="Apple WeatherKit — daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">WEATHERKIT</span>
+      </div>
+      <p class="summary-text" id="tomorrow-text"></p>
+    </section>
+
+    <section class="summary-section today-section" id="today-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" style="margin:0">TODAY <span class="live-dot"></span></p>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
+      <p class="summary-text" id="today-text"></p>
+    </section>
+
     <section class="summary-section" id="summary-section" hidden>
-      <p class="summary-date" id="summary-date"></p>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" id="summary-date" style="margin:0"></p>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
       <p class="summary-text" id="summary-text"></p>
     </section>
 
-    <section class="conditions-grid">
-      <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</span>
+      <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+    </div>
+    <section class="conditions-grid sr">
+      <div class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND</div>
         <div class="card-value" id="wind-speed">—</div>
         <div class="card-sub" id="wind-detail">—</div>
       </div>
-      <div class="card">
+      <div class="card card-clickable" data-chart-field="humidity">
         <div class="card-label">HUMIDITY</div>
         <div class="card-value" id="humidity">—</div>
         <div class="card-sub" id="dewpoint">Dew point —°F</div>
       </div>
-      <div class="card">
+      <div class="card card-clickable" data-chart-field="baromrelin">
         <div class="card-label">PRESSURE</div>
         <div class="card-value" id="pressure">—</div>
         <div class="card-sub" id="pressure-trend">—</div>
@@ -97,12 +171,12 @@
         <div class="card-value" id="uv">—</div>
         <div class="card-sub" id="solar">— W/m²</div>
       </div>
-      <div class="card">
+      <div class="card card-clickable" data-scroll-to="rain-events-section">
         <div class="card-label">RAINFALL</div>
         <div class="card-value" id="rain-hourly">—</div>
         <div class="card-sub" id="rain-daily">Daily: —"</div>
       </div>
-      <div class="card">
+      <div class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND GUST</div>
         <div class="card-value" id="wind-gust">—</div>
         <div class="card-sub" id="wind-dir">—</div>
@@ -117,39 +191,55 @@
         <div class="card-value" id="rain-prob">—</div>
         <div class="card-sub" id="rain-prob-label">—</div>
       </div>
-      <div class="card">
-        <div class="card-label has-tooltip" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
+      <div class="card card-clickable" data-chart-field="uhi_delta">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div class="card-label has-tooltip" style="margin-bottom:0" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
+          <span class="source-tag source-external" style="font-size:8px;padding:1px 5px">NOAA</span>
+        </div>
         <div class="card-value" id="uhi-delta">—</div>
         <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
         <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px;color:#555"></div>
       </div>
     </section>
 
-    <section class="comfort-calendar-section" id="comfort-calendar-section" hidden>
+    <section class="comfort-calendar-section sr" id="comfort-calendar-section" hidden>
       <div class="section-header">
         <span class="section-title">COMFORT CALENDAR</span>
-        <span class="section-meta" id="comfort-meta">30-day history</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="comfort-meta">30-day history</span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+        </div>
       </div>
       <div class="comfort-grid" id="comfort-grid"></div>
     </section>
 
-    <section class="forecast-section" id="forecast-section" hidden>
+    <section class="forecast-section sr" id="forecast-section" hidden>
       <div class="forecast-header">
         <span class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</span>
-        <span class="forecast-meta" id="forecast-meta"></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="forecast-meta" id="forecast-meta"></span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+        </div>
       </div>
       <div class="forecast-grid" id="forecast-grid"></div>
     </section>
 
-    <section class="records-section" id="records-section" hidden>
+    <section class="records-section sr" id="records-section" hidden>
       <div class="section-header">
         <span class="section-title">STATION RECORDS</span>
-        <span class="section-meta" id="records-month"></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="records-month"></span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        </div>
       </div>
       <div class="records-grid" id="records-grid"></div>
     </section>
 
     <section class="chart-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
       <div class="chart-controls">
         <div class="chart-controls-row">
           <button class="chart-btn active" data-field="tempf">Temperature</button>
@@ -164,19 +254,25 @@
           <button class="range-btn" data-hours="720">30d</button>
         </div>
       </div>
-      <canvas id="wx-chart" height="80"></canvas>
+      <div id="wx-chart-wrap" class="wx-chart-wrap"></div>
     </section>
 
-    <section class="rain-events-section" id="rain-events-section" hidden>
-      <div class="section-title">RECENT RAIN EVENTS</div>
+    <section class="rain-events-section sr" id="rain-events-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span class="section-title" style="margin-bottom:0">RECENT RAIN EVENTS</span>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
       <table class="rain-events-table" id="rain-events-table"></table>
     </section>
 
     <!-- Nearby Stations -->
-    <section class="nearby-section" id="nearby-section" style="display:none">
+    <section class="nearby-section sr" id="nearby-section" style="display:none">
       <div class="section-header">
         <span class="section-title">NEARBY STATIONS</span>
-        <span class="section-meta" id="nearby-meta"></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="nearby-meta"></span>
+          <span class="source-tag source-external">AMBIENT NETWORK</span>
+        </div>
       </div>
       <div class="nearby-strip" id="nearby-strip"></div>
     </section>
@@ -186,6 +282,7 @@
       <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> &nbsp;·&nbsp; <a href="/docs.html">How It Works</a></p>
     </footer>
   </main>
+  <script src="uplot.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

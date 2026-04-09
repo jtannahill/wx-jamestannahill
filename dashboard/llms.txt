@@ -1,0 +1,34 @@
+# wx.jamestannahill.com
+
+> Live hyperlocal weather data from a private personal weather station in Midtown Manhattan, New York. Updated every 5 minutes.
+
+## What this is
+
+wx.jamestannahill.com is a personal weather station dashboard operated by James Tannahill at 40.75°N 73.98°W (Midtown Manhattan, New York). The station (Ambient Weather KNYNEWYO2140, callsign CatHouz) reports temperature, humidity, wind speed and direction, barometric pressure, UV index, solar radiation, and rainfall every 5 minutes.
+
+The dashboard includes derived metrics not available from commercial weather services: a Microclimate Comfort Score, next-hour rain probability via logistic regression on station data, Urban Heat Island delta vs. JFK/LGA/EWR airports, a nearest-neighbor Analog Forecast engine, and 30-day station records.
+
+## Data sources
+
+- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHouz) — private PWS, Midtown Manhattan
+- **Urban Heat Island**: NOAA ASOS readings from JFK, LGA, and EWR via aviationweather.gov
+- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W — condition, high/low, wind
+
+## API
+
+**Base URL**: https://api.wx.jamestannahill.com
+
+- `GET /current` — Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, comfort_score, rain_prob, uhi_delta, dateutc.
+- `GET /history?hours=24` — Historical readings. hours param: 24, 168 (7d), 720 (30d).
+- `GET /forecast` — Analog forecast (nearest-neighbor pattern match on 90 days of 5-min data).
+- `GET /records` — Station records by month.
+- `GET /summary` — AI-generated plain-language weather summary for today and tomorrow.
+
+## Pages
+
+- [Dashboard](https://wx.jamestannahill.com/) — Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events
+- [How It Works](https://wx.jamestannahill.com/docs.html) — Technical documentation on data collection, processing pipeline, ML models, and the public API
+
+## About the operator
+
+James Tannahill — jamestannahill.com

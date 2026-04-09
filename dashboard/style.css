@@ -1,5 +1,3 @@
-@import url('https://fonts.jamestannahill.com/nhg-display.css');
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -67,14 +65,15 @@ header {
 .has-tooltip::after,
 .anomaly-headline[data-tooltip]::after {
   content: attr(data-tooltip);
-  position: absolute; left: 0; top: calc(100% + 6px);
-  background: #1c1c1c; border: 1px solid #333;
-  color: #999; font-size: 11px; font-style: normal; font-weight: 400;
-  letter-spacing: 0.03em; white-space: normal;
-  max-width: min(300px, 88vw);
-  padding: 8px 12px; pointer-events: none;
+  position: absolute; left: 0; top: calc(100% + 8px);
+  background: #161616; border: 1px solid #2e2e2e;
+  color: #888; font-size: 11.5px; font-style: normal; font-weight: 400;
+  font-family: var(--font); letter-spacing: 0.025em; white-space: normal;
+  max-width: min(320px, 90vw);
+  padding: 10px 14px; pointer-events: none;
   opacity: 0; transition: opacity 0.15s; z-index: 100;
-  line-height: 1.55;
+  line-height: 1.65;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
 .has-tooltip:hover::after,
 .has-tooltip.tooltip-active::after,
@@ -92,6 +91,9 @@ header {
 .card-label { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 12px; }
 .card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; }
 .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.card-clickable { cursor: pointer; transition: border-top-color 0.15s, background 0.15s; }
+.card-clickable:hover { border-top-color: var(--anomaly); background: #161616; }
 
 .forecast-section { margin-bottom: 48px; }
 .forecast-header {
@@ -114,6 +116,8 @@ header {
   background: none; border: 1px solid var(--border); color: var(--muted);
   padding: 6px 14px; font-family: var(--font); font-size: 12px;
   letter-spacing: 0.08em; cursor: pointer; transition: all 0.15s;
+  /* larger touch target on mobile */
+  min-height: 36px;
 }
 .chart-btn:hover, .chart-btn.active,
 .range-btn:hover, .range-btn.active {
@@ -121,6 +125,42 @@ header {
 }
 .range-row { margin-top: 2px; }
 .range-btn { padding: 4px 10px; font-size: 11px; }
+
+/* ── uPlot chart wrap ────────────────────────────────────────────────────── */
+.wx-chart-wrap {
+  width: 100%;
+  background: #0e0e0e;
+  border: 1px solid var(--border);
+  padding: 16px 4px 8px;
+}
+.wx-chart-wrap .u-wrap { width: 100% !important; }
+.wx-chart-wrap canvas  { display: block; }
+
+/* ── Chart tooltip ───────────────────────────────────────────────────────── */
+.wx-tooltip {
+  position: absolute;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  padding: 10px 14px;
+  font-family: var(--font);
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.04em;
+  line-height: 1.85;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.wx-tooltip .wxt-time {
+  font-size: 10px;
+  color: var(--anomaly);
+  letter-spacing: 0.1em;
+  margin-bottom: 3px;
+}
+.wx-tooltip .wxt-active {
+  color: var(--text);
+}
 
 /* ── Section header (shared) ─────────────────────────────────────────────── */
 .section-header {
@@ -130,16 +170,26 @@ header {
 .section-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
 .section-meta  { font-size: 11px; color: #444; }
 
-/* ── Yesterday's summary ─────────────────────────────────────────────────── */
+/* ── Today / Yesterday summaries ─────────────────────────────────────────── */
 .summary-section {
   border-left: 2px solid var(--border);
   padding: 12px 18px;
   margin-bottom: 48px;
 }
+.tomorrow-section { border-left-color: #5a8aad; margin-bottom: 20px; }
+.tomorrow-section .summary-date { color: #5a8aad; }
+.today-section { border-left-color: var(--anomaly); margin-bottom: 20px; }
 .summary-date {
   font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; font-weight: 500;
 }
 .summary-text { font-size: 14px; color: #aaa; line-height: 1.7; }
+
+.live-dot {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--anomaly); vertical-align: middle; margin-left: 5px;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
 /* ── Comfort Calendar ────────────────────────────────────────────────────── */
 .comfort-calendar-section { margin-bottom: 48px; }
@@ -203,6 +253,22 @@ header {
 .nearby-chip-rain { font-size: 11px; color: #6aaa6a; margin-top: 3px; }
 .nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
+/* ── Source tags ─────────────────────────────────────────────────────────── */
+.source-tag {
+  font-size: 9px; letter-spacing: 0.12em; color: #3a3a3a;
+  font-weight: 500; text-transform: uppercase;
+  border: 1px solid #222; padding: 2px 7px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.source-tag.source-external { color: #4a5a6a; border-color: #2a3540; }
+
+/* section-header already has flex; source-tag goes on the right */
+.section-source-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.section-source-row .section-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
+
 footer { border-top: 1px solid var(--border); padding-top: 24px; }
 footer p { font-size: 12px; color: var(--muted); line-height: 1.8; }
 footer a { color: var(--muted); text-decoration: underline; }
@@ -215,4 +281,18 @@ footer a { color: var(--muted); text-decoration: underline; }
   .temp { font-size: 80px; }
   .card-value { font-size: 26px; }
   header { flex-wrap: wrap; gap: 8px; }
+}
+
+/* Scroll reveal */
+.sr { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.sr.visible { opacity: 1; transform: translateY(0); }
+/* View transitions */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: 200ms ease both wx-fade-out; }
+::view-transition-new(root) { animation: 280ms ease both wx-fade-in; }
+@keyframes wx-fade-out { to { opacity: 0; } }
+@keyframes wx-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+  .sr { opacity: 1; transform: none; }
 }
