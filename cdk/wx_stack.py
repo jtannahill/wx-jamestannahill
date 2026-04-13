@@ -263,6 +263,26 @@ class WxStack(Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
+        # --- Climate DOY table (NOAA GHCN-Daily per calendar date, 366 rows) ---
+        self.climate_doy_table = dynamodb.Table(
+            self, "WxClimateDoy",
+            table_name="wx-climate-doy",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="doy", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Climate hourly table (ERA5 per DOY×hour, ~8784 rows) ---
+        self.climate_hourly_table = dynamodb.Table(
+            self, "WxClimateHourly",
+            table_name="wx-climate-hourly",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="doy_hour", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
         # --- Summarizer Lambda (daily at 05:00 UTC = midnight ET) ---
         self.summarizer_fn = make_lambda(
             "WxSummarizer", "wx_summarizer.handler",
