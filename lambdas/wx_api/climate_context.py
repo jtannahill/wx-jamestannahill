@@ -158,6 +158,9 @@ def daily_verdict(
             "last_exceeded_year":  last_exceeded,
             "label":               label,
             "years_of_data":       years_of_data,
+            "p5":   round(float(doy_stats["p5_tmax"]),  1) if doy_stats.get("p5_tmax")  is not None else None,
+            "p50":  round(float(doy_stats["p50_tmax"]), 1) if doy_stats.get("p50_tmax") is not None else None,
+            "p95":  round(float(doy_stats["p95_tmax"]), 1) if doy_stats.get("p95_tmax") is not None else None,
         }
 
     # ── Temperature low ───────────────────────────────────────────────────────
@@ -182,6 +185,9 @@ def daily_verdict(
             result["temp_low"] = {
                 "value":              round(today_low, 1),
                 "percentile":         pct,
+                "p5":   round(float(doy_stats["p5_tmin"]),  1) if doy_stats.get("p5_tmin")  is not None else None,
+                "p50":  round(float(doy_stats["p50_tmin"]), 1) if doy_stats.get("p50_tmin") is not None else None,
+                "p95":  round(float(doy_stats["p95_tmin"]), 1) if doy_stats.get("p95_tmin") is not None else None,
                 "last_exceeded_year": last_exceeded_low,
                 "label":              label_low,
                 "years_of_data":      years_of_data,

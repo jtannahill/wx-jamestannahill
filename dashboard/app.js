@@ -534,26 +534,47 @@ function renderClimatePanel(data) {
     // Daily verdict: high temp, low temp from NOAA
     const verdict = cc.verdict;
     const rows = [
-      { key: 'temp_high',  label: 'High Temp',  unit: '°F', color: COLORS.temp },
-      { key: 'temp_low',   label: 'Low Temp',   unit: '°F', color: '#4ab8e8' },
+      { key: 'temp_high', label: 'High Temp', unit: '°F', color: COLORS.temp },
+      { key: 'temp_low',  label: 'Low Temp',  unit: '°F', color: '#4ab8e8' },
     ];
     rows.forEach(({ key, label, unit, color }) => {
       const m = verdict[key];
       if (!m) return;
       const pct   = m.percentile;
-      const since = m.last_exceeded_year ? `· since ${m.last_exceeded_year}` : '· on record';
+      const since = m.last_exceeded_year ? `since ${m.last_exceeded_year}` : 'on record';
+
+      // Deviation bar: track spans p5→max(p95, value)+buffer; fill from avg→today
+      let barHtml = '';
+      if (m.p5 != null && m.p50 != null && m.p95 != null) {
+        const trackMin = m.p5;
+        const trackMax = Math.max(m.p95, m.value) * 1.03;
+        const span     = trackMax - trackMin;
+        const avgPct   = Math.max(0, Math.min(98, (m.p50  - trackMin) / span * 100));
+        const todayPct = Math.max(2, Math.min(99, (m.value - trackMin) / span * 100));
+        const fillLeft  = Math.min(avgPct, todayPct);
+        const fillWidth = Math.abs(todayPct - avgPct);
+        barHtml = `
+          <div class="dev-bar">
+            <div class="dev-bar-axis-labels">
+              <span style="left:${avgPct}%">avg ${m.p50}°</span>
+              <span style="left:${todayPct}%" class="dev-bar-today-label">${m.value}°</span>
+            </div>
+            <div class="dev-bar-track">
+              <div class="dev-bar-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${color}20;border-right:2px solid ${color}"></div>
+              <div class="dev-bar-avg-tick" style="left:${avgPct}%"></div>
+            </div>
+          </div>`;
+      }
+
       container.innerHTML += `
         <div class="climate-metric">
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
             <span class="climate-metric-value" style="color:${color}">${m.value}${unit}
-              <span class="climate-metric-pct">${pct}th pct ${since}</span>
+              <span class="climate-metric-pct">${pct}th pct · ${since}</span>
             </span>
           </div>
-          <div class="climate-bar-track">
-            <div class="climate-bar-fill" style="width:${pct}%;background:${color}"></div>
-            <div class="climate-bar-marker" style="left:${pct}%;background:${color}"></div>
-          </div>
+          ${barHtml}
         </div>`;
     });
 
@@ -567,9 +588,6 @@ function renderClimatePanel(data) {
             <span class="climate-metric-value" style="color:#4ab8e8">${dp.value}°F
               <span class="climate-metric-pct">${dp.percentile}th pct</span>
             </span>
-          </div>
-          <div class="climate-bar-track">
-            <div class="climate-bar-fill" style="width:${dp.percentile}%;background:#4ab8e8"></div>
           </div>
         </div>`;
     }
