@@ -246,37 +246,67 @@ function makeTooltipPlugin(readings, hours, activeField) {
   };
 }
 
-function makeBgPlugin(baseData) {
+function makeDrawPlugin(tsArr, baseArr, upperArr, lowerArr) {
   return {
     hooks: {
       drawClear: [u => {
-        const { ctx, bbox } = u;
-        ctx.save();
-        ctx.fillStyle = '#0e0e0e';
-        ctx.fillRect(bbox.left, bbox.top, bbox.width, bbox.height);
-        ctx.restore();
+        try {
+          const { ctx, bbox } = u;
+          ctx.save();
+          ctx.fillStyle = '#0e0e0e';
+          ctx.fillRect(bbox.left, bbox.top, bbox.width, bbox.height);
+          ctx.restore();
+        } catch(e) { console.warn('[drawClear]', e); }
       }],
       draw: [u => {
-        // Draw baseline as dashed line (series 4 data = index 4)
-        const xs   = u.data[0];
-        const base = u.data[4];
-        if (!xs || !base) return;
-        const { ctx, bbox } = u;
-        ctx.save();
-        ctx.setLineDash([4, 6]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.20)';
-        ctx.lineWidth   = 1;
-        ctx.beginPath();
-        let started = false;
-        for (let i = 0; i < xs.length; i++) {
-          if (base[i] == null) { started = false; continue; }
-          const px = Math.round(u.valToPos(xs[i],    'x', true));
-          const py = Math.round(u.valToPos(base[i],  'y', true));
-          if (!started) { ctx.moveTo(px, py); started = true; }
-          else           ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-        ctx.restore();
+        try {
+          const { ctx } = u;
+          ctx.save();
+
+          // σ band fill: trace upper forward, lower backward, fill closed path
+          const hasUpper = upperArr && upperArr.some(v => v != null);
+          const hasLower = lowerArr && lowerArr.some(v => v != null);
+          if (hasUpper && hasLower) {
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i < tsArr.length; i++) {
+              if (upperArr[i] == null) { started = false; continue; }
+              const px = Math.round(u.valToPos(tsArr[i],    'x', true));
+              const py = Math.round(u.valToPos(upperArr[i], 'y', true));
+              if (!started) { ctx.moveTo(px, py); started = true; }
+              else            ctx.lineTo(px, py);
+            }
+            for (let i = tsArr.length - 1; i >= 0; i--) {
+              if (lowerArr[i] == null) continue;
+              const px = Math.round(u.valToPos(tsArr[i],    'x', true));
+              const py = Math.round(u.valToPos(lowerArr[i], 'y', true));
+              ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(110,120,150,0.09)';
+            ctx.fill();
+          }
+
+          // Dashed baseline
+          const hasBase = baseArr && baseArr.some(v => v != null);
+          if (hasBase) {
+            ctx.setLineDash([4, 6]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+            ctx.lineWidth   = 1;
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i < tsArr.length; i++) {
+              if (baseArr[i] == null) { started = false; continue; }
+              const px = Math.round(u.valToPos(tsArr[i],   'x', true));
+              const py = Math.round(u.valToPos(baseArr[i], 'y', true));
+              if (!started) { ctx.moveTo(px, py); started = true; }
+              else           ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        } catch(e) { console.warn('[draw]', e); }
       }],
     }
   };
@@ -310,114 +340,94 @@ function makeNowLinePlugin() {
 
 function renderChart(history, field, hours) {
   if (!history?.readings?.length) return;
-  // Defer one frame so the browser has laid out the page before uPlot measures clientWidth
-  requestAnimationFrame(() => _renderChart(history, field, hours));
+  setTimeout(() => _renderChart(history, field, hours), 50);
 }
 
 function _renderChart(history, field, hours) {
+  const wrap = document.getElementById('wx-chart-wrap');
+  const dbg  = document.getElementById('wx-chart-status');
   const cfg      = FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 };
   const readings = history.readings;
-  const wrap     = document.getElementById('wx-chart-wrap');
 
-  // Columnar data arrays (uPlot format)
   const ts      = readings.map(r => new Date(r.timestamp).getTime() / 1000);
   const vals    = readings.map(r => r[field] ?? null);
   const base    = readings.map(r => r[`baseline_${field}`] ?? null);
   const upper   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b+s : null; });
   const lower   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b-s : null; });
   const rain    = readings.map(r => r.hourlyrainin ?? null);
-  const maxRain = Math.max(...rain.filter(v => v != null), 0.01);
+  const maxRain = Math.max(0.01, ...rain.filter(v => v != null && isFinite(v)));
 
   if (uplot) { uplot.destroy(); uplot = null; }
+  wrap.innerHTML = '';
 
-  const W = wrap.clientWidth || (window.innerWidth - 48);
+  // Show/hide legend rows based on available data
+  const hasBaseline = base.some(v => v != null);
+  const hasRain     = rain.some(v => v != null && v > 0);
+  const legend = document.getElementById('wx-chart-legend');
+  if (legend) {
+    legend.querySelectorAll('.chart-legend-item').forEach(el => {
+      const sw = el.querySelector('.chart-legend-swatch');
+      if (!sw) return;
+      if (sw.classList.contains('swatch-baseline') || sw.classList.contains('swatch-band'))
+        el.style.display = hasBaseline ? '' : 'none';
+      if (sw.classList.contains('swatch-rain'))
+        el.style.display = hasRain ? '' : 'none';
+    });
+    legend.style.display = '';
+  }
 
-  uplot = new uPlot({
-    width:  W,
-    height: window.innerWidth < 480 ? 180 : 220,
-    cursor: {
-      y:    false,
-      drag: { x: false, y: false },
-      points: { size: 0 },
-    },
-    legend: { show: false },
-    axes: [
-      {
-        // x — time
-        stroke: '#666',
-        ticks:  { stroke: '#252525', width: 1, size: 4 },
-        grid:   { stroke: '#1e1e1e', width: 1 },
-        values: (u, ticks) => ticks.map(v => {
-          if (v == null) return null;
-          const d = new Date(v * 1000);
-          if (hours > 24) return `${d.getMonth()+1}/${d.getDate()}`;
-          const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
-          return `${h===0?12:h>12?h-12:h}${ap}`;
-        }),
-        font:  '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
-        size:  28,
-        gap:   6,
-      },
-      {
-        // y — main field
-        stroke: '#666',
-        ticks:  { stroke: '#252525', width: 1, size: 4 },
-        grid:   { stroke: '#1e1e1e', width: 1 },
-        values: (u, ticks) => ticks.map(v => v != null ? `${Number(v).toFixed(cfg.decimals)}${cfg.unit}` : null),
-        font:   '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
-        size:   window.innerWidth < 480 ? 48 : 56,
-        gap:    6,
-      },
-      { show: false, scale: 'rain' },
-    ],
-    scales: {
-      x:    {},
-      y:    { auto: true },
-      rain: { range: [0, maxRain * 14] },
-    },
-    series: [
-      {},   // x timestamps
-      {
-        // 1 — main field line
-        stroke: '#c8b97a',
-        width:  2,
-        fill:   'rgba(200,185,122,0.08)',
-      },
-      {
-        // 2 — upper σ (band anchor — rendered transparent)
-        stroke: 'rgba(0,0,0,0)',
-        width:  0,
-        fill:   'rgba(0,0,0,0)',
-      },
-      {
-        // 3 — lower σ (band anchor — rendered transparent)
-        stroke: 'rgba(0,0,0,0)',
-        width:  0,
-        fill:   'rgba(0,0,0,0)',
-      },
-      {
-        // 4 — baseline (drawn dashed via plugin, series itself invisible)
-        stroke: 'rgba(0,0,0,0)',
-        width:  0,
-        fill:   'rgba(0,0,0,0)',
-      },
-      {
-        // 5 — rain (subtle filled area on secondary scale)
-        scale:  'rain',
-        stroke: 'rgba(90,140,210,0.7)',
-        fill:   'rgba(90,140,210,0.20)',
-        width:  1,
-      },
-    ],
-    bands: [
-      { series: [2, 3], fill: 'rgba(110,120,150,0.09)' }
-    ],
-    plugins: [
-      makeBgPlugin(),
-      makeTooltipPlugin(readings, hours, field),
-      makeNowLinePlugin(),
-    ],
-  }, [ts, vals, upper, lower, base, rain], wrap);
+  const W = Math.max(100, wrap.clientWidth || (window.innerWidth - 48));
+  const H = window.innerWidth < 480 ? 180 : 220;
+
+  try {
+    uplot = new uPlot({
+      width:  W,
+      height: H,
+      cursor: { y: false, drag: { x: false, y: false }, points: { size: 0 } },
+      legend: { show: false },
+      axes: [
+        {
+          stroke: '#999',
+          ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
+          grid:   { stroke: '#1e1e1e', width: 1 },
+          values: (u, ticks) => ticks.map(v => {
+            if (v == null) return null;
+            const d = new Date(v * 1000);
+            if (hours > 24) return `${d.getMonth()+1}/${d.getDate()}`;
+            const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
+            return `${h===0?12:h>12?h-12:h}${ap}`;
+          }),
+          font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
+          size: 28, gap: 6,
+        },
+        {
+          stroke: '#999',
+          ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
+          grid:   { stroke: '#1e1e1e', width: 1 },
+          values: (u, ticks) => ticks.map(v => v != null ? `${Number(v).toFixed(cfg.decimals)}${cfg.unit}` : null),
+          font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
+          size: window.innerWidth < 480 ? 48 : 56, gap: 6,
+        },
+        { show: false, scale: 'rain' },
+      ],
+      scales: { x: {}, y: { auto: true }, rain: { range: [0, maxRain * 14] } },
+      series: [
+        {},
+        { stroke: '#c8b97a', width: 2, fill: 'rgba(200,185,122,0.08)' },
+        { scale: 'rain', stroke: 'rgba(90,140,210,0.7)', fill: 'rgba(90,140,210,0.20)', width: 1 },
+      ],
+      plugins: [
+        makeDrawPlugin(ts, base, upper, lower),
+        makeTooltipPlugin(readings, hours, field),
+        makeNowLinePlugin(),
+      ],
+    }, [ts, vals, rain], wrap);
+    if (dbg) dbg.textContent = '';
+  } catch (e) {
+    console.error('[wx chart]', e);
+    if (dbg) dbg.textContent = `ERR: ${e.message}`;
+    wrap.innerHTML = `<div style="color:#c8b97a;font-size:11px;letter-spacing:0.08em;padding:20px 16px">CHART ERROR — ${e.message}</div>`;
+  }
 }
 
 // Resize chart with window
@@ -526,8 +536,8 @@ function renderComfortCalendar(summaries) {
     </div>`;
   }).join('');
 
-  // Re-apply mobile tooltip to new elements
-  grid.querySelectorAll('.has-tooltip').forEach(enableMobileTooltip);
+  // Re-bind tooltip to dynamically created cells
+  grid.querySelectorAll('.has-tooltip').forEach(bindTip);
 
   const avg = Math.round(summaries.reduce((s, d) => s + (d.avg_comfort ?? 0), 0) / summaries.length);
   document.getElementById('comfort-meta').textContent = `${summaries.length}-day avg · ${avg}/100`;
@@ -696,28 +706,74 @@ refreshBtn.addEventListener('click', async () => {
   refreshBtn.classList.remove('spinning');
 });
 
-// Mobile tooltip: tap to show, tap outside to dismiss
-// Works for both .anomaly-headline[data-tooltip] and .has-tooltip elements
-function enableMobileTooltip(el) {
-  el.addEventListener('touchstart', e => {
-    if (!el.dataset.tooltip) return;
-    e.preventDefault();
-    const wasActive = el.classList.contains('tooltip-active');
-    document.querySelectorAll('.tooltip-active').forEach(t => t.classList.remove('tooltip-active'));
-    if (!wasActive) {
-      el.classList.add('tooltip-active');
-      const dismiss = ev => {
-        if (!el.contains(ev.target)) {
-          el.classList.remove('tooltip-active');
-          document.removeEventListener('touchstart', dismiss);
-        }
-      };
-      setTimeout(() => document.addEventListener('touchstart', dismiss), 0);
-    }
-  }, { passive: false });
+// ── Viewport-aware tooltip manager ───────────────────────────────────────────
+// Single fixed div — no overflow possible. Replaces CSS ::after approach.
+const _tipEl = document.createElement('div');
+_tipEl.id = 'wx-tip';
+_tipEl.style.display = 'none';
+document.body.appendChild(_tipEl);
+
+function _showTip(anchor) {
+  const text = anchor.dataset.tooltip;
+  if (!text) return;
+  _tipEl.textContent = text;
+  _tipEl._anchor = anchor;
+  _tipEl.style.display = 'block';
+
+  // getBoundingClientRect returns viewport coords — correct for position:fixed
+  const r   = anchor.getBoundingClientRect();
+  const tw  = _tipEl.offsetWidth;
+  const th  = _tipEl.offsetHeight;
+  const vw  = window.innerWidth;
+  const vh  = window.innerHeight;
+  const gap = 8;
+  const pad = 10;
+
+  // Prefer below anchor; flip above if bottom clips
+  let top = r.bottom + gap;
+  if (top + th > vh - pad) top = r.top - th - gap;
+  if (top < pad) top = pad;
+
+  // Left-align with anchor; shift if right clips; clamp to left edge
+  let left = r.left;
+  if (left + tw > vw - pad) left = vw - tw - pad;
+  if (left < pad) left = pad;
+
+  _tipEl.style.left = left + 'px';
+  _tipEl.style.top  = top  + 'px';
 }
-document.getElementById('anomaly-headline') && enableMobileTooltip(document.getElementById('anomaly-headline'));
-document.querySelectorAll('.has-tooltip').forEach(enableMobileTooltip);
+
+function _hideTip() {
+  _tipEl.style.display = 'none';
+  _tipEl._anchor = null;
+}
+
+function bindTip(el) {
+  el.addEventListener('mouseenter', () => _showTip(el));
+  el.addEventListener('mouseleave', _hideTip);
+  // Touch: tap to show/dismiss — do NOT preventDefault so card clicks still fire
+  el.addEventListener('touchend', e => {
+    if (!el.dataset.tooltip) return;
+    const wasThis = _tipEl._anchor === el && _tipEl.style.display !== 'none';
+    _hideTip();
+    if (!wasThis) {
+      // Show after a short delay so the tap doesn't immediately dismiss via the doc listener
+      setTimeout(() => {
+        _showTip(el);
+        const dismiss = ev => {
+          if (!el.contains(ev.target)) {
+            _hideTip();
+            document.removeEventListener('touchstart', dismiss);
+          }
+        };
+        setTimeout(() => document.addEventListener('touchstart', dismiss), 50);
+      }, 0);
+    }
+  }, { passive: true });
+}
+
+document.getElementById('anomaly-headline') && bindTip(document.getElementById('anomaly-headline'));
+document.querySelectorAll('.has-tooltip').forEach(bindTip);
 
 // ── KPI card click-ins ────────────────────────────────────────────────────────
 document.querySelectorAll('.card[data-chart-field]').forEach(card => {

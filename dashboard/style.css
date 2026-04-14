@@ -13,7 +13,14 @@
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
 
-main { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+main {
+  max-width: 900px; margin: 0 auto;
+  padding: 40px 24px 80px;
+  /* Safe area insets for iPhone X+ notch / home indicator */
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  padding-bottom: max(80px, calc(40px + env(safe-area-inset-bottom)));
+}
 
 header {
   display: flex; justify-content: space-between; align-items: center;
@@ -23,11 +30,14 @@ header {
 .updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
 .refresh-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
-  font-size: 16px; width: 28px; height: 28px; cursor: pointer;
+  font-size: 16px; width: 44px; height: 44px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s; padding: 0; margin-left: 12px;
+  transition: border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+.refresh-btn:active { border-color: var(--accent); color: var(--accent); }
 .refresh-btn.spinning { animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -58,27 +68,27 @@ header {
 }
 
 /* Generic tooltip — apply class="has-tooltip" + data-tooltip="..." to any element */
-.has-tooltip {
-  position: relative;
-  cursor: help;
-}
-.has-tooltip::after,
-.anomaly-headline[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute; left: 0; top: calc(100% + 8px);
-  background: #161616; border: 1px solid #2e2e2e;
-  color: #888; font-size: 11.5px; font-style: normal; font-weight: 400;
-  font-family: var(--font); letter-spacing: 0.025em; white-space: normal;
-  max-width: min(320px, 90vw);
-  padding: 10px 14px; pointer-events: none;
-  opacity: 0; transition: opacity 0.15s; z-index: 100;
+.has-tooltip { cursor: help; }
+
+/* #wx-tip — JS-positioned floating tooltip (viewport-aware, no overflow) */
+#wx-tip {
+  position: fixed;
+  background: #161616;
+  border: 1px solid #2e2e2e;
+  color: #888;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 400;
+  font-family: var(--font);
+  letter-spacing: 0.025em;
+  white-space: normal;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 10px 14px;
+  pointer-events: none;
+  z-index: 9999;
   line-height: 1.65;
   box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
-.has-tooltip:hover::after,
-.has-tooltip.tooltip-active::after,
-.anomaly-headline[data-tooltip]:hover::after,
-.anomaly-headline[data-tooltip].tooltip-active::after { opacity: 1; }
 
 .conditions-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
@@ -92,8 +102,13 @@ header {
 .card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; }
 .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
-.card-clickable { cursor: pointer; transition: border-top-color 0.15s, background 0.15s; }
-.card-clickable:hover { border-top-color: var(--anomaly); background: #161616; }
+.card-clickable {
+  cursor: pointer;
+  transition: border-top-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.card-clickable:hover, .card-clickable:active { border-top-color: var(--anomaly); background: #161616; }
 
 .forecast-section { margin-bottom: 48px; }
 .forecast-header {
@@ -115,9 +130,10 @@ header {
 .chart-btn, .range-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   padding: 6px 14px; font-family: var(--font); font-size: 12px;
-  letter-spacing: 0.08em; cursor: pointer; transition: all 0.15s;
-  /* larger touch target on mobile */
-  min-height: 36px;
+  letter-spacing: 0.08em; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .chart-btn:hover, .chart-btn.active,
 .range-btn:hover, .range-btn.active {
@@ -131,10 +147,59 @@ header {
   width: 100%;
   background: #0e0e0e;
   border: 1px solid var(--border);
-  padding: 16px 4px 8px;
+  padding: 16px 0 8px;
+  overflow: hidden;
 }
-.wx-chart-wrap .u-wrap { width: 100% !important; }
-.wx-chart-wrap canvas  { display: block; }
+/* Let uPlot control canvas size via its width/height attributes, not CSS percentages */
+.wx-chart-wrap canvas {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* ── Chart legend ────────────────────────────────────────────────────────── */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 10px 16px 4px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: #0e0e0e;
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: #666;
+  white-space: nowrap;
+}
+.chart-legend-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+.swatch-observed  { background: #c8b97a; height: 2px; }
+.swatch-baseline  {
+  background: none;
+  border-top: 1.5px dashed rgba(255,255,255,0.35);
+  height: 0;
+}
+.swatch-band {
+  background: rgba(110,120,150,0.25);
+  height: 10px;
+  border-radius: 2px;
+}
+.swatch-rain {
+  background: rgba(90,140,210,0.55);
+  height: 8px;
+  border-radius: 2px;
+}
 
 /* ── Chart tooltip ───────────────────────────────────────────────────────── */
 .wx-tooltip {
@@ -277,10 +342,28 @@ footer a { color: var(--muted); text-decoration: underline; }
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }
   .forecast-grid   { grid-template-columns: repeat(1, 1fr); }
   .records-grid    { grid-template-columns: repeat(2, 1fr); }
-  .comfort-cell    { width: 32px; height: 32px; }
-  .temp { font-size: 80px; }
-  .card-value { font-size: 26px; }
-  header { flex-wrap: wrap; gap: 8px; }
+  .comfort-cell    { width: 30px; height: 30px; }
+  .temp            { font-size: clamp(72px, 20vw, 96px); }
+  .card-value      { font-size: 26px; }
+  .card            { padding: 18px 14px; }
+  /* Header: station label shrinks, refresh stays right */
+  header {
+    flex-wrap: nowrap; gap: 8px; align-items: center;
+    margin-bottom: 32px;
+  }
+  .station-label { font-size: 10px; letter-spacing: 0.1em; flex: 1; min-width: 0; }
+  .updated-at    { font-size: 10px; white-space: nowrap; }
+  /* Chart controls wrap nicely */
+  .chart-controls-row { gap: 6px; }
+  .chart-btn  { padding: 6px 10px; font-size: 11px; }
+  .range-btn  { padding: 6px 10px; font-size: 11px; }
+  /* Summary blocks: compact side border on small screens */
+  .summary-section { padding: 10px 14px; }
+  .summary-text { font-size: 13px; }
+  /* Rain table: keep columns readable */
+  .rain-events-table { font-size: 12px; }
+  .rain-events-table th + th,
+  .rain-events-table td + td { padding-left: 14px; }
 }
 
 /* Scroll reveal */

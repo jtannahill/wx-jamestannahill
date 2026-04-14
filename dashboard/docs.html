@@ -5,6 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>wx.jamestannahill.com — How It Works</title>
   <meta name="description" content="Technical documentation: how weather data is collected, processed, and served at wx.jamestannahill.com.">
+  <meta name="author" content="James Tannahill">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://wx.jamestannahill.com/docs.html">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="theme-color" content="#0a0a0a">
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="wx.jamestannahill.com">
+  <meta property="og:title" content="wx.jamestannahill.com — How It Works">
+  <meta property="og:description" content="Technical documentation: how weather data is collected, processed, and served at wx.jamestannahill.com.">
+  <meta property="og:image" content="https://wx.jamestannahill.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://wx.jamestannahill.com/docs.html">
+  <meta property="og:locale" content="en_US">
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="wx.jamestannahill.com — How It Works">
+  <meta name="twitter:description" content="Technical documentation: how weather data is collected, processed, and served at wx.jamestannahill.com.">
+  <meta name="twitter:image" content="https://wx.jamestannahill.com/og.png">
+  <meta name="twitter:creator" content="@jamestannahill">
+  <!-- Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "How It Works — wx.jamestannahill.com",
+    "description": "Technical documentation on the data collection, processing pipeline, ML models, and public API behind wx.jamestannahill.com.",
+    "url": "https://wx.jamestannahill.com/docs.html",
+    "author": { "@type": "Person", "name": "James Tannahill", "url": "https://jamestannahill.com" },
+    "isPartOf": { "@type": "WebSite", "name": "wx.jamestannahill.com", "url": "https://wx.jamestannahill.com" }
+  }
+  </script>
+  <!-- Sitemap + AI discoverability -->
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+  <link rel="ai" href="/llms.txt">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.jamestannahill.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.jamestannahill.com/nhg-display.css">
   <link rel="stylesheet" href="style.css">
   <style>
     .docs-body { max-width: 680px; }
@@ -54,7 +95,7 @@
     <hr class="divider">
 
     <h2>DATA COLLECTION</h2>
-    <p>The station is an <strong>Ambient Weather WS-2902</strong> mounted at the property. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway.</p>
+    <p>The station is an <a href="https://www.ambientweather.com/ws-2902" target="_blank" rel="noopener"><strong>Ambient Weather WS-2902</strong></a> mounted at the property. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway and is also registered with Weather Underground as <strong>KNYNEWYO2140</strong>. Live readings are visible at <a href="https://ambientweather.net/dashboard/4d5daff008263473b2bb72e0d64f5c35" target="_blank" rel="noopener">ambientweather.net</a> and <a href="https://preview.wunderground.com/dashboard/pws/KNYNEWYO2140" target="_blank" rel="noopener">wunderground.com/dashboard/pws/KNYNEWYO2140</a>.</p>
     <p>A scheduled AWS Lambda (<code>wx-poller</code>) fires every 5 minutes via EventBridge and calls the Ambient Weather REST API to fetch the latest reading:</p>
     <pre><code>GET https://api.ambientweather.net/v1/devices/{mac}
     ?apiKey=...&applicationKey=...&limit=1</code></pre>
@@ -261,7 +302,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <pre><code>new_var = (old_var × n + (x − old_mean) × (x − new_mean)) / (n + 1)</code></pre>
     <p>This allows variance to be updated in O(1) per reading without storing all historical values. Once the rolling sample count reaches 8,640 (30 days × 288 readings/day), the algorithm transitions to exponential moving average variance to prevent very old data from dominating:</p>
     <pre><code>new_var = (1 − α) × old_var + α × (x − old_mean)²</code></pre>
-    <p>The resulting <code>std_{field}</code> values are stored per MM-HH baseline slot and attached to history readings by the API. The dashboard renders the band as a transparent fill between the upper and lower edges using Chart.js's <code>fill: '+1'</code> dataset pairing.</p>
+    <p>The resulting <code>std_{field}</code> values are stored per MM-HH baseline slot and attached to history readings by the API. The dashboard renders the band as a transparent fill between the upper and lower edges using uPlot's <code>bands</code> config, anchored to the upper and lower σ series.</p>
 
     <hr class="divider">
 

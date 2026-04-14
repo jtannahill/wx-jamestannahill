@@ -1,4 +1,5 @@
 import os, json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from decimal import Decimal
@@ -10,6 +11,7 @@ from wx_api.anomaly import compute_anomalies, pressure_trend, condition_label, p
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
 from wx_api.nearby import nearby_route, _fetch_nearby_snapshot
+from wx_api.weatherkit import fetch_tomorrow_forecast as _wk_fetch, fetch_attribution as _wk_attr
 from boto3.dynamodb.conditions import Key
 
 READINGS_TABLE     = os.environ.get('READINGS_TABLE',     'wx-readings')
@@ -107,16 +109,39 @@ def _current():
     label     = condition_label(reading)
     baseline_source = baseline.get('source', 'none') if baseline else 'none'
 
-    # ML signals
-    uhi             = fetch_uhi(reading['tempf']) if reading.get('tempf') is not None else {}
-    comfort         = comfort_score(reading, baseline, local_now.month)
-    pct_rank        = percentile_rank(reading, baseline, local_now.month) if baseline else None
-    nearby          = _fetch_nearby_snapshot(mac)
-    rain_prob       = rain_probability(reading, recent, nearby)
-    forecast        = _fetch_forecast(mac)
-    uhi_seasonal    = _fetch_uhi_seasonal(mac)
-    station_records = _fetch_station_records(mac, local_now.month)
-    daily_summary   = _fetch_latest_summary(mac)
+    # ML signals — run all independent I/O in parallel
+    comfort  = comfort_score(reading, baseline, local_now.month)
+    pct_rank = percentile_rank(reading, baseline, local_now.month) if baseline else None
+
+    def _get_uhi():
+        return fetch_uhi(reading['tempf']) if reading.get('tempf') is not None else {}
+
+    def _get_wk():
+        try:
+            creds = get_secret('weatherkit/credentials')
+            return _wk_fetch(creds), _wk_attr(creds)
+        except Exception as e:
+            print(f"WeatherKit fetch failed (non-critical): {e}")
+            return None, None
+
+    with ThreadPoolExecutor(max_workers=7) as ex:
+        f_uhi      = ex.submit(_get_uhi)
+        f_nearby   = ex.submit(_fetch_nearby_snapshot, mac)
+        f_forecast = ex.submit(_fetch_forecast, mac)
+        f_seasonal = ex.submit(_fetch_uhi_seasonal, mac)
+        f_records  = ex.submit(_fetch_station_records, mac)
+        f_summary  = ex.submit(_fetch_latest_summary, mac)
+        f_wk       = ex.submit(_get_wk)
+
+    uhi             = f_uhi.result()
+    nearby          = f_nearby.result()
+    forecast        = f_forecast.result()
+    uhi_seasonal    = f_seasonal.result()
+    station_records = f_records.result()
+    daily_summary   = f_summary.result()
+    nws_tomorrow, wk_attribution = f_wk.result()
+
+    rain_prob = rain_probability(reading, recent, nearby)
 
     body = {
         **{k: v for k, v in reading.items() if k not in ('station_id', 'ttl')},
@@ -137,6 +162,8 @@ def _current():
         "uhi_seasonal_curve":    uhi_seasonal,
         "station_records":       station_records,
         "daily_summary":         daily_summary,
+        "nws_tomorrow":          nws_tomorrow,
+        "wk_attribution":        wk_attribution,
         "nearby_stations":       nearby[:8],
         **uhi,
     }
@@ -326,16 +353,44 @@ def _attach_baselines(readings: list, mac: str) -> list:
     return readings
 
 
-def _fetch_station_records(mac: str, month: int) -> dict | None:
-    """Fetch pre-computed records for the given calendar month."""
+def _fetch_station_records(mac: str) -> dict | None:
+    """Scan all monthly records and return all-time extremes."""
     try:
         table = get_table(RECORDS_TABLE)
-        resp  = table.get_item(Key={'station_id': mac, 'month': str(month).zfill(2)})
-        item  = resp.get('Item')
-        if not item:
+        resp  = table.query(KeyConditionExpression=Key('station_id').eq(mac))
+        items = [_floatify(i) for i in resp.get('Items', [])]
+        if not items:
             return None
-        f = _floatify(item)
-        return {k: v for k, v in f.items() if k not in ('station_id',)}
+
+        def _pick(items, field, best_fn, at_field):
+            candidates = [(i[field], i.get(at_field)) for i in items if i.get(field) is not None]
+            if not candidates:
+                return None, None
+            val, at = best_fn(candidates, key=lambda x: x[0])
+            return val, at
+
+        temp_high,      temp_high_at      = _pick(items, 'temp_high',      max, 'temp_high_at')
+        temp_low,       temp_low_at       = _pick(items, 'temp_low',       min, 'temp_low_at')
+        max_gust,       max_gust_at       = _pick(items, 'max_gust',       max, 'max_gust_at')
+        max_rain_rate,  max_rain_rate_at  = _pick(items, 'max_rain_rate',  max, 'max_rain_rate_at')
+        max_pressure,   max_pressure_at   = _pick(items, 'max_pressure',   max, 'max_pressure_at')
+        min_pressure,   min_pressure_at   = _pick(items, 'min_pressure',   min, 'min_pressure_at')
+
+        return {
+            'temp_high':         temp_high,
+            'temp_high_at':      temp_high_at,
+            'temp_low':          temp_low,
+            'temp_low_at':       temp_low_at,
+            'max_gust':          max_gust,
+            'max_gust_at':       max_gust_at,
+            'max_rain_rate':     max_rain_rate,
+            'max_rain_rate_at':  max_rain_rate_at,
+            'max_pressure':      max_pressure,
+            'max_pressure_at':   max_pressure_at,
+            'min_pressure':      min_pressure,
+            'min_pressure_at':   min_pressure_at,
+            'scope':             'all-time',
+        }
     except Exception as e:
         print(f"Records fetch (non-fatal): {e}")
         return None

@@ -24,13 +24,13 @@ def percentile_rank(reading: dict, baseline: dict, month: int) -> dict | None:
     rank = max(1, min(99, rank))
 
     # Label
-    if rank >= 95:   label = f"one of the warmest {_ordinal(rank)} on record here"
+    if rank >= 95:   label = f"in the warmest {100-rank}% of readings on record"
     elif rank >= 80: label = f"warmer than {rank}% of readings"
     elif rank >= 60: label = f"slightly warm ({rank}th percentile)"
     elif rank >= 40: label = f"near median ({rank}th percentile)"
     elif rank >= 20: label = f"slightly cool ({rank}th percentile)"
     elif rank >= 5:  label = f"cooler than {100-rank}% of readings"
-    else:            label = f"one of the coldest {_ordinal(100-rank)} on record here"
+    else:            label = f"in the coldest {rank}% of readings on record"
 
     return {'rank': rank, 'label': label}
 
