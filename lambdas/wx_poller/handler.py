@@ -87,7 +87,7 @@ def handler(event, context):
     except Exception:
         condition = None
     try:
-        generate_og(cleaned, condition)
+        generate_og(cleaned, condition, uhi_delta=uhi_delta)
     except Exception as e:
         print(f"OG image generation failed (non-fatal): {e}")
 
