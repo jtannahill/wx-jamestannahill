@@ -69,20 +69,9 @@ def parse_noaa_csv(csv_text: str) -> dict[str, list[dict]]:
 
         doy = date_str[5:7] + date_str[8:10]  # "MMDD"
 
-        # Try TMAX column first, fall back to TMAX_ATTRIBUTES if empty
         tmax_raw = row.get("TMAX", "").strip()
-        if not tmax_raw:
-            tmax_raw = row.get("TMAX_ATTRIBUTES", "").strip()
-
-        # Try TMIN column first, fall back to TMIN_ATTRIBUTES if empty
         tmin_raw = row.get("TMIN", "").strip()
-        if not tmin_raw:
-            tmin_raw = row.get("TMIN_ATTRIBUTES", "").strip()
-
-        # Try AWND column first, fall back to AWND_ATTRIBUTES if empty
         awnd_raw = row.get("AWND", "").strip()
-        if not awnd_raw:
-            awnd_raw = row.get("AWND_ATTRIBUTES", "").strip()
 
         if not tmax_raw or not tmin_raw:
             continue
