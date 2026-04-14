@@ -311,7 +311,7 @@ class WxStack(Stack):
 
         # --- Bootstrap lambda (manual trigger, 900s) ---
         self.climate_bootstrap_fn = make_lambda(
-            "WxClimateBootstrap", "wx_climate_bootstrap",
+            "WxClimateBootstrap", "wx_climate_bootstrap.handler",
             memory=1024, timeout=900,
             extra_env={
                 "CLIMATE_DOY_TABLE":    self.climate_doy_table.table_name,
@@ -323,7 +323,7 @@ class WxStack(Stack):
 
         # --- Updater lambda (nightly 06:00 UTC) ---
         self.climate_updater_fn = make_lambda(
-            "WxClimateUpdater", "wx_climate_updater",
+            "WxClimateUpdater", "wx_climate_updater.handler",
             memory=512, timeout=120,
             extra_env={
                 "CLIMATE_DOY_TABLE":    self.climate_doy_table.table_name,
