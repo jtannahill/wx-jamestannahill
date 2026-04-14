@@ -51,6 +51,12 @@ def parse_noaa_csv(csv_text: str) -> dict[str, list[dict]]:
     """
     Parse GHCN-Daily CSV text into per-DOY annual records.
 
+    Handles the long format from noaa-ghcn-pds S3 bucket:
+      ID, DATE (YYYYMMDD), ELEMENT, DATA_VALUE, M_FLAG, Q_FLAG, S_FLAG, OBS_TIME
+
+    Also handles the legacy wide format from NCEI CDN:
+      STATION, DATE (YYYY-MM-DD), ..., TMAX, TMIN, AWND, ...
+
     Returns dict keyed by doy string ("0413"), values are lists of
     {year, tmax, tmin, awnd} sorted by year descending.
     TMAX/TMIN missing rows are skipped. AWND may be None.
@@ -58,41 +64,77 @@ def parse_noaa_csv(csv_text: str) -> dict[str, list[dict]]:
     import csv
     from io import StringIO
 
-    by_doy: dict[str, list[dict]] = defaultdict(list)
     reader = csv.DictReader(StringIO(csv_text))
+    fieldnames = reader.fieldnames or []
+    is_long_format = "ELEMENT" in fieldnames
 
-    for row in reader:
-        date_str = row.get("DATE", "").strip()
-        if not date_str or len(date_str) != 10:
-            continue
-        try:
-            year = int(date_str[:4])
-        except ValueError:
-            continue
+    if is_long_format:
+        # Long format: pivot element rows by date key, then emit per-date records
+        date_vals: dict[str, dict] = defaultdict(dict)
+        for row in reader:
+            element = row.get("ELEMENT", "").strip()
+            if element not in ("TMAX", "TMIN", "AWND"):
+                continue
+            if row.get("Q_FLAG", "").strip():
+                continue  # skip quality-flagged readings
+            raw = row.get("DATA_VALUE", "").strip()
+            if not raw:
+                continue
+            date_str = row.get("DATE", "").strip()
+            if not date_str or len(date_str) != 8:
+                continue
+            date_vals[date_str][element] = raw
 
-        doy = date_str[5:7] + date_str[8:10]  # "MMDD"
-
-        tmax_raw = row.get("TMAX", "").strip()
-        tmin_raw = row.get("TMIN", "").strip()
-        awnd_raw = row.get("AWND", "").strip()
-
-        if not tmax_raw or not tmin_raw:
-            continue
-
-        try:
-            tmax_f = round(_tenths_c_to_f(float(tmax_raw)), 1)
-            tmin_f = round(_tenths_c_to_f(float(tmin_raw)), 1)
-        except ValueError:
-            continue
-
-        awnd_mph = None
-        if awnd_raw:
+        by_doy: dict[str, list[dict]] = defaultdict(list)
+        for date_str, vals in date_vals.items():
+            tmax_raw = vals.get("TMAX", "")
+            tmin_raw = vals.get("TMIN", "")
+            if not tmax_raw or not tmin_raw:
+                continue
             try:
-                awnd_mph = round(_tenths_ms_to_mph(float(awnd_raw)), 1)
+                year  = int(date_str[:4])
+                tmax_f = round(_tenths_c_to_f(float(tmax_raw)), 1)
+                tmin_f = round(_tenths_c_to_f(float(tmin_raw)), 1)
             except ValueError:
-                pass
-
-        by_doy[doy].append({"year": year, "tmax": tmax_f, "tmin": tmin_f, "awnd": awnd_mph})
+                continue
+            awnd_mph = None
+            awnd_raw = vals.get("AWND", "")
+            if awnd_raw:
+                try:
+                    awnd_mph = round(_tenths_ms_to_mph(float(awnd_raw)), 1)
+                except ValueError:
+                    pass
+            doy = date_str[4:6] + date_str[6:8]  # YYYYMMDD → MMDD
+            by_doy[doy].append({"year": year, "tmax": tmax_f, "tmin": tmin_f, "awnd": awnd_mph})
+    else:
+        # Wide format: one row per date with TMAX/TMIN/AWND columns
+        by_doy = defaultdict(list)
+        for row in reader:
+            date_str = row.get("DATE", "").strip()
+            if not date_str or len(date_str) != 10:
+                continue
+            try:
+                year = int(date_str[:4])
+            except ValueError:
+                continue
+            doy = date_str[5:7] + date_str[8:10]  # YYYY-MM-DD → MMDD
+            tmax_raw = row.get("TMAX", "").strip()
+            tmin_raw = row.get("TMIN", "").strip()
+            awnd_raw = row.get("AWND", "").strip()
+            if not tmax_raw or not tmin_raw:
+                continue
+            try:
+                tmax_f = round(_tenths_c_to_f(float(tmax_raw)), 1)
+                tmin_f = round(_tenths_c_to_f(float(tmin_raw)), 1)
+            except ValueError:
+                continue
+            awnd_mph = None
+            if awnd_raw:
+                try:
+                    awnd_mph = round(_tenths_ms_to_mph(float(awnd_raw)), 1)
+                except ValueError:
+                    pass
+            by_doy[doy].append({"year": year, "tmax": tmax_f, "tmin": tmin_f, "awnd": awnd_mph})
 
     # Sort each DOY by year descending (for fast last_exceeded_year lookup)
     for doy in by_doy:

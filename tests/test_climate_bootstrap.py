@@ -9,6 +9,42 @@ USC00305801,1941-04-13,40.7789,-73.9692,39.6,NY CITY CENTRAL PARK NY US,0,,250,,
 USC00305801,1942-04-13,40.7789,-73.9692,39.6,NY CITY CENTRAL PARK NY US,0,,180,,120,,30,
 """
 
+# Long format — matches actual noaa-ghcn-pds S3 CSV structure
+SAMPLE_CSV_LONG = """ID,DATE,ELEMENT,DATA_VALUE,M_FLAG,Q_FLAG,S_FLAG,OBS_TIME
+USW00094728,19400413,TMAX,200,,,Z,
+USW00094728,19400413,TMIN,150,,,Z,
+USW00094728,19400413,AWND,45,,,Z,
+USW00094728,19410413,TMAX,250,,,Z,
+USW00094728,19410413,TMIN,180,,,Z,
+USW00094728,19410413,AWND,60,,,Z,
+USW00094728,19420413,TMAX,180,,,Z,
+USW00094728,19420413,TMIN,120,,,Z,
+USW00094728,19420413,AWND,30,,,Z,
+"""
+
+def test_parse_noaa_csv_long_format_groups_by_doy():
+    by_doy = parse_noaa_csv(SAMPLE_CSV_LONG)
+    assert "0413" in by_doy
+    assert len(by_doy["0413"]) == 3
+
+def test_parse_noaa_csv_long_format_converts_units():
+    by_doy = parse_noaa_csv(SAMPLE_CSV_LONG)
+    r1940 = by_doy["0413"][-1]
+    assert r1940["year"] == 1940
+    assert abs(r1940["tmax"] - 68.0) < 0.2
+    assert abs(r1940["tmin"] - 59.0) < 0.2
+    assert abs(r1940["awnd"] - 10.1) < 0.2
+
+def test_parse_noaa_csv_long_format_skips_quality_flagged():
+    csv_flagged = """ID,DATE,ELEMENT,DATA_VALUE,M_FLAG,Q_FLAG,S_FLAG,OBS_TIME
+USW00094728,19400413,TMAX,200,,,Z,
+USW00094728,19400413,TMIN,150,,G,Z,
+USW00094728,19400413,AWND,45,,,Z,
+"""
+    by_doy = parse_noaa_csv(csv_flagged)
+    # TMIN is quality-flagged, so 1940-04-13 should be skipped (no TMIN)
+    assert "0413" not in by_doy or len(by_doy.get("0413", [])) == 0
+
 def test_parse_noaa_csv_groups_by_doy():
     by_doy = parse_noaa_csv(SAMPLE_CSV)
     assert "0413" in by_doy
