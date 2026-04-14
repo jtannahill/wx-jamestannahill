@@ -8,6 +8,7 @@ STATION_TZ = ZoneInfo('America/New_York')
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
 from wx_api.anomaly import compute_anomalies, pressure_trend, condition_label, percentile_rank
+from wx_api.climate_context import live_context, daily_verdict, anomaly_headline
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
 from wx_api.nearby import nearby_route, _fetch_nearby_snapshot
@@ -21,6 +22,8 @@ ACCURACY_TABLE     = os.environ.get('ACCURACY_TABLE',     'wx-forecast-accuracy'
 UHI_SEASONAL_TABLE = os.environ.get('UHI_SEASONAL_TABLE', 'wx-uhi-seasonal')
 SUMMARIES_TABLE    = os.environ.get('SUMMARIES_TABLE',    'wx-daily-summaries')
 RECORDS_TABLE      = os.environ.get('RECORDS_TABLE',      'wx-station-records')
+CLIMATE_DOY_TABLE    = os.environ.get('CLIMATE_DOY_TABLE',    'wx-climate-doy')
+CLIMATE_HOURLY_TABLE = os.environ.get('CLIMATE_HOURLY_TABLE', 'wx-climate-hourly')
 STATION_SECRET     = 'ambient-weather/station-config'
 
 _MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -100,6 +103,8 @@ def _current():
 
     local_now = now.astimezone(STATION_TZ)
     month_hour = local_now.strftime('%m-%H')
+    doy      = local_now.strftime("%m%d")        # e.g. "0413"
+    doy_hour = f"{doy}-{local_now.hour:02d}"     # e.g. "0413-14"
     stats_table = get_table(STATS_TABLE)
     stats_resp = stats_table.get_item(Key={'station_id': mac, 'month_hour': month_hour})
     baseline = _floatify(stats_resp.get('Item', {}))
@@ -124,24 +129,43 @@ def _current():
             print(f"WeatherKit fetch failed (non-critical): {e}")
             return None, None
 
-    with ThreadPoolExecutor(max_workers=7) as ex:
-        f_uhi      = ex.submit(_get_uhi)
-        f_nearby   = ex.submit(_fetch_nearby_snapshot, mac)
-        f_forecast = ex.submit(_fetch_forecast, mac)
-        f_seasonal = ex.submit(_fetch_uhi_seasonal, mac)
-        f_records  = ex.submit(_fetch_station_records, mac)
-        f_summary  = ex.submit(_fetch_latest_summary, mac)
-        f_wk       = ex.submit(_get_wk)
+    with ThreadPoolExecutor(max_workers=9) as ex:
+        f_uhi            = ex.submit(_get_uhi)
+        f_nearby         = ex.submit(_fetch_nearby_snapshot, mac)
+        f_forecast       = ex.submit(_fetch_forecast, mac)
+        f_seasonal       = ex.submit(_fetch_uhi_seasonal, mac)
+        f_records        = ex.submit(_fetch_station_records, mac)
+        f_summary        = ex.submit(_fetch_latest_summary, mac)
+        f_wk             = ex.submit(_get_wk)
+        f_climate_doy    = ex.submit(_fetch_climate_doy,    mac, doy)
+        f_climate_hourly = ex.submit(_fetch_climate_hourly, mac, doy_hour)
 
-    uhi             = f_uhi.result()
-    nearby          = f_nearby.result()
-    forecast        = f_forecast.result()
-    uhi_seasonal    = f_seasonal.result()
-    station_records = f_records.result()
-    daily_summary   = f_summary.result()
+    uhi                  = f_uhi.result()
+    nearby               = f_nearby.result()
+    forecast             = f_forecast.result()
+    uhi_seasonal         = f_seasonal.result()
+    station_records      = f_records.result()
+    daily_summary        = f_summary.result()
     nws_tomorrow, wk_attribution = f_wk.result()
+    climate_doy_stats    = f_climate_doy.result()
+    climate_hourly_stats = f_climate_hourly.result()
 
     rain_prob = rain_probability(reading, recent, nearby)
+
+    # Climate context — live percentile + daily verdict
+    climate_live     = live_context(reading, climate_hourly_stats, doy)
+    today_high       = daily_summary.get("temp_high") if daily_summary else None
+    today_low        = daily_summary.get("temp_low")  if daily_summary else None
+    climate_verdict  = daily_verdict(today_high, today_low, climate_doy_stats, doy) if today_high else None
+    climate_mode     = "daily" if climate_verdict else "live"
+    climate_headline = anomaly_headline(climate_live, climate_verdict)
+
+    climate_context = {
+        "mode":     climate_mode,
+        "headline": climate_headline,
+        "metrics":  climate_live["metrics"] if climate_live else {},
+        "verdict":  climate_verdict,
+    }
 
     body = {
         **{k: v for k, v in reading.items() if k not in ('station_id', 'ttl')},
@@ -157,6 +181,7 @@ def _current():
         "quality_flag":          reading.get('quality_flag'),
         "comfort":               comfort,
         "percentile_rank":       pct_rank,
+        "climate_context":       climate_context,
         "rain_probability":      rain_prob,
         "forecast":              forecast,
         "uhi_seasonal_curve":    uhi_seasonal,
@@ -501,6 +526,30 @@ def _floatify(obj):
     if isinstance(obj, Decimal):
         return float(obj)
     return obj
+
+
+def _fetch_climate_doy(mac: str, doy: str) -> dict | None:
+    """Fetch NOAA per-DOY stats from wx-climate-doy."""
+    try:
+        table = get_table(CLIMATE_DOY_TABLE)
+        resp  = table.get_item(Key={"station_id": mac, "doy": doy})
+        item  = resp.get("Item")
+        return _floatify(item) if item else None
+    except Exception as e:
+        print(f"Climate DOY fetch (non-fatal): {e}")
+        return None
+
+
+def _fetch_climate_hourly(mac: str, doy_hour: str) -> dict | None:
+    """Fetch ERA5 per-DOY-hour stats from wx-climate-hourly."""
+    try:
+        table = get_table(CLIMATE_HOURLY_TABLE)
+        resp  = table.get_item(Key={"station_id": mac, "doy_hour": doy_hour})
+        item  = resp.get("Item")
+        return _floatify(item) if item else None
+    except Exception as e:
+        print(f"Climate hourly fetch (non-fatal): {e}")
+        return None
 
 
 def _resp(status: int, body: dict) -> dict:

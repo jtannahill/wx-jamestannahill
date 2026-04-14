@@ -263,6 +263,26 @@ class WxStack(Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
+        # --- Climate DOY table (NOAA GHCN-Daily per calendar date, 366 rows) ---
+        self.climate_doy_table = dynamodb.Table(
+            self, "WxClimateDoy",
+            table_name="wx-climate-doy",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="doy", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        # --- Climate hourly table (ERA5 per DOY×hour, ~8784 rows) ---
+        self.climate_hourly_table = dynamodb.Table(
+            self, "WxClimateHourly",
+            table_name="wx-climate-hourly",
+            partition_key=dynamodb.Attribute(name="station_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="doy_hour", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
         # --- Summarizer Lambda (daily at 05:00 UTC = midnight ET) ---
         self.summarizer_fn = make_lambda(
             "WxSummarizer", "wx_summarizer.handler",
@@ -289,11 +309,44 @@ class WxStack(Stack):
         )
         records_rule.add_target(targets.LambdaFunction(self.records_fn))
 
+        # --- Bootstrap lambda (manual trigger, 900s) ---
+        self.climate_bootstrap_fn = make_lambda(
+            "WxClimateBootstrap", "wx_climate_bootstrap",
+            memory=1024, timeout=900,
+            extra_env={
+                "CLIMATE_DOY_TABLE":    self.climate_doy_table.table_name,
+                "CLIMATE_HOURLY_TABLE": self.climate_hourly_table.table_name,
+            },
+        )
+        self.climate_doy_table.grant_read_write_data(self.climate_bootstrap_fn)
+        self.climate_hourly_table.grant_read_write_data(self.climate_bootstrap_fn)
+
+        # --- Updater lambda (nightly 06:00 UTC) ---
+        self.climate_updater_fn = make_lambda(
+            "WxClimateUpdater", "wx_climate_updater",
+            memory=512, timeout=120,
+            extra_env={
+                "CLIMATE_DOY_TABLE":    self.climate_doy_table.table_name,
+                "CLIMATE_HOURLY_TABLE": self.climate_hourly_table.table_name,
+            },
+        )
+        self.climate_doy_table.grant_read_write_data(self.climate_updater_fn)
+        self.climate_hourly_table.grant_read_write_data(self.climate_updater_fn)
+        updater_rule = events.Rule(
+            self, "WxClimateUpdaterSchedule",
+            schedule=events.Schedule.cron(hour="6", minute="0"),
+        )
+        updater_rule.add_target(targets.LambdaFunction(self.climate_updater_fn))
+
         # Allow the API Lambda to read summaries and records
         self.daily_summaries_table.grant_read_data(self.api_fn)
         self.station_records_table.grant_read_data(self.api_fn)
         self.api_fn.add_environment("SUMMARIES_TABLE", self.daily_summaries_table.table_name)
         self.api_fn.add_environment("RECORDS_TABLE",   self.station_records_table.table_name)
+        self.climate_doy_table.grant_read_data(self.api_fn)
+        self.climate_hourly_table.grant_read_data(self.api_fn)
+        self.api_fn.add_environment("CLIMATE_DOY_TABLE",    self.climate_doy_table.table_name)
+        self.api_fn.add_environment("CLIMATE_HOURLY_TABLE", self.climate_hourly_table.table_name)
 
         # --- API Gateway HTTP API ---
         http_api = apigwv2.HttpApi(
