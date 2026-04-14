@@ -112,3 +112,8 @@ def test_anomaly_headline_falls_back_to_live():
 
 def test_anomaly_headline_none_when_no_data():
     assert anomaly_headline(None, None) is None
+
+def test_daily_verdict_temp_low_has_label():
+    result = daily_verdict(70.0, 45.0, DOY_STATS, "0413")
+    assert "label" in result["temp_low"]
+    assert len(result["temp_low"]["label"]) > 0

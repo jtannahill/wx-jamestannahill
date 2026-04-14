@@ -126,6 +126,7 @@ def daily_verdict(
         return None
 
     annual_highs = doy_stats.get("annual_highs", [])
+    annual_highs = sorted(annual_highs, key=lambda r: r["year"], reverse=True)
     if not annual_highs:
         return None
 
@@ -172,10 +173,17 @@ def daily_verdict(
                     last_exceeded_low = int(rec["year"])
                     break
 
+            earliest_year_low = int(annual_highs[-1]["year"]) if annual_highs else 1869
+            if last_exceeded_low:
+                label_low = f"Warmest low on {_doy_label(doy)} since {last_exceeded_low}"
+            else:
+                label_low = f"Warmest low on {_doy_label(doy)} on record (since {earliest_year_low})"
+
             result["temp_low"] = {
                 "value":              round(today_low, 1),
                 "percentile":         pct,
                 "last_exceeded_year": last_exceeded_low,
+                "label":              label_low,
                 "years_of_data":      years_of_data,
             }
 
