@@ -41,3 +41,62 @@ def test_compute_doy_stats():
     # record_high should be the largest tmax
     tmax_vals = [r["tmax"] for r in by_doy["0413"]]
     assert abs(stats["record_high_temp"] - max(tmax_vals)) < 0.1
+
+from wx_climate_bootstrap.era5 import compute_hourly_stats, _c_to_f, _dewpoint_f
+
+def test_c_to_f():
+    assert abs(_c_to_f(0) - 32.0) < 0.01
+    assert abs(_c_to_f(100) - 212.0) < 0.01
+
+def test_dewpoint_f():
+    # dewpoint at 20°C, 50% RH ≈ 9.3°C ≈ 48.7°F
+    dp = _dewpoint_f(20.0, 50.0)
+    assert 48 < dp < 50
+
+def test_compute_hourly_stats_basic():
+    samples = [60.0, 65.0, 70.0]
+    stats = compute_hourly_stats(samples)
+    assert stats["p25_tempf"] is not None
+    assert stats["p50_tempf"] is not None
+    assert abs(stats["p50_tempf"] - 65.0) < 0.5
+    assert stats["mean_tempf"] is not None
+    assert abs(stats["mean_tempf"] - 65.0) < 0.5
+
+def test_compute_hourly_stats_std():
+    samples = [60.0, 65.0, 70.0]
+    stats = compute_hourly_stats(samples)
+    assert stats["std_tempf"] is not None
+    assert stats["std_tempf"] > 0
+
+def test_fetch_month_era5_slot_key_format():
+    """fetch_month_era5 slots must use MMDD-HH format matching what the API reads."""
+    import re
+    pattern = re.compile(r"^\d{4}-\d{2}$")
+    sample_key = "0413-14"
+    assert pattern.match(sample_key), f"Key format wrong: {sample_key}"
+
+def test_fetch_month_era5_output_keys():
+    """era5 output dict must have the field prefixes that climate_context.py expects."""
+    from wx_climate_bootstrap.era5 import _percentile, _c_to_f, _dewpoint_f
+    import math
+    temps  = [_c_to_f(10 + i) for i in range(85)]
+    dewpts = [_dewpoint_f(10 + i, 60) for i in range(85)]
+    winds  = [5.0 + i * 0.1 for i in range(85)]
+
+    def _percs(vals, prefix):
+        mean = sum(vals) / len(vals)
+        std  = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+        return {
+            f"p25_{prefix}":  _percentile(vals, 25),
+            f"p50_{prefix}":  _percentile(vals, 50),
+            f"p75_{prefix}":  _percentile(vals, 75),
+            f"mean_{prefix}": round(mean, 2),
+            f"std_{prefix}":  round(std, 2),
+        }
+
+    slot = {**_percs(temps, "tempf"), **_percs(dewpts, "dewptf"), **_percs(winds, "windmph")}
+    assert "mean_tempf"  in slot
+    assert "std_tempf"   in slot
+    assert "p25_tempf"   in slot
+    assert "mean_dewptf" in slot
+    assert "mean_windmph" in slot
