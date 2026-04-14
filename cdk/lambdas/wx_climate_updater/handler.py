@@ -44,6 +44,7 @@ def handler(event, context):
     now_et    = datetime.now(timezone.utc).astimezone(STATION_TZ)
     yesterday = (now_et - timedelta(days=1)).date()
     month     = yesterday.month
+    doy       = f"{yesterday.month:02d}{yesterday.day:02d}"
 
     # ── Daily: refresh yesterday's DOY in ERA5 hourly table ──────────────────
     print(f"Updater: refreshing ERA5 for month {month:02d} (yesterday = {yesterday})")
@@ -51,7 +52,6 @@ def handler(event, context):
         slots        = fetch_month_era5(lat, lon, month)
         hourly_table = get_table(CLIMATE_HOURLY_TABLE)
         updated      = 0
-        doy          = f"{yesterday.month:02d}{yesterday.day:02d}"
         for doy_hour, stats in slots.items():
             # Only update slots belonging to yesterday's DOY
             if not doy_hour.startswith(doy):
@@ -74,13 +74,13 @@ def handler(event, context):
             by_doy    = parse_noaa_csv(csv_text)
             doy_table = get_table(CLIMATE_DOY_TABLE)
             written   = 0
-            for doy, records in by_doy.items():
+            for row_doy, records in by_doy.items():
                 if not records:
                     continue
                 stats = compute_doy_stats(records)
                 doy_table.put_item(Item={
                     "station_id": mac,
-                    "doy":        doy,
+                    "doy":        row_doy,
                     **_decimalize(stats),
                 })
                 written += 1
