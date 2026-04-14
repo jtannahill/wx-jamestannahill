@@ -1,6 +1,10 @@
 """
-NOAA GHCN-Daily parser for Central Park station USC00305801.
-Downloads CSV from NOAA CDN and parses per-DOY annual records.
+NOAA GHCN-Daily parser for Central Park station USW00094728.
+Downloads CSV from NOAA public S3 bucket (noaa-ghcn-pds) and parses
+per-DOY annual records.
+
+Station: USW00094728 = NY CITY CNTRL PARK (WBAN/HCN station, lat 40.7789)
+Note: The older COOP station ID USC00305801 does not exist in GHCN-Daily.
 
 Units in raw CSV:
   TMAX, TMIN: tenths of degrees Celsius  (e.g. 200 = 20.0°C = 68.0°F)
@@ -11,8 +15,7 @@ from collections import defaultdict
 
 
 NOAA_CSV_URL = (
-    "https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily"
-    "/access/USC00305801.csv"
+    "https://noaa-ghcn-pds.s3.amazonaws.com/csv/by_station/USW00094728.csv"
 )
 
 
