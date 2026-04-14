@@ -572,12 +572,15 @@ def _og_image() -> dict:
     }
 
 
+DASHBOARD_CF_ID = 'E2OIRPWQ2L8LB6'
+
+
 def _refresh_og() -> dict:
-    """Patch index.html on S3 with a fresh ?v=<ts> on the og:image URLs.
-    Called by the share button before opening the Twitter intent so Twitter
-    sees a URL it hasn't cached and fetches the latest og.png."""
+    """Patch index.html on S3 with a fresh ?v=<ts> on the og:image URLs,
+    then invalidate CloudFront so Twitter's crawler gets the updated page."""
     import re, time, boto3
     s3  = boto3.client('s3', region_name='us-east-1')
+    cf  = boto3.client('cloudfront', region_name='us-east-1')
     ts  = int(time.time())
     try:
         obj  = s3.get_object(Bucket=DASHBOARD_BUCKET, Key='index.html')
@@ -593,6 +596,13 @@ def _refresh_og() -> dict:
             Body=html.encode('utf-8'),
             ContentType='text/html',
             CacheControl='no-cache, no-store, must-revalidate',
+        )
+        cf.create_invalidation(
+            DistributionId=DASHBOARD_CF_ID,
+            InvalidationBatch={
+                'Paths': {'Quantity': 1, 'Items': ['/index.html']},
+                'CallerReference': str(ts),
+            },
         )
         return {
             'statusCode': 200,
