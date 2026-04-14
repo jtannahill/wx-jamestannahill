@@ -498,11 +498,12 @@ function renderTodayContext(current, history) {
 function renderClimatePanel(data) {
   const section = document.getElementById('climate-panel');
   const cc = data.climate_context;
-  if (!cc || (!cc.metrics || !Object.keys(cc.metrics).length) && !cc.verdict) {
+  if (!cc || ((!cc.metrics || !Object.keys(cc.metrics).length) && !cc.verdict)) {
     section.hidden = true;
     return;
   }
   section.hidden = false;
+  section.classList.add('visible');
 
   // Update anomaly subline
   const subline = document.getElementById('anomaly-subline');
