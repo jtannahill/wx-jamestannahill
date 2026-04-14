@@ -376,7 +376,7 @@ function _renderChart(history, field, hours) {
     legend.style.display = '';
   }
 
-  const W = Math.max(100, wrap.clientWidth || (window.innerWidth - 48));
+  const W = Math.max(100, Math.floor(wrap.getBoundingClientRect().width) || (window.innerWidth - 48));
   const H = window.innerWidth < 480 ? 180 : 220;
 
   try {
@@ -433,7 +433,10 @@ function _renderChart(history, field, hours) {
 // Resize chart with window
 const _chartWrap = document.getElementById('wx-chart-wrap');
 new ResizeObserver(() => {
-  if (uplot) uplot.setSize({ width: _chartWrap.clientWidth, height: window.innerWidth < 480 ? 180 : 220 });
+  if (uplot) {
+    const w = Math.floor(_chartWrap.getBoundingClientRect().width);
+    if (w > 0) uplot.setSize({ width: w, height: window.innerWidth < 480 ? 180 : 220 });
+  }
 }).observe(_chartWrap);
 
 // ── Tomorrow forecast (WeatherKit) ───────────────────────────────────────────
@@ -553,18 +556,13 @@ function renderClimatePanel(data) {
         const todayPct  = Math.max(3,  Math.min(97, (m.value - trackMin) / span * 100));
         const fillLeft  = Math.min(avgPct, todayPct);
         const fillWidth = Math.abs(todayPct - avgPct);
-        // Clamp label anchors so they don't bleed off edges
-        const avgLblPct   = Math.max(4,  Math.min(50, avgPct));
-        const todayLblPct = Math.max(50, Math.min(93, todayPct));
         barHtml = `
           <div class="dev-bar">
-            <div class="dev-bar-axis-labels">
-              <span style="left:${avgLblPct}%">avg ${m.p50}°</span>
-              <span style="left:${todayLblPct}%;color:${color}">${m.value}°</span>
-            </div>
             <div class="dev-bar-track">
               <div class="dev-bar-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${color}"></div>
-              <div class="dev-bar-avg-tick" style="left:${avgPct}%"></div>
+              <div class="dev-bar-avg-tick" style="left:${avgPct}%">
+                <span class="dev-bar-avg-label">avg ${m.p50}°</span>
+              </div>
               <div class="dev-bar-today-dot" style="left:${todayPct}%;background:${color}"></div>
             </div>
           </div>`;
@@ -902,6 +900,36 @@ document.querySelectorAll('.card[data-scroll-to]').forEach(card => {
     const el = document.getElementById(card.dataset.scrollTo);
     if (el && !el.hidden) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+});
+
+// ── Share to X ───────────────────────────────────────────────────────────────
+function buildShareText(data) {
+  const temp   = fmt(data.tempf, 0);
+  const feels  = fmt(data.feelsLike, 0);
+  const cond   = data.condition || '';
+  const anomaly = data.anomalies?.temp?.label || '';
+  const hum    = fmt(data.humidity, 0);
+  const wind   = `${fmt(data.windspeedmph, 0)} mph ${degToCompass(data.winddir)}`;
+  const comfort = data.comfort;
+  const rp     = data.rain_probability;
+
+  let line1 = `Midtown Manhattan: ${temp}°F`;
+  if (cond) line1 += ` · ${cond}`;
+  if (feels !== temp) line1 += ` · Feels ${feels}°F`;
+  if (anomaly) line1 += ` · ${anomaly}`;
+
+  let line2 = `${hum}% humidity · Wind ${wind}`;
+  if (comfort?.score) line2 += ` · Comfort ${comfort.score} (${comfort.label})`;
+  if (rp?.probability >= 30) line2 += ` · ${rp.probability}% rain next hr`;
+
+  return `${line1}\n\n${line2}\n\nwx.jamestannahill.com #NYC #weather`;
+}
+
+document.getElementById('share-btn').addEventListener('click', () => {
+  if (!_bootCurrent) return;
+  const text = buildShareText(_bootCurrent);
+  const url  = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener,noreferrer,width=600,height=450');
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

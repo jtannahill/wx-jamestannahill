@@ -28,6 +28,16 @@ header {
 }
 .station-label { font-size: 11px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
 .updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
+.share-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  font-size: 14px; width: 44px; height: 44px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0; font-family: inherit;
+}
+.share-btn:hover { border-color: #fff; color: #fff; }
+.share-btn:active { border-color: #fff; color: #fff; }
 .refresh-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 16px; width: 44px; height: 44px; cursor: pointer;
@@ -150,11 +160,10 @@ header {
   padding: 16px 0 8px;
   overflow: hidden;
 }
-/* Let uPlot control canvas size via its width/height attributes, not CSS percentages */
+/* Prevent canvas from overflowing on HiDPI / mobile */
 .wx-chart-wrap canvas {
   display: block !important;
-  width: auto !important;
-  height: auto !important;
+  max-width: 100% !important;
 }
 
 /* ── Chart legend ────────────────────────────────────────────────────────── */
@@ -341,6 +350,12 @@ footer a { color: var(--muted); text-decoration: underline; }
   /* Summary blocks: compact side border on small screens */
   .summary-section { padding: 10px 14px; }
   .summary-text { font-size: 13px; }
+  /* Climate panel */
+  .climate-metric-row { flex-wrap: wrap; gap: 2px; }
+  .climate-metric-value { font-size: 13px; }
+  .climate-metric-pct { font-size: 10px; }
+  .dev-bar { margin: 4px 0 18px; }
+  .climate-footer { font-size: 9px; }
 }
 
 /* Scroll reveal */
@@ -411,56 +426,90 @@ footer a { color: var(--muted); text-decoration: underline; }
 
 /* ── Deviation bar (avg → today) ─────────────────────────────────────── */
 .dev-bar {
-  margin: 2px 0 6px;
-}
-
-.dev-bar-axis-labels {
-  position: relative;
-  height: 15px;
-  font-size: 10px;
-  color: #555;
-  margin-bottom: 4px;
-}
-
-.dev-bar-axis-labels span {
-  position: absolute;
-  transform: translateX(-50%);
-  white-space: nowrap;
+  margin: 5px 0 20px; /* bottom room for avg label below tick */
 }
 
 .dev-bar-track {
   position: relative;
-  height: 5px;
-  background: #252525;
-  border-radius: 3px;
-  border: 1px solid #333;
+  height: 3px;
+  background: #1c1c1c;
+  border-radius: 1px;
+  overflow: visible;
 }
 
 .dev-bar-fill {
   position: absolute;
   top: 0;
   height: 100%;
-  opacity: 0.35;
-  border-radius: 2px;
+  opacity: 0.45;
+  border-radius: 1px;
 }
 
 .dev-bar-avg-tick {
   position: absolute;
   top: -5px;
   width: 1px;
-  height: 15px;
-  background: #555;
+  height: 13px;
+  background: #3a3a3a;
   transform: translateX(-50%);
+}
+
+.dev-bar-avg-label {
+  position: absolute;
+  top: 100%;
+  margin-top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #3a3a3a;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
 }
 
 .dev-bar-today-dot {
   position: absolute;
   top: 50%;
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 4px currentColor;
+}
+
+/* ── Live mode percentile bars (ERA5) ────────────────────────────── */
+.climate-bar-track {
+  position: relative;
+  height: 3px;
+  background: #1c1c1c;
+  border-radius: 1px;
+  margin: 5px 0 4px;
+  overflow: hidden;
+}
+
+.climate-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 1px;
+  opacity: 0.5;
+}
+
+.climate-bar-marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 9px;
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+
+.climate-bar-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #2e2e2e;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
 }
 
 .climate-footer {
