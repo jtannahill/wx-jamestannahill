@@ -1,12 +1,9 @@
 """
 Generates a 1200x630 OG image PNG with current weather conditions.
-Uploads to the dashboard S3 bucket as og.png, then patches the og:image
-and twitter:image URLs in index.html with a cache-busting timestamp so
-Twitter always fetches the latest image when a user composes a share.
+Uploads to the dashboard S3 bucket as og.png.
 """
 import io
 import os
-import re
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -154,38 +151,10 @@ def generate_og(reading: dict, condition: str, uhi_delta: float | None = None) -
     img.save(buf, format='PNG', optimize=True)
     buf.seek(0)
 
-    s3 = boto3.client('s3', region_name='us-east-1')
-    s3.put_object(
+    boto3.client('s3', region_name='us-east-1').put_object(
         Bucket=DASHBOARD_BUCKET,
         Key='og.png',
         Body=buf.read(),
         ContentType='image/png',
         CacheControl='max-age=300',
     )
-
-    # ── Patch index.html with a versioned og:image URL ────────────────────────
-    # Twitter caches OG images by URL; appending ?v=<timestamp> forces a fresh
-    # fetch each time the poller runs (every 5 minutes).
-    try:
-        ts = int(time.time())
-        versioned = f'https://wx.jamestannahill.com/og.png?v={ts}'
-        html_obj  = s3.get_object(Bucket=DASHBOARD_BUCKET, Key='index.html')
-        html      = html_obj['Body'].read().decode('utf-8')
-
-        # Replace both og:image and twitter:image content values
-        html = re.sub(
-            r'(content="https://wx\.jamestannahill\.com/og\.png)(?:\?v=\d+)?(")',
-            rf'\g<1>?v={ts}\2',
-            html,
-        )
-
-        s3.put_object(
-            Bucket=DASHBOARD_BUCKET,
-            Key='index.html',
-            Body=html.encode('utf-8'),
-            ContentType='text/html',
-            CacheControl='no-cache, no-store, must-revalidate',
-        )
-        print(f"[og_image] Patched index.html og:image URLs with ?v={ts}")
-    except Exception as e:
-        print(f"[og_image] index.html patch failed (non-fatal): {e}")

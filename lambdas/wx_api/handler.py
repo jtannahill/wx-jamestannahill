@@ -63,6 +63,8 @@ def handler(event, context):
             return _resp(500, {'error': 'nearby unavailable'})
     elif path == '/og.png':
         return _og_image()
+    elif path == '/refresh-og':
+        return _refresh_og()
     else:
         return _resp(404, {"error": "Not found"})
 
@@ -568,6 +570,38 @@ def _og_image() -> dict:
         },
         'body': '',
     }
+
+
+def _refresh_og() -> dict:
+    """Patch index.html on S3 with a fresh ?v=<ts> on the og:image URLs.
+    Called by the share button before opening the Twitter intent so Twitter
+    sees a URL it hasn't cached and fetches the latest og.png."""
+    import re, time, boto3
+    s3  = boto3.client('s3', region_name='us-east-1')
+    ts  = int(time.time())
+    try:
+        obj  = s3.get_object(Bucket=DASHBOARD_BUCKET, Key='index.html')
+        html = obj['Body'].read().decode('utf-8')
+        html = re.sub(
+            r'(content="https://wx\.jamestannahill\.com/og\.png)(?:\?v=\d+)?(")',
+            rf'\g<1>?v={ts}\2',
+            html,
+        )
+        s3.put_object(
+            Bucket=DASHBOARD_BUCKET,
+            Key='index.html',
+            Body=html.encode('utf-8'),
+            ContentType='text/html',
+            CacheControl='no-cache, no-store, must-revalidate',
+        )
+        return {
+            'statusCode': 200,
+            'headers': {**CORS_HEADERS, 'Cache-Control': 'no-store'},
+            'body': json.dumps({'v': ts}),
+        }
+    except Exception as e:
+        print(f"[refresh-og] failed: {e}")
+        return _resp(500, {'error': 'refresh failed'})
 
 
 def _resp(status: int, body: dict) -> dict:

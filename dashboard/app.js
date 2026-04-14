@@ -925,11 +925,14 @@ function buildShareText(data) {
   return `${line1}\n\n${line2}\n\nwx.jamestannahill.com #NYC #weather`;
 }
 
-document.getElementById('share-btn').addEventListener('click', () => {
+document.getElementById('share-btn').addEventListener('click', async () => {
   if (!_bootCurrent) return;
   const text = buildShareText(_bootCurrent);
-  const url  = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank', 'noopener,noreferrer,width=600,height=450');
+  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  // Stamp a fresh ?v= on index.html's og:image before opening Twitter so the
+  // card fetcher sees a URL it hasn't cached and pulls the latest og.png.
+  try { await fetch(`${API}/refresh-og`); } catch (_) { /* non-fatal */ }
+  window.open(tweetUrl, '_blank', 'noopener,noreferrer,width=600,height=450');
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
