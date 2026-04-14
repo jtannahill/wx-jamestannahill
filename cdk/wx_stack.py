@@ -118,7 +118,7 @@ class WxStack(Stack):
         )
         poller_rule.add_target(targets.LambdaFunction(self.poller_fn))
 
-        self.api_fn = make_lambda("WxApi", "wx_api.handler", timeout=10)
+        self.api_fn = make_lambda("WxApi", "wx_api.handler", memory=256, timeout=20)
 
         self.bootstrap_fn = make_lambda("WxBootstrap", "wx_bootstrap.handler",
                                          memory=256, timeout=300)
