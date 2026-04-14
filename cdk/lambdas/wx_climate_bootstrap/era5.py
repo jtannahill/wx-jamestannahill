@@ -48,26 +48,30 @@ def _percentile(values: list, p: float):
     return round(s[lo] + (k - lo) * (s[hi] - s[lo]), 2)
 
 
-def compute_hourly_stats(values: list) -> dict:
-    """
-    Compute distribution stats for a list of float values (one field, one DOY-hour slot).
-    Returns dict with p25/p50/p75/mean/std keys using the caller's field suffix.
-    """
-    if not values:
-        return {"p25_tempf": None, "p50_tempf": None, "p75_tempf": None,
-                "mean_tempf": None, "std_tempf": None, "sample_count": 0}
-    n = len(values)
-    mean = sum(values) / n
-    variance = sum((v - mean) ** 2 for v in values) / n
-    std = math.sqrt(variance)
+def _compute_stats(vals: list[float], prefix: str) -> dict:
+    """Compute p25/p50/p75/mean/std for vals, keyed with the given prefix."""
+    if not vals:
+        return {f"p25_{prefix}": None, f"p50_{prefix}": None,
+                f"p75_{prefix}": None, f"mean_{prefix}": None, f"std_{prefix}": None}
+    mean = sum(vals) / len(vals)
+    std = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
     return {
-        "p25_tempf":  _percentile(values, 25),
-        "p50_tempf":  _percentile(values, 50),
-        "p75_tempf":  _percentile(values, 75),
-        "mean_tempf": round(mean, 2),
-        "std_tempf":  round(std, 2),
-        "sample_count": n,
+        f"p25_{prefix}": _percentile(vals, 25),
+        f"p50_{prefix}": _percentile(vals, 50),
+        f"p75_{prefix}": _percentile(vals, 75),
+        f"mean_{prefix}": round(mean, 2),
+        f"std_{prefix}":  round(std, 2),
     }
+
+
+def compute_hourly_stats(values: list[float]) -> dict:
+    """
+    Compute distribution stats for temperature values (°F) at a single DOY-hour slot.
+    Returns dict with p25_tempf/p50_tempf/p75_tempf/mean_tempf/std_tempf/sample_count keys.
+    """
+    stats = _compute_stats(values, "tempf")
+    stats["sample_count"] = len(values)
+    return stats
 
 
 def fetch_month_era5(lat: float, lon: float, month: int) -> dict:
@@ -131,7 +135,7 @@ def fetch_month_era5(lat: float, lon: float, month: int) -> dict:
 
         if temp_c is not None:
             slot_temps[doy_hour].append(_c_to_f(temp_c))
-            if rh is not None:
+            if rh is not None and rh > 0:
                 slot_dewpts[doy_hour].append(_dewpoint_f(temp_c, rh))
         if wind is not None:
             slot_winds[doy_hour].append(wind)
@@ -144,27 +148,12 @@ def fetch_month_era5(lat: float, lon: float, month: int) -> dict:
         temps  = slot_temps.get(slot, [])
         dewpts = slot_dewpts.get(slot, [])
         winds  = slot_winds.get(slot, [])
-        n      = len(temps) or len(winds)
-
-        def _percs(vals, prefix):
-            if not vals:
-                return {f"p25_{prefix}": None, f"p50_{prefix}": None,
-                        f"p75_{prefix}": None, f"mean_{prefix}": None, f"std_{prefix}": None}
-            mean = sum(vals) / len(vals)
-            std  = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
-            return {
-                f"p25_{prefix}":  _percentile(vals, 25),
-                f"p50_{prefix}":  _percentile(vals, 50),
-                f"p75_{prefix}":  _percentile(vals, 75),
-                f"mean_{prefix}": round(mean, 2),
-                f"std_{prefix}":  round(std, 2),
-            }
 
         result[slot] = {
-            **_percs(temps,  "tempf"),
-            **_percs(dewpts, "dewptf"),
-            **_percs(winds,  "windmph"),
-            "sample_count": n,
+            **_compute_stats(temps,  "tempf"),
+            **_compute_stats(dewpts, "dewptf"),
+            **_compute_stats(winds,  "windmph"),
+            "sample_count": max(len(temps), len(dewpts), len(winds)),
         }
 
     return result
