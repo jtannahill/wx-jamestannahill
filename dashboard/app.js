@@ -494,6 +494,127 @@ function renderTodayContext(current, history) {
   section.hidden = false;
 }
 
+// ── Climate Panel ─────────────────────────────────────────────────────────────
+function renderClimatePanel(data) {
+  const section = document.getElementById('climate-panel');
+  const cc = data.climate_context;
+  if (!cc || (!cc.metrics || !Object.keys(cc.metrics).length) && !cc.verdict) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  // Update anomaly subline
+  const subline = document.getElementById('anomaly-subline');
+  if (cc.headline) {
+    subline.textContent = cc.headline;
+  } else {
+    subline.textContent = '';
+  }
+
+  const isDaily = cc.mode === 'daily' && cc.verdict;
+  const container = document.getElementById('climate-metrics');
+  container.innerHTML = '';
+
+  // Color map per metric
+  const COLORS = { temp: '#e8c84a', dewpoint: '#4ab8e8', wind: '#888888' };
+
+  if (isDaily) {
+    // Daily verdict: high temp, low temp from NOAA
+    const verdict = cc.verdict;
+    const rows = [
+      { key: 'temp_high',  label: 'High Temp',  unit: '°F', color: COLORS.temp },
+      { key: 'temp_low',   label: 'Low Temp',   unit: '°F', color: '#4ab8e8' },
+    ];
+    rows.forEach(({ key, label, unit, color }) => {
+      const m = verdict[key];
+      if (!m) return;
+      const pct   = m.percentile;
+      const since = m.last_exceeded_year ? `· since ${m.last_exceeded_year}` : '· on record';
+      container.innerHTML += `
+        <div class="climate-metric">
+          <div class="climate-metric-row">
+            <span class="climate-metric-label">${label}</span>
+            <span class="climate-metric-value" style="color:${color}">${m.value}${unit}
+              <span class="climate-metric-pct">${pct}th pct ${since}</span>
+            </span>
+          </div>
+          <div class="climate-bar-track">
+            <div class="climate-bar-fill" style="width:${pct}%;background:${color}"></div>
+            <div class="climate-bar-marker" style="left:${pct}%;background:${color}"></div>
+          </div>
+        </div>`;
+    });
+
+    // Dew point from ERA5 (live metrics, muted)
+    const dp = cc.metrics && cc.metrics.dewpoint;
+    if (dp) {
+      container.innerHTML += `
+        <div class="climate-metric" style="opacity:0.6">
+          <div class="climate-metric-row">
+            <span class="climate-metric-label">Dew Point <span style="font-size:9px;color:#444">(ERA5)</span></span>
+            <span class="climate-metric-value" style="color:#4ab8e8">${dp.value}°F
+              <span class="climate-metric-pct">${dp.percentile}th pct</span>
+            </span>
+          </div>
+          <div class="climate-bar-track">
+            <div class="climate-bar-fill" style="width:${dp.percentile}%;background:#4ab8e8"></div>
+          </div>
+        </div>`;
+    }
+
+    const yrs = verdict.temp_high?.years_of_data ?? 156;
+    document.getElementById('climate-footer').textContent =
+      `NOAA Central Park 1869–${new Date().getFullYear()} · ${yrs} yrs`;
+    document.getElementById('climate-source-tag').setAttribute(
+      'data-tooltip',
+      'NOAA GHCN-Daily station USC00305801 (Central Park). Daily high/low temperature going back to 1869.'
+    );
+    document.getElementById('climate-source-tag').textContent = 'NOAA · GHCN';
+
+  } else {
+    // Live mode: current percentile for temp, dewpoint, wind from ERA5
+    const metrics = cc.metrics || {};
+    const order = [
+      { key: 'temp',     label: 'Temperature', unit: '°F',  color: COLORS.temp },
+      { key: 'dewpoint', label: 'Dew Point',   unit: '°F',  color: COLORS.dewpoint },
+      { key: 'wind',     label: 'Wind Speed',  unit: ' mph', color: COLORS.wind },
+    ];
+    order.forEach(({ key, label, unit, color }) => {
+      const m = metrics[key];
+      if (!m) return;
+      const pct = m.percentile;
+      container.innerHTML += `
+        <div class="climate-metric">
+          <div class="climate-metric-row">
+            <span class="climate-metric-label">${label}</span>
+            <span class="climate-metric-value" style="color:${color}">${m.value}${unit}
+              <span class="climate-metric-pct">${pct}th pct</span>
+            </span>
+          </div>
+          <div class="climate-bar-track">
+            <div class="climate-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,#222,${color})"></div>
+            <div class="climate-bar-marker" style="left:${pct}%;background:${color}"></div>
+          </div>
+          <div class="climate-bar-ticks">
+            <span>p25: ${m.p25 ?? '—'}</span>
+            <span>p50: ${m.p50 ?? '—'}</span>
+            <span>p75: ${m.p75 ?? '—'}</span>
+          </div>
+        </div>`;
+    });
+
+    const yrs = metrics.temp?.years_of_data ?? 85;
+    document.getElementById('climate-footer').textContent =
+      `ERA5 1940–${new Date().getFullYear() - 1} · ${yrs} yrs`;
+    document.getElementById('climate-source-tag').setAttribute(
+      'data-tooltip',
+      'ERA5 reanalysis via Open-Meteo Archive. Hourly temperature, dew point, and wind for this exact lat/lon going back to 1940.'
+    );
+    document.getElementById('climate-source-tag').textContent = 'ERA5';
+  }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 function renderSummary(summary) {
   const section = document.getElementById('summary-section');
@@ -648,6 +769,7 @@ async function refresh(forceHistory = false) {
     renderCurrent(current);
     renderTomorrow(current.nws_tomorrow, current.wk_attribution);
     renderSummary(current.daily_summary);
+    renderClimatePanel(current);
     renderStationRecords(current.station_records);
     renderNearby(current.nearby_stations, null);
 
@@ -751,6 +873,7 @@ async function boot() {
     renderCurrent(cc);
     renderTomorrow(cc.nws_tomorrow, cc.wk_attribution);
     renderSummary(cc.daily_summary);
+    renderClimatePanel(cc);
     renderStationRecords(cc.station_records);
     renderNearby(cc.nearby_stations, null);
   }
@@ -773,6 +896,7 @@ async function boot() {
     renderCurrent(cur);
     renderTomorrow(cur.nws_tomorrow, cur.wk_attribution);
     renderSummary(cur.daily_summary);
+    renderClimatePanel(cur);
     renderStationRecords(cur.station_records);
     renderNearby(cur.nearby_stations, null);
   } else {

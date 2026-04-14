@@ -296,3 +296,101 @@ footer a { color: var(--muted); text-decoration: underline; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
   .sr { opacity: 1; transform: none; }
 }
+
+/* ── Climate Panel ─────────────────────────────────────────────────────────── */
+.anomaly-subline {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+.climate-panel {
+  margin-bottom: 32px;
+  padding: 16px 0;
+  border-top: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.climate-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.climate-metric {
+  margin-bottom: 14px;
+}
+
+.climate-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+
+.climate-metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #666;
+}
+
+.climate-metric-value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.climate-metric-pct {
+  font-size: 11px;
+  color: #666;
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.climate-bar-track {
+  height: 4px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  position: relative;
+  margin-bottom: 3px;
+}
+
+.climate-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+.climate-bar-marker {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+}
+
+.climate-bar-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #333;
+}
+
+.climate-footer {
+  font-size: 10px;
+  color: #2a2a2a;
+  text-align: right;
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+}
+
+.climate-verdict-label {
+  font-size: 12px;
+  color: #888;
+  margin-left: 6px;
+}
