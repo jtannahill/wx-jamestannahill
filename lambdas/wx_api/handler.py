@@ -25,6 +25,7 @@ RECORDS_TABLE      = os.environ.get('RECORDS_TABLE',      'wx-station-records')
 CLIMATE_DOY_TABLE    = os.environ.get('CLIMATE_DOY_TABLE',    'wx-climate-doy')
 CLIMATE_HOURLY_TABLE = os.environ.get('CLIMATE_HOURLY_TABLE', 'wx-climate-hourly')
 STATION_SECRET     = 'ambient-weather/station-config'
+DASHBOARD_BUCKET   = os.environ.get('DASHBOARD_BUCKET', 'wx-jamestannahill-dashboard')
 
 _MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -60,6 +61,8 @@ def handler(event, context):
         except Exception as e:
             print(f"Nearby route error: {e}")
             return _resp(500, {'error': 'nearby unavailable'})
+    elif path == '/og.png':
+        return _og_image()
     else:
         return _resp(404, {"error": "Not found"})
 
@@ -550,6 +553,21 @@ def _fetch_climate_hourly(mac: str, doy_hour: str) -> dict | None:
     except Exception as e:
         print(f"Climate hourly fetch (non-fatal): {e}")
         return None
+
+
+def _og_image() -> dict:
+    import boto3
+    s3 = boto3.client('s3', region_name='us-east-1')
+    head = s3.head_object(Bucket=DASHBOARD_BUCKET, Key='og.png')
+    ts = int(head['LastModified'].timestamp())
+    return {
+        'statusCode': 302,
+        'headers': {
+            'Location': f'https://wx.jamestannahill.com/og.png?v={ts}',
+            'Cache-Control': 'no-store',
+        },
+        'body': '',
+    }
 
 
 def _resp(status: int, body: dict) -> dict:
