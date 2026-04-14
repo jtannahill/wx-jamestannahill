@@ -714,50 +714,14 @@ function renderNearby(stations, snapshotAt) {
 }
 
 // ── Rain Events ───────────────────────────────────────────────────────────────
-function renderRainEvents(events) {
-  const section = document.getElementById('rain-events-section');
-  if (!events || !events.length) { section.hidden = true; return; }
-  section.hidden = false;
-
-  const rows = events.map(ev => {
-    const d = new Date(ev.start);
-    const mo = d.getMonth() + 1, day = d.getDate();
-    const h  = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
-    const ampm = h >= 12 ? 'pm' : 'am';
-    const hr12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    const dateStr = `${mo}/${day} ${hr12}:${m}${ampm}`;
-    return `<tr>
-      <td>${dateStr}</td>
-      <td>${ev.duration_min} min</td>
-      <td>${Number(ev.total_in).toFixed(2)}"</td>
-      <td>${Number(ev.peak_rate).toFixed(2)}"/hr</td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('rain-events-table').innerHTML = `
-    <thead><tr><th>DATE / TIME</th><th>DURATION</th><th>TOTAL</th><th>PEAK RATE</th></tr></thead>
-    <tbody>${rows}</tbody>`;
-}
-
-// ── Secondary data (rain events + comfort calendar) ───────────────────────────
+// ── Secondary data (comfort calendar) ────────────────────────────────────────
 let secondaryLoaded = false;
 async function loadSecondaryData() {
-  // Render from cache instantly
-  const cachedEvents = cacheGet('rain_events');
   const cachedSummaries = cacheGet('daily_summaries');
-  if (cachedEvents)    renderRainEvents(cachedEvents);
   if (cachedSummaries) renderComfortCalendar(cachedSummaries);
 
   try {
-    const [evResp, sumResp] = await Promise.all([
-      fetch(`${API_BASE}/rain-events?days=30`),
-      fetch(`${API_BASE}/daily-summaries?days=30`),
-    ]);
-    if (evResp.ok) {
-      const d = await evResp.json();
-      cacheSet('rain_events', d.events || []);
-      renderRainEvents(d.events || []);
-    }
+    const sumResp = await fetch(`${API_BASE}/daily-summaries?days=30`);
     if (sumResp.ok) {
       const d = await sumResp.json();
       cacheSet('daily_summaries', d.summaries || []);

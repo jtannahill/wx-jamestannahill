@@ -284,25 +284,6 @@ header {
 .record-value { font-size: 24px; font-weight: 400; letter-spacing: -0.01em; }
 .record-date  { font-size: 11px; color: #555; margin-top: 4px; }
 
-/* ── Rain Events ─────────────────────────────────────────────────────────── */
-.rain-events-section { margin-bottom: 48px; }
-.rain-events-section .section-title {
-  font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500;
-  margin-bottom: 16px; display: block;
-}
-.rain-events-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
-}
-.rain-events-table th {
-  text-align: left; font-size: 10px; letter-spacing: 0.12em;
-  color: var(--muted); font-weight: 500; padding: 0 0 10px;
-  border-bottom: 1px solid var(--border);
-}
-.rain-events-table td {
-  padding: 10px 0; color: #aaa; border-bottom: 1px solid #181818;
-}
-.rain-events-table th + th,
-.rain-events-table td + td { padding-left: 24px; }
 
 /* ── Nearby Stations ─────────────────────────────────────────────────────── */
 .nearby-section { margin-bottom: 48px; }
@@ -360,10 +341,6 @@ footer a { color: var(--muted); text-decoration: underline; }
   /* Summary blocks: compact side border on small screens */
   .summary-section { padding: 10px 14px; }
   .summary-text { font-size: 13px; }
-  /* Rain table: keep columns readable */
-  .rain-events-table { font-size: 12px; }
-  .rain-events-table th + th,
-  .rain-events-table td + td { padding-left: 14px; }
 }
 
 /* Scroll reveal */
