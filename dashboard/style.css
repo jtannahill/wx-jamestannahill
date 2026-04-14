@@ -411,15 +411,15 @@ footer a { color: var(--muted); text-decoration: underline; }
 
 /* ── Deviation bar (avg → today) ─────────────────────────────────────── */
 .dev-bar {
-  margin-bottom: 2px;
+  margin: 2px 0 6px;
 }
 
 .dev-bar-axis-labels {
   position: relative;
-  height: 14px;
+  height: 15px;
   font-size: 10px;
-  color: #444;
-  margin-bottom: 2px;
+  color: #555;
+  margin-bottom: 4px;
 }
 
 .dev-bar-axis-labels span {
@@ -428,30 +428,39 @@ footer a { color: var(--muted); text-decoration: underline; }
   white-space: nowrap;
 }
 
-.dev-bar-today-label {
-  color: #777 !important;
-}
-
 .dev-bar-track {
   position: relative;
-  height: 3px;
-  background: #1a1a1a;
-  border-radius: 2px;
+  height: 5px;
+  background: #252525;
+  border-radius: 3px;
+  border: 1px solid #333;
 }
 
 .dev-bar-fill {
   position: absolute;
   top: 0;
   height: 100%;
+  opacity: 0.35;
+  border-radius: 2px;
 }
 
 .dev-bar-avg-tick {
   position: absolute;
-  top: -3px;
+  top: -5px;
   width: 1px;
-  height: 9px;
-  background: #444;
+  height: 15px;
+  background: #555;
   transform: translateX(-50%);
+}
+
+.dev-bar-today-dot {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 4px currentColor;
 }
 
 .climate-footer {

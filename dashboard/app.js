@@ -543,25 +543,29 @@ function renderClimatePanel(data) {
       const pct   = m.percentile;
       const since = m.last_exceeded_year ? `since ${m.last_exceeded_year}` : 'on record';
 
-      // Deviation bar: track spans p5→max(p95, value)+buffer; fill from avg→today
+      // Deviation bar: track spans p5→max(p95,value)+buffer; fill avg→today
       let barHtml = '';
       if (m.p5 != null && m.p50 != null && m.p95 != null) {
-        const trackMin = m.p5;
-        const trackMax = Math.max(m.p95, m.value) * 1.03;
-        const span     = trackMax - trackMin;
-        const avgPct   = Math.max(0, Math.min(98, (m.p50  - trackMin) / span * 100));
-        const todayPct = Math.max(2, Math.min(99, (m.value - trackMin) / span * 100));
+        const trackMin  = m.p5;
+        const trackMax  = Math.max(m.p95, m.value) + (m.p95 - m.p5) * 0.06;
+        const span      = trackMax - trackMin;
+        const avgPct    = Math.max(1,  Math.min(96, (m.p50  - trackMin) / span * 100));
+        const todayPct  = Math.max(3,  Math.min(97, (m.value - trackMin) / span * 100));
         const fillLeft  = Math.min(avgPct, todayPct);
         const fillWidth = Math.abs(todayPct - avgPct);
+        // Clamp label anchors so they don't bleed off edges
+        const avgLblPct   = Math.max(4,  Math.min(50, avgPct));
+        const todayLblPct = Math.max(50, Math.min(93, todayPct));
         barHtml = `
           <div class="dev-bar">
             <div class="dev-bar-axis-labels">
-              <span style="left:${avgPct}%">avg ${m.p50}°</span>
-              <span style="left:${todayPct}%" class="dev-bar-today-label">${m.value}°</span>
+              <span style="left:${avgLblPct}%">avg ${m.p50}°</span>
+              <span style="left:${todayLblPct}%;color:${color}">${m.value}°</span>
             </div>
             <div class="dev-bar-track">
-              <div class="dev-bar-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${color}20;border-right:2px solid ${color}"></div>
+              <div class="dev-bar-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${color}"></div>
               <div class="dev-bar-avg-tick" style="left:${avgPct}%"></div>
+              <div class="dev-bar-today-dot" style="left:${todayPct}%;background:${color}"></div>
             </div>
           </div>`;
       }
