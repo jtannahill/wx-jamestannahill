@@ -16,7 +16,7 @@
   <meta property="og:site_name" content="wx.jamestannahill.com">
   <meta property="og:title" content="wx.jamestannahill.com — Midtown Manhattan Weather">
   <meta property="og:description" content="Live hyperlocal weather from a private station in Midtown Manhattan, New York. Updated every 5 minutes.">
-  <meta property="og:image" content="https://wx.jamestannahill.com/og.png">
+  <meta property="og:image" content="https://api.wx.jamestannahill.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:type" content="image/png">
@@ -28,7 +28,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="wx.jamestannahill.com — Midtown Manhattan Weather">
   <meta name="twitter:description" content="Live hyperlocal weather from a private station in Midtown Manhattan. Updated every 5 minutes.">
-  <meta name="twitter:image" content="https://wx.jamestannahill.com/og.png">
+  <meta name="twitter:image" content="https://api.wx.jamestannahill.com/og.png">
   <meta name="twitter:image:alt" content="wx.jamestannahill.com — Live Midtown Manhattan Weather">
   <meta name="twitter:creator" content="@jamestannahill">
   <!-- Schema -->
@@ -104,6 +104,7 @@
     <header>
       <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
       <span class="updated-at" id="updated-at">—</span>
+      <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C">°F</button>
       <button class="share-btn" id="share-btn" title="Share on X">𝕏</button>
       <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
     </header>
@@ -115,7 +116,7 @@
     <section class="hero">
       <div class="temp-block">
         <span class="temp" id="temp">—</span>
-        <span class="temp-unit">°F</span>
+        <span class="temp-unit" id="temp-unit">°F</span>
       </div>
       <div class="feels-like" id="feels-like">Feels like —°F</div>
       <div class="condition" id="condition">—</div>

@@ -5,6 +5,14 @@ let uplot = null;
 let currentField = 'tempf';
 let currentHours = 24;
 let lastHistory = null;
+let _lastSummaries = null;
+
+let useCelsius = localStorage.getItem('wx_celsius') === '1';
+function toC(f)        { return f == null ? null : (f - 32) * 5 / 9; }
+function toDC(f)       { return f == null ? null : f / 1.8; }
+function tempUnit()    { return useCelsius ? '°C' : '°F'; }
+function fmtT(f, dec = 0) { return fmt(useCelsius ? toC(f) : f, dec); }
+function fmtD(f, dec = 1) { return fmt(useCelsius ? toDC(f) : f, dec); }
 
 const FIELD_LABELS = {
   tempf:        { label: 'Temperature', unit: '°F',  decimals: 1 },
@@ -65,8 +73,9 @@ async function fetchHistory(hours = 24) {
 
 // ── Current conditions ────────────────────────────────────────────────────────
 function renderCurrent(data) {
-  document.getElementById('temp').textContent = fmt(data.tempf, 0);
-  document.getElementById('feels-like').textContent = `Feels like ${fmt(data.feelsLike, 0)}°F`;
+  document.getElementById('temp').textContent = fmtT(data.tempf, 0);
+  document.getElementById('temp-unit').textContent = tempUnit();
+  document.getElementById('feels-like').textContent = `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`;
   document.getElementById('condition').textContent = data.condition || '—';
 
   const pr = data.percentile_rank;
@@ -90,7 +99,7 @@ function renderCurrent(data) {
     `From ${degToCompass(data.winddir)} (${fmt(data.winddir, 0)}°)`;
 
   document.getElementById('humidity').textContent = `${fmt(data.humidity, 0)}%`;
-  document.getElementById('dewpoint').textContent = `Dew point ${fmt(data.dewPoint, 0)}°F`;
+  document.getElementById('dewpoint').textContent = `Dew point ${fmtT(data.dewPoint, 0)}${tempUnit()}`;
 
   document.getElementById('pressure').textContent = `${fmt(data.baromrelin, 2)}"`;
   const trend = data.pressure_trend || 'steady';
@@ -123,7 +132,7 @@ function renderCurrent(data) {
   // Urban Heat Island
   const uhi = data.uhi_delta;
   document.getElementById('uhi-delta').textContent =
-    uhi != null ? `${uhi >= 0 ? '+' : ''}${uhi.toFixed(1)}°F` : '—';
+    uhi != null ? `${uhi >= 0 ? '+' : ''}${fmtD(uhi, 1)}${tempUnit()}` : '—';
   document.getElementById('uhi-label').textContent = data.uhi_label ?? 'vs JFK / LGA / EWR';
 
   // Seasonal UHI average for current month
@@ -135,7 +144,7 @@ function renderCurrent(data) {
     if (entry && entry.avg_delta != null && entry.sample_count >= 10) {
       const avg = entry.avg_delta;
       uhiMonthlyEl.textContent =
-        `Typical ${entry.month_name}: ${avg >= 0 ? '+' : ''}${avg.toFixed(1)}°F`;
+        `Typical ${entry.month_name}: ${avg >= 0 ? '+' : ''}${fmtD(avg, 1)}${tempUnit()}`;
     } else {
       uhiMonthlyEl.textContent = '';
     }
@@ -182,7 +191,7 @@ function renderForecast(forecast) {
   ];
   if (forecast.accuracy && forecast.accuracy.mae_1h_tempf != null) {
     const n = forecast.accuracy.evaluation_count;
-    metaParts.push(`±${forecast.accuracy.mae_1h_tempf.toFixed(1)}°F avg error (+1h, n=${n})`);
+    metaParts.push(`±${fmtD(forecast.accuracy.mae_1h_tempf, 1)}${tempUnit()} avg error (+1h, n=${n})`);
   }
   document.getElementById('forecast-meta').textContent = metaParts.filter(Boolean).join(' · ');
 
@@ -193,7 +202,7 @@ function renderForecast(forecast) {
     return `
       <div class="forecast-card">
         <div class="forecast-offset">${label}</div>
-        <div class="forecast-temp">${fmt(h.tempf, 0)}°F</div>
+        <div class="forecast-temp">${fmtT(h.tempf, 0)}${tempUnit()}</div>
         <div class="forecast-fields">
           <div class="forecast-field">Humidity ${fmt(h.humidity, 0)}%</div>
           <div class="forecast-field">Wind ${fmt(h.windspeedmph, 0)} mph</div>
@@ -224,11 +233,11 @@ function makeTooltipPlugin(readings, hours, activeField) {
         const active = v => `<span class="wxt-active">${v}</span>`;
         const rows = [];
         rows.push(`<div class="wxt-time">${fmtChartLabel(new Date(r.timestamp).getTime(), hours)}</div>`);
-        if (r.tempf        != null) rows.push(`<div>Temp&ensp;${activeField==='tempf'        ? active(r.tempf.toFixed(1)+'°F')        : r.tempf.toFixed(1)+'°F'}</div>`);
+        if (r.tempf        != null) { const v = fmtT(r.tempf,1)+tempUnit(); rows.push(`<div>Temp&ensp;${activeField==='tempf' ? active(v) : v}</div>`); }
         if (r.humidity     != null) rows.push(`<div>RH&emsp;&ensp;${activeField==='humidity'    ? active(r.humidity.toFixed(0)+'%')       : r.humidity.toFixed(0)+'%'}</div>`);
         if (r.windspeedmph != null) rows.push(`<div>Wind&ensp;${activeField==='windspeedmph'  ? active(r.windspeedmph.toFixed(1)+' mph') : r.windspeedmph.toFixed(1)+' mph'}</div>`);
         if (r.baromrelin   != null) rows.push(`<div>Pres&ensp;${activeField==='baromrelin'    ? active(r.baromrelin.toFixed(2)+'"')      : r.baromrelin.toFixed(2)+'"'}</div>`);
-        if (r.uhi_delta    != null) rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active((r.uhi_delta>=0?'+':'')+r.uhi_delta.toFixed(1)+'°F') : (r.uhi_delta>=0?'+':'')+r.uhi_delta.toFixed(1)+'°F'}</div>`);
+        if (r.uhi_delta    != null) { const v = (r.uhi_delta>=0?'+':'')+fmtD(r.uhi_delta,1)+tempUnit(); rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active(v) : v}</div>`); }
         if ((r.hourlyrainin??0) > 0.005) rows.push(`<div>Rain&ensp;${r.hourlyrainin.toFixed(2)}"/hr</div>`);
 
         el.innerHTML = rows.join('');
@@ -346,7 +355,8 @@ function renderChart(history, field, hours) {
 function _renderChart(history, field, hours) {
   const wrap = document.getElementById('wx-chart-wrap');
   const dbg  = document.getElementById('wx-chart-status');
-  const cfg      = FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 };
+  const cfg      = { ...(FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 }) };
+  if (useCelsius && (field === 'tempf' || field === 'uhi_delta')) cfg.unit = '°C';
   const readings = history.readings;
 
   const ts      = readings.map(r => new Date(r.timestamp).getTime() / 1000);
@@ -354,6 +364,17 @@ function _renderChart(history, field, hours) {
   const base    = readings.map(r => r[`baseline_${field}`] ?? null);
   const upper   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b+s : null; });
   const lower   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b-s : null; });
+  if (useCelsius) {
+    const cvt = field === 'tempf' ? toC : field === 'uhi_delta' ? toDC : null;
+    if (cvt) {
+      for (let i = 0; i < vals.length; i++) {
+        if (vals[i]  != null) vals[i]  = cvt(vals[i]);
+        if (base[i]  != null) base[i]  = cvt(base[i]);
+        if (upper[i] != null) upper[i] = cvt(upper[i]);
+        if (lower[i] != null) lower[i] = cvt(lower[i]);
+      }
+    }
+  }
   const rain    = readings.map(r => r.hourlyrainin ?? null);
   const maxRain = Math.max(0.01, ...rain.filter(v => v != null && isFinite(v)));
 
@@ -475,8 +496,8 @@ function renderTodayContext(current, history) {
 
   const temps = todayReadings.map(r => r.tempf).filter(v => v != null);
   const gusts = todayReadings.map(r => r.windgustmph).filter(v => v != null);
-  const high     = temps.length  ? Math.round(Math.max(...temps))  : null;
-  const low      = temps.length  ? Math.round(Math.min(...temps))  : null;
+  const high  = temps.length ? Math.round(useCelsius ? toC(Math.max(...temps)) : Math.max(...temps)) : null;
+  const low   = temps.length ? Math.round(useCelsius ? toC(Math.min(...temps)) : Math.min(...temps)) : null;
   const maxGust  = gusts.length  ? Math.round(Math.max(...gusts))  : null;
   const rain     = current.dailyrainin ?? 0;
 
@@ -485,8 +506,8 @@ function renderTodayContext(current, history) {
   // Temp range
   if (high != null && low != null) {
     sentences.push(high - low < 3
-      ? `Temperatures holding near ${Math.round((high + low) / 2)}°F.`
-      : `Temperatures ranging from ${low}°F to ${high}°F so far.`);
+      ? `Temperatures holding near ${Math.round((high + low) / 2)}${tempUnit()}.`
+      : `Temperatures ranging from ${low}${tempUnit()} to ${high}${tempUnit()} so far.`);
   }
 
   // Wind gusts
@@ -537,14 +558,16 @@ function renderClimatePanel(data) {
     // Daily verdict: high temp, low temp from NOAA
     const verdict = cc.verdict;
     const rows = [
-      { key: 'temp_high', label: 'High Temp', unit: '°F', color: COLORS.temp },
-      { key: 'temp_low',  label: 'Low Temp',  unit: '°F', color: '#4ab8e8' },
+      { key: 'temp_high', label: 'High Temp', color: COLORS.temp },
+      { key: 'temp_low',  label: 'Low Temp',  color: '#4ab8e8' },
     ];
-    rows.forEach(({ key, label, unit, color }) => {
+    rows.forEach(({ key, label, color }) => {
       const m = verdict[key];
       if (!m) return;
       const pct   = m.percentile;
       const since = m.last_exceeded_year ? `since ${m.last_exceeded_year}` : 'on record';
+      const dispVal = fmtT(m.value, 0);
+      const dispP50 = fmtT(m.p50, 0);
 
       // Deviation bar: track spans p5→max(p95,value)+buffer; fill avg→today
       let barHtml = '';
@@ -561,7 +584,7 @@ function renderClimatePanel(data) {
             <div class="dev-bar-track">
               <div class="dev-bar-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${color}"></div>
               <div class="dev-bar-avg-tick" style="left:${avgPct}%">
-                <span class="dev-bar-avg-label">avg ${m.p50}°</span>
+                <span class="dev-bar-avg-label">avg ${dispP50}°</span>
               </div>
               <div class="dev-bar-today-dot" style="left:${todayPct}%;background:${color}"></div>
             </div>
@@ -572,7 +595,7 @@ function renderClimatePanel(data) {
         <div class="climate-metric">
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
-            <span class="climate-metric-value" style="color:${color}">${m.value}${unit}
+            <span class="climate-metric-value" style="color:${color}">${dispVal}${tempUnit()}
               <span class="climate-metric-pct">${pct}th pct · ${since}</span>
             </span>
           </div>
@@ -587,7 +610,7 @@ function renderClimatePanel(data) {
         <div class="climate-metric" style="opacity:0.6">
           <div class="climate-metric-row">
             <span class="climate-metric-label">Dew Point <span style="font-size:9px;color:#444">(ERA5)</span></span>
-            <span class="climate-metric-value" style="color:#4ab8e8">${dp.value}°F
+            <span class="climate-metric-value" style="color:#4ab8e8">${fmtT(dp.value, 0)}${tempUnit()}
               <span class="climate-metric-pct">${dp.percentile}th pct</span>
             </span>
           </div>
@@ -607,19 +630,24 @@ function renderClimatePanel(data) {
     // Live mode: current percentile for temp, dewpoint, wind from ERA5
     const metrics = cc.metrics || {};
     const order = [
-      { key: 'temp',     label: 'Temperature', unit: '°F',  color: COLORS.temp },
-      { key: 'dewpoint', label: 'Dew Point',   unit: '°F',  color: COLORS.dewpoint },
-      { key: 'wind',     label: 'Wind Speed',  unit: ' mph', color: COLORS.wind },
+      { key: 'temp',     label: 'Temperature', isTemp: true,  color: COLORS.temp },
+      { key: 'dewpoint', label: 'Dew Point',   isTemp: true,  color: COLORS.dewpoint },
+      { key: 'wind',     label: 'Wind Speed',  isTemp: false, color: COLORS.wind },
     ];
-    order.forEach(({ key, label, unit, color }) => {
+    order.forEach(({ key, label, isTemp, color }) => {
       const m = metrics[key];
       if (!m) return;
-      const pct = m.percentile;
+      const pct  = m.percentile;
+      const unit = isTemp ? tempUnit() : ' mph';
+      const dispVal = isTemp ? fmtT(m.value, 0) : m.value;
+      const dispP25 = isTemp ? fmtT(m.p25, 0) : (m.p25 ?? '—');
+      const dispP50 = isTemp ? fmtT(m.p50, 0) : (m.p50 ?? '—');
+      const dispP75 = isTemp ? fmtT(m.p75, 0) : (m.p75 ?? '—');
       container.innerHTML += `
         <div class="climate-metric">
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
-            <span class="climate-metric-value" style="color:${color}">${m.value}${unit}
+            <span class="climate-metric-value" style="color:${color}">${dispVal}${unit}
               <span class="climate-metric-pct">${pct}th pct</span>
             </span>
           </div>
@@ -628,9 +656,9 @@ function renderClimatePanel(data) {
             <div class="climate-bar-marker" style="left:${pct}%;background:${color}"></div>
           </div>
           <div class="climate-bar-ticks">
-            <span>p25: ${m.p25 ?? '—'}</span>
-            <span>p50: ${m.p50 ?? '—'}</span>
-            <span>p75: ${m.p75 ?? '—'}</span>
+            <span>p25: ${dispP25}</span>
+            <span>p50: ${dispP50}</span>
+            <span>p75: ${dispP75}</span>
           </div>
         </div>`;
     });
@@ -663,6 +691,7 @@ function renderComfortCalendar(summaries) {
   if (!summaries || !summaries.length) { section.hidden = true; return; }
   section.hidden = false;
 
+  _lastSummaries = summaries;
   const sorted = [...summaries].sort((a, b) => a.date.localeCompare(b.date));
   const grid = document.getElementById('comfort-grid');
   grid.innerHTML = sorted.map(s => {
@@ -672,7 +701,7 @@ function renderComfortCalendar(summaries) {
     const d     = new Date(s.date + 'T12:00:00');
     const label = `${d.getMonth() + 1}/${d.getDate()}`;
     const rain  = s.total_rain > 0.01 ? ` · ${Number(s.total_rain).toFixed(2)}"` : '';
-    const tip   = `${s.date}: ${score}/100 comfort · ${s.temp_high}°–${s.temp_low}°F${rain}`;
+    const tip   = `${s.date}: ${score}/100 comfort · ${fmtT(s.temp_high,0)}°–${fmtT(s.temp_low,0)}${tempUnit()}${rain}`;
     return `<div class="comfort-cell has-tooltip" style="background:${color}" data-tooltip="${tip}">
       <span class="comfort-cell-label">${label}</span>
     </div>`;
@@ -694,8 +723,8 @@ function renderStationRecords(records) {
   document.getElementById('records-month').textContent = records.scope === 'all-time' ? 'all time' : (records.month_name || '');
 
   const items = [];
-  if (records.temp_high    != null) items.push({ label: 'HIGH TEMP',     value: `${records.temp_high}°F`,     date: records.temp_high_at });
-  if (records.temp_low     != null) items.push({ label: 'LOW TEMP',      value: `${records.temp_low}°F`,      date: records.temp_low_at });
+  if (records.temp_high    != null) items.push({ label: 'HIGH TEMP',     value: `${fmtT(records.temp_high, 0)}${tempUnit()}`,     date: records.temp_high_at });
+  if (records.temp_low     != null) items.push({ label: 'LOW TEMP',      value: `${fmtT(records.temp_low, 0)}${tempUnit()}`,      date: records.temp_low_at });
   if (records.max_gust     != null) items.push({ label: 'MAX GUST',      value: `${records.max_gust} mph`,    date: records.max_gust_at });
   if (records.max_rain_rate!= null) items.push({ label: 'PEAK RAIN',     value: `${records.max_rain_rate}"/hr`, date: records.max_rain_rate_at });
   if (records.min_pressure != null) items.push({ label: 'MIN PRESSURE',  value: `${records.min_pressure}"`,   date: records.min_pressure_at });
@@ -721,7 +750,7 @@ function renderNearby(stations, snapshotAt) {
   if (snapshotAt) meta.textContent = new Date(snapshotAt).toLocaleTimeString();
 
   strip.innerHTML = stations.map(s => {
-    const temp = s.temp_f != null ? `${Math.round(s.temp_f)}°` : '–';
+    const temp = s.temp_f != null ? `${fmtT(s.temp_f, 0)}${tempUnit()}` : '–';
     const rain = s.rain_rate_in_hr > 0 ? `${s.rain_rate_in_hr.toFixed(2)}" /hr` : '';
     const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
     return `<div class="nearby-chip">
@@ -804,6 +833,26 @@ document.querySelectorAll('.range-btn').forEach(btn => {
       renderChart(lastHistory, currentField, currentHours);
     } catch (e) { console.error('Range fetch failed:', e); }
   });
+});
+
+const unitToggleBtn = document.getElementById('unit-toggle');
+unitToggleBtn.textContent = useCelsius ? '°C' : '°F';
+if (useCelsius) unitToggleBtn.classList.add('celsius');
+unitToggleBtn.addEventListener('click', () => {
+  useCelsius = !useCelsius;
+  localStorage.setItem('wx_celsius', useCelsius ? '1' : '0');
+  unitToggleBtn.textContent = useCelsius ? '°C' : '°F';
+  unitToggleBtn.classList.toggle('celsius', useCelsius);
+  document.getElementById('temp-unit').textContent = tempUnit();
+  if (_bootCurrent) {
+    renderCurrent(_bootCurrent);
+    renderClimatePanel(_bootCurrent);
+    renderStationRecords(_bootCurrent.station_records);
+    renderNearby(_bootCurrent.nearby_stations, null);
+    renderTodayContext(_bootCurrent, lastHistory);
+  }
+  if (_lastSummaries) renderComfortCalendar(_lastSummaries);
+  if (lastHistory) renderChart(lastHistory, currentField, currentHours);
 });
 
 const refreshBtn = document.getElementById('refresh-btn');
@@ -904,8 +953,8 @@ document.querySelectorAll('.card[data-scroll-to]').forEach(card => {
 
 // ── Share to X ───────────────────────────────────────────────────────────────
 function buildShareText(data) {
-  const temp   = fmt(data.tempf, 0);
-  const feels  = fmt(data.feelsLike, 0);
+  const temp   = fmtT(data.tempf, 0);
+  const feels  = fmtT(data.feelsLike, 0);
   const cond   = data.condition || '';
   const anomaly = data.anomalies?.temp?.label || '';
   const hum    = fmt(data.humidity, 0);
@@ -913,9 +962,9 @@ function buildShareText(data) {
   const comfort = data.comfort;
   const rp     = data.rain_probability;
 
-  let line1 = `Midtown Manhattan: ${temp}°F`;
+  let line1 = `Midtown Manhattan: ${temp}${tempUnit()}`;
   if (cond) line1 += ` · ${cond}`;
-  if (feels !== temp) line1 += ` · Feels ${feels}°F`;
+  if (feels !== temp) line1 += ` · Feels ${feels}${tempUnit()}`;
   if (anomaly) line1 += ` · ${anomaly}`;
 
   let line2 = `${hum}% humidity · Wind ${wind}`;
