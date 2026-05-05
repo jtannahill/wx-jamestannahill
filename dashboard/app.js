@@ -14,6 +14,23 @@ function tempUnit()    { return useCelsius ? '°C' : '°F'; }
 function fmtT(f, dec = 0) { return fmt(useCelsius ? toC(f) : f, dec); }
 function fmtD(f, dec = 1) { return fmt(useCelsius ? toDC(f) : f, dec); }
 
+// Server gives us anomaly labels like "16.3°F above average for 7pm in May"
+// with the °F baked in. Recompose in °C when the toggle is on.
+function localizeTempAnomalyLabel(temp) {
+  if (!temp || !temp.label) return '';
+  if (!useCelsius) return temp.label;
+  const delta = temp.delta;
+  if (delta != null && Math.abs(delta) >= 0.5) {
+    const c = (Math.abs(delta) / 1.8).toFixed(1);
+    return temp.label.replace(/^\d+(?:\.\d+)?°F/, `${c}°C`);
+  }
+  // "near average ..." or unknown → fallback to a generic °F → °C swap
+  return temp.label.replace(/(-?\d+(?:\.\d+)?)°F/g, (_, n) => {
+    const c = (parseFloat(n) / 1.8).toFixed(1);
+    return `${c}°C`;
+  });
+}
+
 const FIELD_LABELS = {
   tempf:        { label: 'Temperature', unit: '°F',  decimals: 1 },
   humidity:     { label: 'Humidity',    unit: '%',   decimals: 0 },
@@ -83,7 +100,7 @@ function renderCurrent(data) {
 
   const topAnomaly = data.anomalies?.temp;
   const anomalyEl = document.getElementById('anomaly-headline');
-  anomalyEl.textContent = topAnomaly ? topAnomaly.label : '';
+  anomalyEl.textContent = localizeTempAnomalyLabel(topAnomaly);
   if (topAnomaly && data.baseline_sample_count > 0) {
     const n = data.baseline_sample_count.toLocaleString();
     const src = data.baseline_source === 'era5'
