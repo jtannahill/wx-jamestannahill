@@ -348,6 +348,20 @@ class WxStack(Stack):
         self.api_fn.add_environment("CLIMATE_DOY_TABLE",    self.climate_doy_table.table_name)
         self.api_fn.add_environment("CLIMATE_HOURLY_TABLE", self.climate_hourly_table.table_name)
 
+        # Grant API Lambda read access to dashboard bucket (og.png + index.html for /og.png and /refresh-og)
+        self.api_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:GetObject"],
+            resources=[f"arn:aws:s3:::wx-jamestannahill-dashboard/*"],
+        ))
+        self.api_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:PutObject"],
+            resources=["arn:aws:s3:::wx-jamestannahill-dashboard/index.html"],
+        ))
+        self.api_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["cloudfront:CreateInvalidation"],
+            resources=[f"arn:aws:cloudfront::{self.account}:distribution/E2OIRPWQ2L8LB6"],
+        ))
+
         # --- API Gateway HTTP API ---
         http_api = apigwv2.HttpApi(
             self, "WxHttpApi",
@@ -362,7 +376,8 @@ class WxStack(Stack):
         http_api.add_routes(path="/history",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/rain-events",        methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/daily-summaries",    methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
-        http_api.add_routes(path="/nearby", methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/nearby",         methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        # /og.png and /refresh-og routes exist in API GW (added manually) — managed outside CDK
 
         # --- CloudFront in front of API Gateway ---
         api_origin = origins.HttpOrigin(

@@ -146,6 +146,34 @@ header {
 .forecast-field  { font-size: 12px; color: var(--muted); line-height: 1.7; }
 
 .chart-section { margin-bottom: 48px; }
+.chart-section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.chart-actions {
+  display: flex; align-items: center; gap: 6px;
+}
+.chart-action-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  width: 28px; height: 28px; cursor: pointer; padding: 0;
+  font-family: inherit; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.chart-action-btn:hover, .chart-action-btn:active {
+  border-color: var(--accent); color: var(--accent);
+}
+.chart-action-btn.flash {
+  border-color: var(--anomaly); color: var(--anomaly);
+}
+.chart-hint {
+  font-size: 9.5px; letter-spacing: 0.05em; color: #333;
+  margin-top: 8px; text-align: right;
+}
+@media (max-width: 600px) {
+  .chart-hint { font-size: 9px; text-align: center; }
+}
 .chart-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .chart-controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .chart-btn, .range-btn {
@@ -211,7 +239,7 @@ header {
   height: 0;
 }
 .swatch-band {
-  background: rgba(110,120,150,0.25);
+  background: rgba(150,160,190,0.45);
   height: 10px;
   border-radius: 2px;
 }
@@ -341,7 +369,19 @@ footer a { color: var(--muted); text-decoration: underline; }
 
 @media (max-width: 600px) {
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }
-  .forecast-grid   { grid-template-columns: repeat(1, 1fr); }
+  /* Compact analog forecast: row layout — offset | big temp | inline fields */
+  .forecast-grid   { grid-template-columns: 1fr; }
+  .forecast-card   {
+    display: grid;
+    grid-template-columns: 56px auto 1fr;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+  .forecast-offset { margin-bottom: 0; font-size: 9.5px; }
+  .forecast-temp   { font-size: 22px; }
+  .forecast-fields { margin-top: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: flex-end; }
+  .forecast-field  { font-size: 11px; line-height: 1.2; }
   .records-grid    { grid-template-columns: repeat(2, 1fr); }
   .comfort-cell    { width: 30px; height: 30px; }
   .temp            { font-size: clamp(72px, 20vw, 96px); }

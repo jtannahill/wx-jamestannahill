@@ -292,7 +292,7 @@ function makeDrawPlugin(tsArr, baseArr, upperArr, lowerArr) {
               ctx.lineTo(px, py);
             }
             ctx.closePath();
-            ctx.fillStyle = 'rgba(110,120,150,0.09)';
+            ctx.fillStyle = 'rgba(150,160,190,0.22)';
             ctx.fill();
           }
 
@@ -300,7 +300,7 @@ function makeDrawPlugin(tsArr, baseArr, upperArr, lowerArr) {
           const hasBase = baseArr && baseArr.some(v => v != null);
           if (hasBase) {
             ctx.setLineDash([4, 6]);
-            ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.42)';
             ctx.lineWidth   = 1;
             ctx.beginPath();
             let started = false;
@@ -345,6 +345,109 @@ function makeNowLinePlugin() {
       }]
     }
   };
+}
+
+// Show/hide the Reset button based on whether the chart's x-scale matches the data extent.
+function makeZoomTrackerPlugin(tsArr) {
+  const t0 = tsArr.length ? tsArr[0]              : null;
+  const t1 = tsArr.length ? tsArr[tsArr.length-1] : null;
+  return {
+    hooks: {
+      setScale: [(u, key) => {
+        if (key !== 'x' || t0 == null) return;
+        const sc = u.scales.x;
+        const zoomed = sc && (sc.min > t0 + 1 || sc.max < t1 - 1);
+        const btn = document.getElementById('chart-zoom-reset');
+        if (btn) btn.hidden = !zoomed;
+      }],
+    },
+  };
+}
+
+function resetChartZoom() {
+  if (!uplot || !uplot.data?.[0]?.length) return;
+  const xs = uplot.data[0];
+  uplot.setScale('x', { min: xs[0], max: xs[xs.length - 1] });
+}
+
+// Compose a clean PNG of the chart (with title, station, timestamp) for copy/share.
+async function exportChartPng() {
+  if (!uplot) return null;
+  const src = uplot.ctx.canvas;
+  const dpr = window.devicePixelRatio || 1;
+  const padTop = 56 * dpr, padBot = 36 * dpr, padX = 24 * dpr;
+  const out = document.createElement('canvas');
+  out.width  = src.width  + padX * 2;
+  out.height = src.height + padTop + padBot;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, out.width, out.height);
+  // Title
+  ctx.fillStyle = '#e8e0d0';
+  ctx.font = `${14 * dpr}px "NHG Display", -apple-system, sans-serif`;
+  ctx.textBaseline = 'top';
+  const cfg = FIELD_LABELS[currentField] || { label: currentField };
+  const rangeLabel = currentHours === 24 ? '24h' : currentHours === 168 ? '7d' : '30d';
+  ctx.fillText(`${cfg.label.toUpperCase()} · ${rangeLabel}`, padX, 14 * dpr);
+  ctx.fillStyle = '#666';
+  ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
+  ctx.fillText('MIDTOWN MANHATTAN, NEW YORK', padX, 34 * dpr);
+  // Chart
+  ctx.drawImage(src, padX, padTop);
+  // Footer
+  ctx.fillStyle = '#444';
+  ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
+  ctx.fillText(`wx.jamestannahill.com · ${new Date().toLocaleString()}`, padX, padTop + src.height + 10 * dpr);
+  return new Promise(res => out.toBlob(b => res(b), 'image/png'));
+}
+
+async function copyChartImage() {
+  const blob = await exportChartPng();
+  if (!blob) return false;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      return true;
+    }
+  } catch (e) { console.warn('[copy chart]', e); }
+  // Fallback: open in a new tab so the user can save/copy manually
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return false;
+}
+
+async function shareChartImage() {
+  const blob = await exportChartPng();
+  if (!blob) return false;
+  const file = new File([blob], 'wx-chart.png', { type: 'image/png' });
+  const cfg = FIELD_LABELS[currentField] || { label: currentField };
+  const rangeLabel = currentHours === 24 ? '24h' : currentHours === 168 ? '7d' : '30d';
+  const shareData = {
+    title: `${cfg.label} · ${rangeLabel} — Midtown Manhattan`,
+    text:  `${cfg.label} · ${rangeLabel} — wx.jamestannahill.com`,
+    url:   'https://wx.jamestannahill.com',
+  };
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ ...shareData, files: [file] });
+      return true;
+    }
+    if (navigator.share) {
+      await navigator.share(shareData);
+      return true;
+    }
+  } catch (e) {
+    if (e?.name !== 'AbortError') console.warn('[share chart]', e);
+  }
+  // Desktop fallback: copy + open Twitter intent
+  await copyChartImage();
+  const tweetText = `${shareData.text} (chart copied to clipboard — paste into the tweet)`;
+  window.open(
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareData.url)}`,
+    '_blank', 'noopener,noreferrer,width=600,height=450',
+  );
+  return false;
 }
 
 function renderChart(history, field, hours) {
@@ -404,7 +507,7 @@ function _renderChart(history, field, hours) {
     uplot = new uPlot({
       width:  W,
       height: H,
-      cursor: { y: false, drag: { x: false, y: false }, points: { size: 0 } },
+      cursor: { y: false, drag: { x: true, y: false, dist: 8, uni: 8 }, points: { size: 0 } },
       legend: { show: false },
       axes: [
         {
@@ -441,9 +544,12 @@ function _renderChart(history, field, hours) {
         makeDrawPlugin(ts, base, upper, lower),
         makeTooltipPlugin(readings, hours, field),
         makeNowLinePlugin(),
+        makeZoomTrackerPlugin(ts),
       ],
     }, [ts, vals, rain], wrap);
     if (dbg) dbg.textContent = '';
+    // Double-click anywhere on the chart to reset zoom
+    wrap.ondblclick = () => resetChartZoom();
   } catch (e) {
     console.error('[wx chart]', e);
     if (dbg) dbg.textContent = `ERR: ${e.message}`;
@@ -971,7 +1077,9 @@ function buildShareText(data) {
   if (comfort?.score) line2 += ` · Comfort ${comfort.score} (${comfort.label})`;
   if (rp?.probability >= 30) line2 += ` · ${rp.probability}% rain next hr`;
 
-  return `${line1}\n\n${line2}\n\nwx.jamestannahill.com #NYC #weather`;
+  // Cache-buster on the URL forces Twitter to do a fresh og.png scrape per tweet
+  const v = Math.floor(Date.now() / 1000);
+  return `${line1}\n\n${line2}\n\nhttps://wx.jamestannahill.com/?v=${v} #NYC #weather`;
 }
 
 document.getElementById('share-btn').addEventListener('click', async () => {
@@ -980,8 +1088,26 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
   // Stamp a fresh ?v= on index.html's og:image before opening Twitter so the
   // card fetcher sees a URL it hasn't cached and pulls the latest og.png.
-  try { await fetch(`${API}/refresh-og`); } catch (_) { /* non-fatal */ }
+  try { await fetch(`${API_BASE}/refresh-og`); } catch (_) { /* non-fatal */ }
   window.open(tweetUrl, '_blank', 'noopener,noreferrer,width=600,height=450');
+});
+
+// Chart toolbar — reset / copy / share
+function flashBtn(el, label, ms = 1100) {
+  if (!el) return;
+  const orig = el.textContent;
+  el.textContent = label;
+  el.classList.add('flash');
+  setTimeout(() => { el.textContent = orig; el.classList.remove('flash'); }, ms);
+}
+document.getElementById('chart-zoom-reset')?.addEventListener('click', () => resetChartZoom());
+document.getElementById('chart-copy-btn')?.addEventListener('click', async (e) => {
+  const ok = await copyChartImage();
+  flashBtn(e.currentTarget, ok ? '✓' : '↗');
+});
+document.getElementById('chart-share-btn')?.addEventListener('click', async (e) => {
+  await shareChartImage();
+  flashBtn(e.currentTarget, '✓');
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

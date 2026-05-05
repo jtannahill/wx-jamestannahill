@@ -16,7 +16,7 @@
   <meta property="og:site_name" content="wx.jamestannahill.com">
   <meta property="og:title" content="wx.jamestannahill.com — Midtown Manhattan Weather">
   <meta property="og:description" content="Live hyperlocal weather from a private station in Midtown Manhattan, New York. Updated every 5 minutes.">
-  <meta property="og:image" content="https://api.wx.jamestannahill.com/og.png">
+  <meta property="og:image" content="https://wx.jamestannahill.com/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:type" content="image/png">
@@ -28,7 +28,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="wx.jamestannahill.com — Midtown Manhattan Weather">
   <meta name="twitter:description" content="Live hyperlocal weather from a private station in Midtown Manhattan. Updated every 5 minutes.">
-  <meta name="twitter:image" content="https://api.wx.jamestannahill.com/og.png">
+  <meta name="twitter:image" content="https://wx.jamestannahill.com/og.png">
   <meta name="twitter:image:alt" content="wx.jamestannahill.com — Live Midtown Manhattan Weather">
   <meta name="twitter:creator" content="@jamestannahill">
   <!-- Schema -->
@@ -236,21 +236,15 @@
       <div class="forecast-grid" id="forecast-grid"></div>
     </section>
 
-    <section class="records-section sr" id="records-section" hidden>
-      <div class="section-header">
-        <span class="section-title">STATION RECORDS</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="section-meta" id="records-month"></span>
+    <section class="chart-section">
+      <div class="chart-section-header">
+        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
+        <div class="chart-actions">
+          <button class="chart-action-btn" id="chart-zoom-reset" title="Reset zoom" hidden>↻</button>
+          <button class="chart-action-btn" id="chart-copy-btn" title="Copy chart">⧉</button>
+          <button class="chart-action-btn" id="chart-share-btn" title="Share chart">↗</button>
           <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
         </div>
-      </div>
-      <div class="records-grid" id="records-grid"></div>
-    </section>
-
-    <section class="chart-section">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
-        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
       </div>
       <div class="chart-controls">
         <div class="chart-controls-row">
@@ -281,6 +275,18 @@
           <span class="chart-legend-swatch swatch-rain"></span>Rainfall
         </span>
       </div>
+      <div class="chart-hint">Drag horizontally to zoom · Double-click to reset</div>
+    </section>
+
+    <section class="records-section sr" id="records-section" hidden>
+      <div class="section-header">
+        <span class="section-title">STATION RECORDS</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="records-month"></span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        </div>
+      </div>
+      <div class="records-grid" id="records-grid"></div>
     </section>
 
     <!-- Nearby Stations -->

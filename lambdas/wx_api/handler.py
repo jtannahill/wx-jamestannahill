@@ -558,18 +558,39 @@ def _fetch_climate_hourly(mac: str, doy_hour: str) -> dict | None:
 
 
 def _og_image() -> dict:
-    import boto3
-    s3 = boto3.client('s3', region_name='us-east-1')
-    head = s3.head_object(Bucket=DASHBOARD_BUCKET, Key='og.png')
-    ts = int(head['LastModified'].timestamp())
-    return {
-        'statusCode': 302,
-        'headers': {
-            'Location': f'https://wx.jamestannahill.com/og.png?v={ts}',
-            'Cache-Control': 'no-store',
-        },
-        'body': '',
-    }
+    import base64
+    from wx_api.og_image import render_og
+    from wx_api.anomaly import condition_label
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        result = get_table(READINGS_TABLE).query(
+            KeyConditionExpression=Key('station_id').eq(mac),
+            ScanIndexForward=False,
+            Limit=5,
+        )
+        items = [_floatify(r) for r in result.get('Items', [])]
+        if not items:
+            return _resp(503, {'error': 'no data'})
+        reading = next(
+            (r for r in items if r.get('tempf') is not None and not r.get('quality_flag')),
+            items[0],
+        )
+        condition = condition_label(reading)
+        uhi_delta = reading.get('uhi_delta')
+        png = render_og(reading, condition, uhi_delta=uhi_delta)
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'image/png',
+                'Cache-Control': 'no-store, max-age=0',
+            },
+            'body': base64.b64encode(png).decode('utf-8'),
+            'isBase64Encoded': True,
+        }
+    except Exception as e:
+        print(f"[og_image] {e}")
+        return _resp(503, {'error': 'og image unavailable'})
 
 
 DASHBOARD_CF_ID = 'E2OIRPWQ2L8LB6'
@@ -586,7 +607,7 @@ def _refresh_og() -> dict:
         obj  = s3.get_object(Bucket=DASHBOARD_BUCKET, Key='index.html')
         html = obj['Body'].read().decode('utf-8')
         html = re.sub(
-            r'(content="https://wx\.jamestannahill\.com/og\.png)(?:\?v=\d+)?(")',
+            r'(content="https://(?:api\.)?wx\.jamestannahill\.com/og\.png)(?:\?v=\d+)?(")',
             rf'\g<1>?v={ts}\2',
             html,
         )

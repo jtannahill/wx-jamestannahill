@@ -28,6 +28,9 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 - Time ranges: 24h / 7d / 30d with automatic downsampling
 - Historical baseline overlay (dotted line)
 - **±1σ anomaly bands** — shaded region between ±1 standard deviation of the baseline, derived from Welford's online variance computed across 90 days of readings
+- **Drag-to-zoom** on the x-axis with a Reset button; double-click resets
+- **Copy** the rendered chart to the clipboard as a branded PNG (title, location, timestamp baked in)
+- **Share** uses the Web Share API on mobile (image + URL) and falls back to clipboard + Twitter intent on desktop
 - Rendered with **uPlot** for high-performance canvas drawing
 
 ### API
@@ -109,7 +112,7 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | Station | Ambient Weather WS-2902, Wi-Fi gateway |
 | Compute | AWS Lambda (Python 3.12, arm64) |
 | Scheduling | AWS EventBridge |
-| Storage | AWS DynamoDB (on-demand, 10 tables) |
+| Storage | AWS DynamoDB (on-demand, 12 tables) |
 | API | AWS API Gateway HTTP API |
 | CDN | AWS CloudFront (API + dashboard) |
 | Dashboard | Vanilla JS, uPlot, NHG Display font |
@@ -136,7 +139,8 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | `wx-ml-models` | model_id | Fitted logistic regression weights + metrics |
 | `wx-daily-summaries` | station_id + date | Daily stats + prose summary |
 | `wx-station-records` | station_id + month | Per-month extreme records with dates |
-| `wx-climate-normals` | station_id + date | 156yr NOAA + 85yr ERA5 historical daily normals |
+| `wx-climate-doy` | mmdd | NOAA GHCN per-day-of-year distributions (156yr Central Park) |
+| `wx-climate-hourly` | doy + hour | ERA5 per-DOY-hour distributions (85yr reanalysis) |
 
 ---
 
