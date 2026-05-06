@@ -198,6 +198,11 @@ header {
   border: 1px solid var(--border);
   padding: 16px 0 8px;
   overflow: hidden;
+  /* Keep horizontal pan smooth on touch — vertical scroll still passes through
+     the page; the gesture plugin only preventDefaults when zoomed + horizontal. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 /* Prevent canvas from overflowing on HiDPI / mobile */
 .wx-chart-wrap canvas {

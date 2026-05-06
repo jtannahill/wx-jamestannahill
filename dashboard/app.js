@@ -14,6 +14,14 @@ function tempUnit()    { return useCelsius ? '°C' : '°F'; }
 function fmtT(f, dec = 0) { return fmt(useCelsius ? toC(f) : f, dec); }
 function fmtD(f, dec = 1) { return fmt(useCelsius ? toDC(f) : f, dec); }
 
+function rangeLabelFor(hours) {
+  if (hours === 12)  return '12h';
+  if (hours === 24)  return '24h';
+  if (hours === 168) return '7d';
+  if (hours === 720) return '30d';
+  return `${hours}h`;
+}
+
 // Server gives us anomaly labels like "16.3°F above average for 7pm in May"
 // with the °F baked in. Recompose in °C when the toggle is on.
 function localizeTempAnomalyLabel(temp) {
@@ -364,6 +372,141 @@ function makeNowLinePlugin() {
   };
 }
 
+// Smooth, intuitive chart gestures:
+//   • mouse wheel / trackpad scroll → zoom centered on cursor
+//   • horizontal trackpad scroll    → pan
+//   • mouse drag                    → pan
+//   • two-finger pinch (touch)      → zoom centered on midpoint
+//   • one-finger drag (touch)       → pan when zoomed in (scrolls page otherwise)
+function makeChartGesturesPlugin() {
+  let dataMin = 0, dataMax = 0;
+  let mousePan = null, touchPan = null, pinch = null;
+  const MIN_SPAN_S = 300; // don't zoom past 5 minutes
+  const ZOOM_SENS  = 0.0014;
+
+  const clamp = (min, max) => {
+    if (min < dataMin) { max += dataMin - min; min = dataMin; }
+    if (max > dataMax) { min -= max - dataMax; max = dataMax; }
+    return { min: Math.max(min, dataMin), max: Math.min(max, dataMax) };
+  };
+  const enforceMinSpan = (min, max) => {
+    if (max - min >= MIN_SPAN_S) return { min, max };
+    const c = (min + max) / 2;
+    return { min: c - MIN_SPAN_S / 2, max: c + MIN_SPAN_S / 2 };
+  };
+  const zoomAt = (u, center, factor) => {
+    const sx = u.scales.x; if (sx.min == null) return;
+    let { min, max } = enforceMinSpan(
+      center + (sx.min - center) * factor,
+      center + (sx.max - center) * factor,
+    );
+    u.setScale('x', clamp(min, max));
+  };
+  const panBy = (u, dxFrac) => {
+    const sx = u.scales.x; if (sx.min == null) return;
+    const range = sx.max - sx.min;
+    const shift = -dxFrac * range;
+    u.setScale('x', clamp(sx.min + shift, sx.max + shift));
+  };
+  const isZoomed = u => {
+    const sx = u.scales.x;
+    return sx && sx.min != null && (sx.min > dataMin + 1 || sx.max < dataMax - 1);
+  };
+  const pinchD = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+  return {
+    hooks: {
+      ready: u => {
+        const over = u.over;
+        const xs = u.data[0];
+        if (xs && xs.length) { dataMin = xs[0]; dataMax = xs[xs.length - 1]; }
+
+        // Wheel: vertical = zoom, horizontal = pan
+        over.addEventListener('wheel', e => {
+          if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.4) {
+            e.preventDefault();
+            panBy(u, e.deltaX / over.getBoundingClientRect().width);
+          } else {
+            e.preventDefault();
+            const rect = over.getBoundingClientRect();
+            const cursorVal = u.posToVal(e.clientX - rect.left, 'x');
+            zoomAt(u, cursorVal, Math.exp(e.deltaY * ZOOM_SENS));
+          }
+        }, { passive: false });
+
+        // Mouse drag = pan
+        over.addEventListener('mousedown', e => {
+          if (e.button !== 0) return;
+          const sx = u.scales.x;
+          mousePan = { x: e.clientX, w: over.getBoundingClientRect().width, min: sx.min, max: sx.max };
+          over.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', e => {
+          if (!mousePan) return;
+          const dxFrac = (mousePan.x - e.clientX) / mousePan.w;
+          const range  = mousePan.max - mousePan.min;
+          u.setScale('x', clamp(mousePan.min + dxFrac * range, mousePan.max + dxFrac * range));
+        });
+        window.addEventListener('mouseup', () => {
+          if (!mousePan) return;
+          mousePan = null;
+          over.style.cursor = isZoomed(u) ? 'grab' : '';
+        });
+        over.addEventListener('mouseenter', () => {
+          if (!mousePan) over.style.cursor = isZoomed(u) ? 'grab' : '';
+        });
+
+        // Touch: 2-finger pinch zoom; 1-finger pan when already zoomed
+        over.addEventListener('touchstart', e => {
+          if (e.touches.length === 2) {
+            const sx = u.scales.x;
+            const rect = over.getBoundingClientRect();
+            const cx = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+            pinch = { d: pinchD(e.touches), center: u.posToVal(cx, 'x'), min: sx.min, max: sx.max };
+            touchPan = null;
+          } else if (e.touches.length === 1 && isZoomed(u)) {
+            const sx = u.scales.x;
+            const t  = e.touches[0];
+            touchPan = { x: t.clientX, y: t.clientY, w: over.getBoundingClientRect().width, min: sx.min, max: sx.max, intercepted: false };
+            pinch = null;
+          }
+        }, { passive: true });
+        over.addEventListener('touchmove', e => {
+          if (pinch && e.touches.length === 2) {
+            e.preventDefault();
+            const factor = pinch.d / pinchD(e.touches);
+            let { min, max } = enforceMinSpan(
+              pinch.center + (pinch.min - pinch.center) * factor,
+              pinch.center + (pinch.max - pinch.center) * factor,
+            );
+            u.setScale('x', clamp(min, max));
+          } else if (touchPan && e.touches.length === 1) {
+            const t  = e.touches[0];
+            const dx = t.clientX - touchPan.x, dy = t.clientY - touchPan.y;
+            if (!touchPan.intercepted) {
+              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) touchPan.intercepted = true;
+              else if (Math.abs(dy) > 8) { touchPan = null; return; }
+              else return;
+            }
+            e.preventDefault();
+            const dxFrac = -dx / touchPan.w;
+            const range  = touchPan.max - touchPan.min;
+            u.setScale('x', clamp(touchPan.min + dxFrac * range, touchPan.max + dxFrac * range));
+          }
+        }, { passive: false });
+        over.addEventListener('touchend', e => {
+          if (e.touches.length < 2) pinch = null;
+          if (e.touches.length === 0) touchPan = null;
+        });
+      },
+      setScale: [(u, key) => {
+        if (key !== 'x' || mousePan) return;
+        u.over.style.cursor = isZoomed(u) ? 'grab' : '';
+      }],
+    },
+  };
+}
+
 // Show/hide the Reset button based on whether the chart's x-scale matches the data extent.
 function makeZoomTrackerPlugin(tsArr) {
   const t0 = tsArr.length ? tsArr[0]              : null;
@@ -404,7 +547,7 @@ async function exportChartPng() {
   ctx.font = `${14 * dpr}px "NHG Display", -apple-system, sans-serif`;
   ctx.textBaseline = 'top';
   const cfg = FIELD_LABELS[currentField] || { label: currentField };
-  const rangeLabel = currentHours === 24 ? '24h' : currentHours === 168 ? '7d' : '30d';
+  const rangeLabel = rangeLabelFor(currentHours);
   ctx.fillText(`${cfg.label.toUpperCase()} · ${rangeLabel}`, padX, 14 * dpr);
   ctx.fillStyle = '#666';
   ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
@@ -439,7 +582,7 @@ async function shareChartImage() {
   if (!blob) return false;
   const file = new File([blob], 'wx-chart.png', { type: 'image/png' });
   const cfg = FIELD_LABELS[currentField] || { label: currentField };
-  const rangeLabel = currentHours === 24 ? '24h' : currentHours === 168 ? '7d' : '30d';
+  const rangeLabel = rangeLabelFor(currentHours);
   const shareData = {
     title: `${cfg.label} · ${rangeLabel} — Midtown Manhattan`,
     text:  `${cfg.label} · ${rangeLabel} — wx.jamestannahill.com`,
@@ -524,7 +667,7 @@ function _renderChart(history, field, hours) {
     uplot = new uPlot({
       width:  W,
       height: H,
-      cursor: { y: false, drag: { x: true, y: false, dist: 8, uni: 8 }, points: { size: 0 } },
+      cursor: { y: false, drag: { x: false, y: false }, points: { size: 0 } },
       legend: { show: false },
       axes: [
         {
@@ -562,6 +705,7 @@ function _renderChart(history, field, hours) {
         makeTooltipPlugin(readings, hours, field),
         makeNowLinePlugin(),
         makeZoomTrackerPlugin(ts),
+        makeChartGesturesPlugin(),
       ],
     }, [ts, vals, rain], wrap);
     if (dbg) dbg.textContent = '';
