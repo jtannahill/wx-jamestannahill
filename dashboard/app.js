@@ -22,6 +22,28 @@ function rangeLabelFor(hours) {
   return `${hours}h`;
 }
 
+// Generic °F → °C swap for absolute-temperature prose (WeatherKit forecast,
+// daily summary, today snippets). Rounds to the same decimal precision as
+// the source, so "70°F" → "21°C" and "70.5°F" → "21.4°C".
+function localizeFTemps(text) {
+  if (!text || !useCelsius) return text || '';
+  return text.replace(/(-?\d+(?:\.\d+)?)\s*°F/g, (_, n) => {
+    const c = (parseFloat(n) - 32) * 5 / 9;
+    const dec = n.includes('.') ? 1 : 0;
+    return `${c.toFixed(dec)}°C`;
+  });
+}
+
+// Same idea but for differences ("8.2°F warmer than airports") — divide by 1.8.
+function localizeDeltaFTemps(text) {
+  if (!text || !useCelsius) return text || '';
+  return text.replace(/(-?\d+(?:\.\d+)?)\s*°F/g, (_, n) => {
+    const c = parseFloat(n) / 1.8;
+    const dec = n.includes('.') ? 1 : 0;
+    return `${c.toFixed(dec)}°C`;
+  });
+}
+
 // Server gives us anomaly labels like "16.3°F above average for 7pm in May"
 // with the °F baked in. Recompose in °C when the toggle is on.
 function localizeTempAnomalyLabel(temp) {
@@ -158,7 +180,7 @@ function renderCurrent(data) {
   const uhi = data.uhi_delta;
   document.getElementById('uhi-delta').textContent =
     uhi != null ? `${uhi >= 0 ? '+' : ''}${fmtD(uhi, 1)}${tempUnit()}` : '—';
-  document.getElementById('uhi-label').textContent = data.uhi_label ?? 'vs JFK / LGA / EWR';
+  document.getElementById('uhi-label').textContent = localizeDeltaFTemps(data.uhi_label) || 'vs JFK / LGA / EWR';
 
   // Seasonal UHI average for current month
   const uhiMonthlyEl = document.getElementById('uhi-monthly-avg');
@@ -732,7 +754,7 @@ function renderTomorrow(nws, attr) {
   const section = document.getElementById('tomorrow-section');
   if (!nws || !nws.detailed) { section.hidden = true; return; }
   document.getElementById('tomorrow-date').textContent = nws.name.toUpperCase();
-  document.getElementById('tomorrow-text').textContent = nws.detailed;
+  document.getElementById('tomorrow-text').textContent = localizeFTemps(nws.detailed);
   section.hidden = false;
 
   // Swap in Apple's official logo + link if attribution data is available
@@ -786,8 +808,8 @@ function renderTodayContext(current, history) {
   // Anomaly — only if notable (≥5°F delta)
   const anomaly = current.anomalies?.temp;
   if (anomaly && Math.abs(anomaly.delta) >= 5) {
-    const cap = anomaly.label[0].toUpperCase() + anomaly.label.slice(1);
-    sentences.push(cap + '.');
+    const localized = localizeTempAnomalyLabel(anomaly);
+    if (localized) sentences.push(localized[0].toUpperCase() + localized.slice(1) + '.');
   }
 
   if (!sentences.length) { section.hidden = true; return; }
@@ -949,7 +971,7 @@ function renderSummary(summary) {
   const d = new Date(summary.date + 'T12:00:00');
   const opts = { weekday: 'long', month: 'long', day: 'numeric' };
   document.getElementById('summary-date').textContent = d.toLocaleDateString('en-US', opts);
-  document.getElementById('summary-text').textContent = summary.summary;
+  document.getElementById('summary-text').textContent = localizeFTemps(summary.summary);
 }
 
 // ── Comfort Calendar ──────────────────────────────────────────────────────────
