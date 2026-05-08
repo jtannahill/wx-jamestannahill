@@ -6,7 +6,6 @@ from boto3.dynamodb.conditions import Key
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
 from shared.uhi import fetch_uhi
-from wx_poller.og_image import generate_og
 from wx_poller.validation import validate_reading, detect_stuck
 from wx_poller.nearby import fetch_nearby
 
@@ -79,17 +78,6 @@ def handler(event, context):
         if uhi_delta is not None:
             local_now = now.astimezone(STATION_TZ)
             _update_uhi_seasonal(mac, str(local_now.month).zfill(2), uhi_delta)
-
-    # --- OG image -------------------------------------------------------------
-    try:
-        from wx_api.anomaly import condition_label
-        condition = condition_label(cleaned)
-    except Exception:
-        condition = None
-    try:
-        generate_og(cleaned, condition, uhi_delta=uhi_delta)
-    except Exception as e:
-        print(f"OG image generation failed (non-fatal): {e}")
 
     flag_str = f" [quality_flag={quality_flag}]" if quality_flag else ""
     uhi_str  = f" [uhi_delta={uhi_delta}]" if uhi_delta is not None else ""

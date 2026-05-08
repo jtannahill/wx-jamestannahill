@@ -1,3 +1,2 @@
 boto3
 cryptography
-Pillow==10.4.0

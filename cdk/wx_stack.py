@@ -9,8 +9,6 @@ from aws_cdk import (
     aws_apigatewayv2_integrations as integrations,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
-    aws_s3 as s3,
-    aws_s3_deployment as s3deploy,
     aws_iam as iam,
 )
 from constructs import Construct
@@ -105,13 +103,7 @@ class WxStack(Stack):
             return fn
 
         # --- Lambdas ---
-        self.poller_fn = make_lambda("WxPoller", "wx_poller.handler", timeout=30,
-                                     extra_env={"DASHBOARD_BUCKET": "wx-jamestannahill-dashboard"})
-        # Grant poller write access to dashboard bucket (for OG image)
-        self.poller_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["s3:PutObject"],
-            resources=["arn:aws:s3:::wx-jamestannahill-dashboard/og.png"],
-        ))
+        self.poller_fn = make_lambda("WxPoller", "wx_poller.handler", timeout=30)
         poller_rule = events.Rule(
             self, "WxPollerSchedule",
             schedule=events.Schedule.rate(Duration.minutes(5)),
@@ -348,20 +340,6 @@ class WxStack(Stack):
         self.api_fn.add_environment("CLIMATE_DOY_TABLE",    self.climate_doy_table.table_name)
         self.api_fn.add_environment("CLIMATE_HOURLY_TABLE", self.climate_hourly_table.table_name)
 
-        # Grant API Lambda read access to dashboard bucket (og.png + index.html for /og.png and /refresh-og)
-        self.api_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["s3:GetObject"],
-            resources=[f"arn:aws:s3:::wx-jamestannahill-dashboard/*"],
-        ))
-        self.api_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["s3:PutObject"],
-            resources=["arn:aws:s3:::wx-jamestannahill-dashboard/index.html"],
-        ))
-        self.api_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["cloudfront:CreateInvalidation"],
-            resources=[f"arn:aws:cloudfront::{self.account}:distribution/E2OIRPWQ2L8LB6"],
-        ))
-
         # --- API Gateway HTTP API ---
         http_api = apigwv2.HttpApi(
             self, "WxHttpApi",
@@ -401,37 +379,3 @@ class WxStack(Stack):
             ),
         )
         cdk.CfnOutput(self, "ApiDistributionDomain", value=self.api_distribution.distribution_domain_name)
-
-        # --- Dashboard S3 + CloudFront ---
-        self.dashboard_bucket = s3.Bucket(
-            self, "WxDashboardBucket",
-            bucket_name="wx-jamestannahill-dashboard",
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            removal_policy=cdk.RemovalPolicy.RETAIN,
-        )
-
-        oac = cloudfront.S3OriginAccessControl(self, "WxDashboardOAC")
-        dashboard_origin = origins.S3BucketOrigin.with_origin_access_control(
-            self.dashboard_bucket, origin_access_control=oac
-        )
-
-        self.dashboard_distribution = cloudfront.Distribution(
-            self, "WxDashboardDistribution",
-            default_behavior=cloudfront.BehaviorOptions(
-                origin=dashboard_origin,
-                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
-            ),
-            default_root_object="index.html",
-            error_responses=[
-                cloudfront.ErrorResponse(
-                    http_status=403,
-                    response_http_status=200,
-                    response_page_path="/index.html",
-                )
-            ],
-        )
-
-        cdk.CfnOutput(self, "DashboardBucketName", value=self.dashboard_bucket.bucket_name)
-        cdk.CfnOutput(self, "DashboardDistributionId", value=self.dashboard_distribution.distribution_id)
-        cdk.CfnOutput(self, "DashboardDistributionDomain", value=self.dashboard_distribution.distribution_domain_name)
