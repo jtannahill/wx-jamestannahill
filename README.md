@@ -175,11 +175,10 @@ lambdas/
   wx_ml_fitter/     # Weekly logistic regression training
   wx_summarizer/    # Daily prose summaries
   wx_records_tracker/ # Weekly station records
-dashboard/
-  index.html        # Dashboard UI
-  app.js            # Fetch + render logic
-  style.css         # Styles
-  docs.html         # How It Works
+astro/
+  src/pages/        # index.astro, docs.astro
+  src/layouts/      # Base layout (shared head/schema)
+  public/           # app.js, style.css, uplot.*, fonts, llms.txt, sitemap.xml
 cdk/
   wx_stack.py       # CDK stack (all infrastructure)
   app.py            # CDK entry point
@@ -193,9 +192,8 @@ cdk/
 # Deploy infrastructure
 cd cdk && npx cdk deploy --require-approval never
 
-# Deploy dashboard
-aws s3 sync dashboard/ s3://wx-jamestannahill-dashboard/ --cache-control no-cache
-aws cloudfront create-invalidation --distribution-id E2OIRPWQ2L8LB6 --paths "/*"
+# Deploy dashboard (builds Astro, syncs astro/dist/, invalidates CF)
+bash scripts/deploy_astro.sh
 ```
 
 Estimated AWS cost: **~$4–6/month**.
