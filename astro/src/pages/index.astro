@@ -19,11 +19,43 @@ try {
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
 const fmt = (v: number | undefined | null, d = 1) =>
-  v == null || Number.isNaN(v) ? '—' : v.toFixed(d);
+  v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(d);
+
+const DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const compass = (deg: number | null | undefined) =>
+  deg == null ? '—' : DIRS[Math.round(Number(deg) / 22.5) % 16];
+
+const trendArrow = (t: string | undefined) =>
+  t === 'rising' ? '↑ Rising' : t === 'falling' ? '↓ Falling' : '→ Steady';
+
+// All SSR'd in °F. If the user has wx_celsius=1 in localStorage,
+// app.js's renderCurrent() will re-paint in °C on hydration (same flash
+// behavior as the hero today).
 const heroTemp     = fmt(boot?.tempf, 1);
 const heroFeels    = boot?.feelsLike != null ? `Feels like ${fmt(boot.feelsLike, 0)}°F` : 'Feels like —°F';
 const heroCond     = boot?.condition ?? '—';
 const anomHead     = boot?.climate_context?.headline ?? '—';
+const percentile   = boot?.percentile_rank?.label ?? '';
+
+const windSpeed    = `${fmt(boot?.windspeedmph, 0)} mph`;
+const windDetail   = boot?.winddir != null ? `From ${compass(boot.winddir)} (${fmt(boot.winddir, 0)}°)` : '—';
+const humidity     = `${fmt(boot?.humidity, 0)}%`;
+const dewpoint     = `Dew point ${fmt(boot?.dewPoint, 0)}°F`;
+const pressure     = `${fmt(boot?.baromrelin, 2)}"`;
+const pressureT    = trendArrow(boot?.pressure_trend);
+const uv           = fmt(boot?.uv, 0);
+const solar        = `${fmt(boot?.solarradiation, 0)} W/m²`;
+const rainHourly   = `${fmt(boot?.hourlyrainin, 2)}"`;
+const rainDaily    = `Daily: ${fmt(boot?.dailyrainin, 2)}"`;
+const windGust     = `${fmt(boot?.windgustmph, 0)} mph`;
+const windDir      = compass(boot?.winddir);
+const comfortScore = boot?.comfort?.score ?? '—';
+const comfortLabel = boot?.comfort?.label ?? '—';
+const rainProb     = boot?.rain_probability?.probability != null ? `${boot.rain_probability.probability}%` : '—';
+const rainProbLbl  = boot?.rain_probability?.label ?? '—';
+const uhiVal       = boot?.uhi_delta != null
+  ? `${boot.uhi_delta >= 0 ? '+' : ''}${Number(boot.uhi_delta).toFixed(1)}°F`
+  : '—';
 ---
 <Base
   title="wx.jamestannahill.com — Midtown Manhattan Weather"
@@ -54,7 +86,7 @@ const anomHead     = boot?.climate_context?.headline ?? '—';
       <div class="condition" id="condition">{heroCond}</div>
       <div class="anomaly-headline" id="anomaly-headline">{anomHead}</div>
       <div class="anomaly-subline" id="anomaly-subline"></div>
-      <div class="percentile-rank" id="percentile-rank"></div>
+      <div class="percentile-rank" id="percentile-rank">{percentile}</div>
     </section>
 
     <section class="climate-panel sr" id="climate-panel" hidden>
@@ -94,53 +126,53 @@ const anomHead     = boot?.climate_context?.headline ?? '—';
       <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</span>
       <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
     </div>
-    <section class="conditions-grid sr">
+    <section class="conditions-grid">
       <div class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND</div>
-        <div class="card-value" id="wind-speed">—</div>
-        <div class="card-sub" id="wind-detail">—</div>
+        <div class="card-value" id="wind-speed">{windSpeed}</div>
+        <div class="card-sub" id="wind-detail">{windDetail}</div>
       </div>
       <div class="card card-clickable" data-chart-field="humidity">
         <div class="card-label">HUMIDITY</div>
-        <div class="card-value" id="humidity">—</div>
-        <div class="card-sub" id="dewpoint">Dew point —°F</div>
+        <div class="card-value" id="humidity">{humidity}</div>
+        <div class="card-sub" id="dewpoint">{dewpoint}</div>
       </div>
       <div class="card card-clickable" data-chart-field="baromrelin">
         <div class="card-label">PRESSURE</div>
-        <div class="card-value" id="pressure">—</div>
-        <div class="card-sub" id="pressure-trend">—</div>
+        <div class="card-value" id="pressure">{pressure}</div>
+        <div class="card-sub" id="pressure-trend">{pressureT}</div>
       </div>
       <div class="card">
         <div class="card-label">UV INDEX</div>
-        <div class="card-value" id="uv">—</div>
-        <div class="card-sub" id="solar">— W/m²</div>
+        <div class="card-value" id="uv">{uv}</div>
+        <div class="card-sub" id="solar">{solar}</div>
       </div>
       <div class="card">
         <div class="card-label">RAINFALL</div>
-        <div class="card-value" id="rain-hourly">—</div>
-        <div class="card-sub" id="rain-daily">Daily: —"</div>
+        <div class="card-value" id="rain-hourly">{rainHourly}</div>
+        <div class="card-sub" id="rain-daily">{rainDaily}</div>
       </div>
       <div class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND GUST</div>
-        <div class="card-value" id="wind-gust">—</div>
-        <div class="card-sub" id="wind-dir">—</div>
+        <div class="card-value" id="wind-gust">{windGust}</div>
+        <div class="card-sub" id="wind-dir">{windDir}</div>
       </div>
       <div class="card">
         <div class="card-label has-tooltip" data-tooltip="Microclimate Comfort Score (0–100). Composite of feels-like temperature deviation from 71°F ideal, humidity, wind speed, UV index, and rain rate. Season-weighted and adjusted for anomalies vs. this station's own baseline.">COMFORT</div>
-        <div class="card-value" id="comfort-score">—</div>
-        <div class="card-sub" id="comfort-label">—</div>
+        <div class="card-value" id="comfort-score">{comfortScore}</div>
+        <div class="card-sub" id="comfort-label">{comfortLabel}</div>
       </div>
       <div class="card">
         <div class="card-label has-tooltip" data-tooltip="Probability of rain in the next 60 minutes. Logistic regression on humidity, 1-hour pressure trend, dew-point depression, and hour-of-day. Heuristic coefficients calibrated for NYC (~120 rain days/yr). Boosts automatically if rain is currently falling.">RAIN NEXT HR</div>
-        <div class="card-value" id="rain-prob">—</div>
-        <div class="card-sub" id="rain-prob-label">—</div>
+        <div class="card-value" id="rain-prob">{rainProb}</div>
+        <div class="card-sub" id="rain-prob-label">{rainProbLbl}</div>
       </div>
       <div class="card card-clickable" data-chart-field="uhi_delta">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
           <div class="card-label has-tooltip" style="margin-bottom:0" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
           <span class="source-tag source-external" style="font-size:8px;padding:1px 5px">NOAA</span>
         </div>
-        <div class="card-value" id="uhi-delta">—</div>
+        <div class="card-value" id="uhi-delta">{uhiVal}</div>
         <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
         <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px;color:#555"></div>
       </div>
