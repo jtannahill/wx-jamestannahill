@@ -1,6 +1,30 @@
 ---
 import Base from '../layouts/Base.astro';
 import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
+
+const API_BASE = (Astro.locals as any)?.runtime?.env?.API_BASE
+  ?? import.meta.env.API_BASE
+  ?? 'https://api.wx.jamestannahill.com';
+
+let boot: any = null;
+try {
+  const res = await fetch(`${API_BASE}/current`, {
+    signal: AbortSignal.timeout(2500),
+    cf: { cacheTtl: 60, cacheEverything: true } as any,
+  });
+  if (res.ok) boot = await res.json();
+} catch (_) {
+  // SSR fetch failed → fall through to client-side fetch (existing behavior)
+}
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+
+const fmt = (v: number | undefined | null, d = 1) =>
+  v == null || Number.isNaN(v) ? '—' : v.toFixed(d);
+const heroTemp     = fmt(boot?.tempf, 1);
+const heroFeels    = boot?.feelsLike != null ? `Feels like ${fmt(boot.feelsLike, 0)}°F` : 'Feels like —°F';
+const heroCond     = boot?.condition ?? '—';
+const anomHead     = boot?.climate_context?.headline ?? '—';
 ---
 <Base
   title="wx.jamestannahill.com — Midtown Manhattan Weather"
@@ -24,12 +48,12 @@ import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
 
     <section class="hero">
       <div class="temp-block">
-        <span class="temp" id="temp">—</span>
+        <span class="temp" id="temp">{heroTemp}</span>
         <span class="temp-unit" id="temp-unit">°F</span>
       </div>
-      <div class="feels-like" id="feels-like">Feels like —°F</div>
-      <div class="condition" id="condition">—</div>
-      <div class="anomaly-headline" id="anomaly-headline">—</div>
+      <div class="feels-like" id="feels-like">{heroFeels}</div>
+      <div class="condition" id="condition">{heroCond}</div>
+      <div class="anomaly-headline" id="anomaly-headline">{anomHead}</div>
       <div class="anomaly-subline" id="anomaly-subline"></div>
       <div class="percentile-rank" id="percentile-rank"></div>
     </section>
@@ -213,9 +237,13 @@ import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
 
     <footer>
       <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
-      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> &nbsp;·&nbsp; <a href="/docs.html">How It Works</a></p>
+      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> &nbsp;·&nbsp; <a href="/docs.html" data-astro-prefetch>How It Works</a></p>
     </footer>
   </main>
+
+  {boot && (
+    <script is:inline set:html={`(function(){try{localStorage.setItem('wx_current',JSON.stringify({d:${JSON.stringify(boot)},t:Date.now()}));}catch(e){}})();`} />
+  )}
 
   <script src="/uplot.min.js" is:inline></script>
   <script src="/app.js" is:inline></script>

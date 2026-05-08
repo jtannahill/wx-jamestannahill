@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/deploy_astro.sh — sync astro/dist/ to the WxStack S3 bucket and invalidate CF.
+# scripts/deploy_astro.sh — sync astro/dist/client/ to the WxStack S3 bucket and invalidate CF.
 set -e
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,12 +16,12 @@ cd "$REPO/astro"
 npm ci
 npm run build
 
-echo "Syncing astro/dist/ to s3://$BUCKET ..."
-aws s3 sync dist/ "s3://$BUCKET" \
+echo "Syncing astro/dist/client/ to s3://$BUCKET ..."
+aws s3 sync dist/client/ "s3://$BUCKET" \
   --exclude ".DS_Store" \
   --exclude "*.html" --exclude "*.js" --exclude "*.css" \
   --cache-control "max-age=300"
-aws s3 sync dist/ "s3://$BUCKET" \
+aws s3 sync dist/client/ "s3://$BUCKET" \
   --exclude "*" \
   --include "*.html" --include "*.js" --include "*.css" \
   --cache-control "public, max-age=60, must-revalidate"
