@@ -57,11 +57,22 @@ const rainProbLbl  = boot?.rain_probability?.label ?? '—';
 const uhiVal       = boot?.uhi_delta != null
   ? `${boot.uhi_delta >= 0 ? '+' : ''}${Number(boot.uhi_delta).toFixed(1)}°F`
   : '—';
+
+// Cache-busting OG image URL: bucket the latest reading timestamp to the
+// nearest 5 min (matches wx_poller's cadence). Crawlers (Twitter, FB, Slack,
+// iMessage) cache OG images by URL — bumping ?v= forces a refetch when a
+// new reading lands. Within a 5-min window the URL is stable, so the CF
+// edge cache hits and the worker doesn't re-render unnecessarily.
+const ogBucket = boot?.timestamp
+  ? Math.floor(new Date(boot.timestamp).getTime() / 1000 / 300) * 300
+  : Math.floor(Date.now() / 1000 / 300) * 300;
+const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 ---
 <Base
   title="wx.jamestannahill.com — Midtown Manhattan Weather"
   description="Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes."
   canonical="https://wx.jamestannahill.com"
+  ogImage={ogImageUrl}
 >
   <SchemaOrgIndex slot="schema" />
 

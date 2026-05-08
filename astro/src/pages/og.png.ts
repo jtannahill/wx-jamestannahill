@@ -138,12 +138,20 @@ function buildJsx(reading: any) {
 
 export async function GET({ request }: { request: Request }) {
   const apiBase = (env as any)?.API_BASE ?? 'https://api.wx.jamestannahill.com';
+  const url = new URL(request.url);
 
+  // The page uses a cache-busting ?v=<5-min bucket> param so each new reading
+  // produces a unique OG URL. Crawlers re-fetch on URL change; the CF edge
+  // caches each ?v= value as a separate object. Within a bucket the URL is
+  // stable → edge hit → no re-render. New bucket → edge miss → render fresh
+  // from a freshly fetched /current. Bypass any internal cache on /current
+  // so the rendered snapshot matches the latest poller write.
   let reading: any = null;
   try {
     const r = await fetch(`${apiBase}/current`, {
-      signal: AbortSignal.timeout(2500),
-      cf: { cacheTtl: 60, cacheEverything: true } as any,
+      signal: AbortSignal.timeout(3000),
+      cf: { cacheTtl: 0, cacheEverything: false } as any,
+      headers: { 'cache-control': 'no-cache' },
     });
     if (r.ok) reading = await r.json();
   } catch {}
@@ -159,9 +167,17 @@ export async function GET({ request }: { request: Request }) {
     ],
   } as any);
 
-  // workers-og sets its own immutable 1-year cache-control. Override it so
-  // the OG image refreshes every 5 min as the underlying reading changes.
+  // workers-og sets its own 1-year immutable header. Override:
+  // - With ?v= → image is keyed by the bucket; cache aggressively at the
+  //   edge AND tell crawlers it's fine to cache (they'd refetch on a new
+  //   ?v= anyway because the URL is different).
+  // - Without ?v= → no edge cache; render fresh every request (matches the
+  //   "actual snapshot" guarantee for crawlers that strip query params).
   const headers = new Headers(r.headers);
-  headers.set('cache-control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600');
+  if (url.searchParams.has('v')) {
+    headers.set('cache-control', 'public, max-age=300, s-maxage=300, immutable');
+  } else {
+    headers.set('cache-control', 'public, max-age=0, s-maxage=0, must-revalidate');
+  }
   return new Response(r.body, { status: 200, headers });
 }
