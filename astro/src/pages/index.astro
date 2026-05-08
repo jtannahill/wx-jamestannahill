@@ -1,10 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
 import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
+import { env } from 'cloudflare:workers';
 
-const API_BASE = (Astro.locals as any)?.runtime?.env?.API_BASE
-  ?? import.meta.env.API_BASE
-  ?? 'https://api.wx.jamestannahill.com';
+const API_BASE = (env as any)?.API_BASE ?? 'https://api.wx.jamestannahill.com';
 
 let boot: any = null;
 try {
