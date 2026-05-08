@@ -46,14 +46,14 @@ describe('build output — index', () => {
 });
 
 describe('build output — docs', () => {
-  const html = () => read('docs/index.html');
+  const html = () => read('docs.html');
 
-  it('emits dist/docs/index.html', () => {
-    expect(existsSync(resolve(dist, 'docs', 'index.html'))).toBe(true);
+  it('emits dist/docs.html', () => {
+    expect(existsSync(resolve(dist, 'docs.html'))).toBe(true);
   });
 
-  it('has canonical pointing to /docs', () => {
-    expect(html()).toMatch(/<link rel="canonical" href="https:\/\/wx\.jamestannahill\.com\/docs"/);
+  it('has canonical pointing to /docs.html', () => {
+    expect(html()).toMatch(/<link rel="canonical" href="https:\/\/wx\.jamestannahill\.com\/docs\.html"/);
   });
 
   it('emits the TechArticle JSON-LD', () => {
