@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
+import Chart from '../components/Chart.tsx';
 import { env } from 'cloudflare:workers';
 
 const API_BASE = (env as any)?.API_BASE ?? 'https://api.wx.jamestannahill.com';
@@ -200,48 +201,7 @@ const uhiVal       = boot?.uhi_delta != null
       <div class="forecast-grid" id="forecast-grid"></div>
     </section>
 
-    <section class="chart-section">
-      <div class="chart-section-header">
-        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
-        <div class="chart-actions">
-          <button class="chart-action-btn" id="chart-zoom-reset" title="Reset zoom" hidden>↻</button>
-          <button class="chart-action-btn" id="chart-copy-btn" title="Copy chart">⧉</button>
-          <button class="chart-action-btn" id="chart-share-btn" title="Share chart">↗</button>
-          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
-        </div>
-      </div>
-      <div class="chart-controls">
-        <div class="chart-controls-row">
-          <button class="chart-btn active" data-field="tempf">Temperature</button>
-          <button class="chart-btn" data-field="humidity">Humidity</button>
-          <button class="chart-btn" data-field="windspeedmph">Wind</button>
-          <button class="chart-btn" data-field="baromrelin">Pressure</button>
-          <button class="chart-btn" data-field="uhi_delta">Urban Heat</button>
-        </div>
-        <div class="chart-controls-row range-row">
-          <button class="range-btn" data-hours="12">12h</button>
-          <button class="range-btn active" data-hours="24">24h</button>
-          <button class="range-btn" data-hours="168">7d</button>
-          <button class="range-btn" data-hours="720">30d</button>
-        </div>
-      </div>
-      <div id="wx-chart-wrap" class="wx-chart-wrap"></div>
-      <div class="chart-legend" id="wx-chart-legend">
-        <span class="chart-legend-item">
-          <span class="chart-legend-swatch swatch-observed"></span>Observed
-        </span>
-        <span class="chart-legend-item">
-          <span class="chart-legend-swatch swatch-baseline"></span>Historical avg
-        </span>
-        <span class="chart-legend-item">
-          <span class="chart-legend-swatch swatch-band"></span>±1σ normal range
-        </span>
-        <span class="chart-legend-item">
-          <span class="chart-legend-swatch swatch-rain"></span>Rainfall
-        </span>
-      </div>
-      <div class="chart-hint">Scroll / pinch to zoom · Drag to pan · Double-click to reset</div>
-    </section>
+    <Chart apiBase={API_BASE} client:visible />
 
     <section class="records-section sr" id="records-section" hidden>
       <div class="section-header">
@@ -276,7 +236,6 @@ const uhiVal       = boot?.uhi_delta != null
     <script is:inline set:html={`(function(){try{localStorage.setItem('wx_current',JSON.stringify({d:${JSON.stringify(boot)},t:Date.now()}));}catch(e){}})();`} />
   )}
 
-  <script src="/uplot.min.js" is:inline></script>
   <script src="/app.js" is:inline></script>
 
 </Base>

@@ -1,7 +1,10 @@
 const API_BASE = 'https://api.wx.jamestannahill.com';
 const REFRESH_MS = 5 * 60 * 1000;
 
-let uplot = null;
+// currentHours kept so refresh() and the cache key stay aligned with the
+// chart island's default range (24h). currentField is no longer used here
+// (the island owns chart state); it stays only because card-click handlers
+// set it before dispatching the wx:fieldChange event.
 let currentField = 'tempf';
 let currentHours = 24;
 let lastHistory = null;
@@ -13,14 +16,6 @@ function toDC(f)       { return f == null ? null : f / 1.8; }
 function tempUnit()    { return useCelsius ? '°C' : '°F'; }
 function fmtT(f, dec = 0) { return fmt(useCelsius ? toC(f) : f, dec); }
 function fmtD(f, dec = 1) { return fmt(useCelsius ? toDC(f) : f, dec); }
-
-function rangeLabelFor(hours) {
-  if (hours === 12)  return '12h';
-  if (hours === 24)  return '24h';
-  if (hours === 168) return '7d';
-  if (hours === 720) return '30d';
-  return `${hours}h`;
-}
 
 // Generic °F → °C swap for absolute-temperature prose (WeatherKit forecast,
 // daily summary, today snippets). Rounds to the same decimal precision as
@@ -61,14 +56,6 @@ function localizeTempAnomalyLabel(temp) {
   });
 }
 
-const FIELD_LABELS = {
-  tempf:        { label: 'Temperature', unit: '°F',  decimals: 1 },
-  humidity:     { label: 'Humidity',    unit: '%',   decimals: 0 },
-  windspeedmph: { label: 'Wind',        unit: ' mph',decimals: 1 },
-  baromrelin:   { label: 'Pressure',    unit: '"',   decimals: 2 },
-  uhi_delta:    { label: 'Urban Heat',  unit: '°F',  decimals: 1 },
-};
-
 const DIR_LABELS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 function degToCompass(deg) {
   return DIR_LABELS[Math.round(deg / 22.5) % 16];
@@ -77,15 +64,6 @@ function degToCompass(deg) {
 function fmt(val, decimals = 1) {
   if (val == null) return '—';
   return Number(val).toFixed(decimals);
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtChartLabel(ts, hours) {
-  const d = new Date(ts);
-  if (hours > 168) return `${d.getMonth()+1}/${d.getDate()}`;
-  if (hours > 24)  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`;
-  const h = d.getHours(), ampm = h >= 12 ? 'pm' : 'am';
-  return `${h === 0 ? 12 : h > 12 ? h - 12 : h}${ampm}`;
 }
 
 // ── Cache (stale-while-revalidate) ───────────────────────────────────────────
@@ -258,496 +236,6 @@ function renderForecast(forecast) {
       </div>`;
   }).join('');
 }
-
-// ── Chart (uPlot) ─────────────────────────────────────────────────────────────
-function makeTooltipPlugin(readings, hours, activeField) {
-  let el;
-  return {
-    hooks: {
-      init: [u => {
-        el = document.createElement('div');
-        el.className = 'wx-tooltip';
-        el.hidden = true;
-        u.over.style.overflow = 'visible';
-        u.over.appendChild(el);
-      }],
-      setCursor: [u => {
-        const { left, idx } = u.cursor;
-        if (idx == null || idx < 0 || left < 0) { el.hidden = true; return; }
-        const r = readings[idx];
-        if (!r) { el.hidden = true; return; }
-
-        const active = v => `<span class="wxt-active">${v}</span>`;
-        const rows = [];
-        rows.push(`<div class="wxt-time">${fmtChartLabel(new Date(r.timestamp).getTime(), hours)}</div>`);
-        if (r.tempf        != null) { const v = fmtT(r.tempf,1)+tempUnit(); rows.push(`<div>Temp&ensp;${activeField==='tempf' ? active(v) : v}</div>`); }
-        if (r.humidity     != null) rows.push(`<div>RH&emsp;&ensp;${activeField==='humidity'    ? active(r.humidity.toFixed(0)+'%')       : r.humidity.toFixed(0)+'%'}</div>`);
-        if (r.windspeedmph != null) rows.push(`<div>Wind&ensp;${activeField==='windspeedmph'  ? active(r.windspeedmph.toFixed(1)+' mph') : r.windspeedmph.toFixed(1)+' mph'}</div>`);
-        if (r.baromrelin   != null) rows.push(`<div>Pres&ensp;${activeField==='baromrelin'    ? active(r.baromrelin.toFixed(2)+'"')      : r.baromrelin.toFixed(2)+'"'}</div>`);
-        if (r.uhi_delta    != null) { const v = (r.uhi_delta>=0?'+':'')+fmtD(r.uhi_delta,1)+tempUnit(); rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active(v) : v}</div>`); }
-        if ((r.hourlyrainin??0) > 0.005) rows.push(`<div>Rain&ensp;${r.hourlyrainin.toFixed(2)}"/hr</div>`);
-
-        el.innerHTML = rows.join('');
-        el.hidden = false;
-
-        // Flip left/right so tooltip stays inside the chart
-        const overW = u.over.offsetWidth;
-        const tipW  = el.offsetWidth || 130;
-        const flip  = left + tipW + 18 > overW;
-        el.style.left  = flip ? 'auto' : `${left + 14}px`;
-        el.style.right = flip ? `${overW - left + 14}px` : 'auto';
-        el.style.top   = '6px';
-      }]
-    }
-  };
-}
-
-function makeDrawPlugin(tsArr, baseArr, upperArr, lowerArr) {
-  return {
-    hooks: {
-      drawClear: [u => {
-        try {
-          const { ctx, bbox } = u;
-          ctx.save();
-          ctx.fillStyle = '#0e0e0e';
-          ctx.fillRect(bbox.left, bbox.top, bbox.width, bbox.height);
-          ctx.restore();
-        } catch(e) { console.warn('[drawClear]', e); }
-      }],
-      draw: [u => {
-        try {
-          const { ctx } = u;
-          ctx.save();
-
-          // σ band fill: trace upper forward, lower backward, fill closed path
-          const hasUpper = upperArr && upperArr.some(v => v != null);
-          const hasLower = lowerArr && lowerArr.some(v => v != null);
-          if (hasUpper && hasLower) {
-            ctx.beginPath();
-            let started = false;
-            for (let i = 0; i < tsArr.length; i++) {
-              if (upperArr[i] == null) { started = false; continue; }
-              const px = Math.round(u.valToPos(tsArr[i],    'x', true));
-              const py = Math.round(u.valToPos(upperArr[i], 'y', true));
-              if (!started) { ctx.moveTo(px, py); started = true; }
-              else            ctx.lineTo(px, py);
-            }
-            for (let i = tsArr.length - 1; i >= 0; i--) {
-              if (lowerArr[i] == null) continue;
-              const px = Math.round(u.valToPos(tsArr[i],    'x', true));
-              const py = Math.round(u.valToPos(lowerArr[i], 'y', true));
-              ctx.lineTo(px, py);
-            }
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(150,160,190,0.22)';
-            ctx.fill();
-          }
-
-          // Dashed baseline
-          const hasBase = baseArr && baseArr.some(v => v != null);
-          if (hasBase) {
-            ctx.setLineDash([4, 6]);
-            ctx.strokeStyle = 'rgba(255,255,255,0.42)';
-            ctx.lineWidth   = 1;
-            ctx.beginPath();
-            let started = false;
-            for (let i = 0; i < tsArr.length; i++) {
-              if (baseArr[i] == null) { started = false; continue; }
-              const px = Math.round(u.valToPos(tsArr[i],   'x', true));
-              const py = Math.round(u.valToPos(baseArr[i], 'y', true));
-              if (!started) { ctx.moveTo(px, py); started = true; }
-              else           ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-          }
-
-          ctx.restore();
-        } catch(e) { console.warn('[draw]', e); }
-      }],
-    }
-  };
-}
-
-function makeNowLinePlugin() {
-  return {
-    hooks: {
-      draw: [u => {
-        const xs = u.data[0];
-        if (!xs || xs.length < 2) return;
-        const nowS = Date.now() / 1000;
-        if (nowS < xs[0] || nowS > xs[xs.length - 1] + 7200) return;
-        let best = 0, bestD = Infinity;
-        xs.forEach((t, i) => { const d = Math.abs(t - nowS); if (d < bestD) { bestD = d; best = i; } });
-        const x = Math.round(u.valToPos(xs[best], 'x', true));
-        const { ctx, bbox } = u;
-        ctx.save();
-        ctx.setLineDash([4, 5]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.13)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, bbox.top);
-        ctx.lineTo(x, bbox.top + bbox.height);
-        ctx.stroke();
-        ctx.restore();
-      }]
-    }
-  };
-}
-
-// Smooth, intuitive chart gestures:
-//   • mouse wheel / trackpad scroll → zoom centered on cursor
-//   • horizontal trackpad scroll    → pan
-//   • mouse drag                    → pan
-//   • two-finger pinch (touch)      → zoom centered on midpoint
-//   • one-finger drag (touch)       → pan when zoomed in (scrolls page otherwise)
-function makeChartGesturesPlugin() {
-  let dataMin = 0, dataMax = 0;
-  let mousePan = null, touchPan = null, pinch = null;
-  const MIN_SPAN_S = 300; // don't zoom past 5 minutes
-  const ZOOM_SENS  = 0.0014;
-
-  const clamp = (min, max) => {
-    if (min < dataMin) { max += dataMin - min; min = dataMin; }
-    if (max > dataMax) { min -= max - dataMax; max = dataMax; }
-    return { min: Math.max(min, dataMin), max: Math.min(max, dataMax) };
-  };
-  const enforceMinSpan = (min, max) => {
-    if (max - min >= MIN_SPAN_S) return { min, max };
-    const c = (min + max) / 2;
-    return { min: c - MIN_SPAN_S / 2, max: c + MIN_SPAN_S / 2 };
-  };
-  const zoomAt = (u, center, factor) => {
-    const sx = u.scales.x; if (sx.min == null) return;
-    let { min, max } = enforceMinSpan(
-      center + (sx.min - center) * factor,
-      center + (sx.max - center) * factor,
-    );
-    u.setScale('x', clamp(min, max));
-  };
-  const panBy = (u, dxFrac) => {
-    const sx = u.scales.x; if (sx.min == null) return;
-    const range = sx.max - sx.min;
-    const shift = -dxFrac * range;
-    u.setScale('x', clamp(sx.min + shift, sx.max + shift));
-  };
-  const isZoomed = u => {
-    const sx = u.scales.x;
-    return sx && sx.min != null && (sx.min > dataMin + 1 || sx.max < dataMax - 1);
-  };
-  const pinchD = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-
-  return {
-    hooks: {
-      ready: u => {
-        const over = u.over;
-        const xs = u.data[0];
-        if (xs && xs.length) { dataMin = xs[0]; dataMax = xs[xs.length - 1]; }
-
-        // Wheel: vertical = zoom, horizontal = pan
-        over.addEventListener('wheel', e => {
-          if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.4) {
-            e.preventDefault();
-            panBy(u, e.deltaX / over.getBoundingClientRect().width);
-          } else {
-            e.preventDefault();
-            const rect = over.getBoundingClientRect();
-            const cursorVal = u.posToVal(e.clientX - rect.left, 'x');
-            zoomAt(u, cursorVal, Math.exp(e.deltaY * ZOOM_SENS));
-          }
-        }, { passive: false });
-
-        // Mouse drag = pan
-        over.addEventListener('mousedown', e => {
-          if (e.button !== 0) return;
-          const sx = u.scales.x;
-          mousePan = { x: e.clientX, w: over.getBoundingClientRect().width, min: sx.min, max: sx.max };
-          over.style.cursor = 'grabbing';
-        });
-        window.addEventListener('mousemove', e => {
-          if (!mousePan) return;
-          const dxFrac = (mousePan.x - e.clientX) / mousePan.w;
-          const range  = mousePan.max - mousePan.min;
-          u.setScale('x', clamp(mousePan.min + dxFrac * range, mousePan.max + dxFrac * range));
-        });
-        window.addEventListener('mouseup', () => {
-          if (!mousePan) return;
-          mousePan = null;
-          over.style.cursor = isZoomed(u) ? 'grab' : '';
-        });
-        over.addEventListener('mouseenter', () => {
-          if (!mousePan) over.style.cursor = isZoomed(u) ? 'grab' : '';
-        });
-
-        // Touch: 2-finger pinch zoom; 1-finger pan when already zoomed
-        over.addEventListener('touchstart', e => {
-          if (e.touches.length === 2) {
-            const sx = u.scales.x;
-            const rect = over.getBoundingClientRect();
-            const cx = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
-            pinch = { d: pinchD(e.touches), center: u.posToVal(cx, 'x'), min: sx.min, max: sx.max };
-            touchPan = null;
-          } else if (e.touches.length === 1 && isZoomed(u)) {
-            const sx = u.scales.x;
-            const t  = e.touches[0];
-            touchPan = { x: t.clientX, y: t.clientY, w: over.getBoundingClientRect().width, min: sx.min, max: sx.max, intercepted: false };
-            pinch = null;
-          }
-        }, { passive: true });
-        over.addEventListener('touchmove', e => {
-          if (pinch && e.touches.length === 2) {
-            e.preventDefault();
-            const factor = pinch.d / pinchD(e.touches);
-            let { min, max } = enforceMinSpan(
-              pinch.center + (pinch.min - pinch.center) * factor,
-              pinch.center + (pinch.max - pinch.center) * factor,
-            );
-            u.setScale('x', clamp(min, max));
-          } else if (touchPan && e.touches.length === 1) {
-            const t  = e.touches[0];
-            const dx = t.clientX - touchPan.x, dy = t.clientY - touchPan.y;
-            if (!touchPan.intercepted) {
-              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) touchPan.intercepted = true;
-              else if (Math.abs(dy) > 8) { touchPan = null; return; }
-              else return;
-            }
-            e.preventDefault();
-            const dxFrac = -dx / touchPan.w;
-            const range  = touchPan.max - touchPan.min;
-            u.setScale('x', clamp(touchPan.min + dxFrac * range, touchPan.max + dxFrac * range));
-          }
-        }, { passive: false });
-        over.addEventListener('touchend', e => {
-          if (e.touches.length < 2) pinch = null;
-          if (e.touches.length === 0) touchPan = null;
-        });
-      },
-      setScale: [(u, key) => {
-        if (key !== 'x' || mousePan) return;
-        u.over.style.cursor = isZoomed(u) ? 'grab' : '';
-      }],
-    },
-  };
-}
-
-// Show/hide the Reset button based on whether the chart's x-scale matches the data extent.
-function makeZoomTrackerPlugin(tsArr) {
-  const t0 = tsArr.length ? tsArr[0]              : null;
-  const t1 = tsArr.length ? tsArr[tsArr.length-1] : null;
-  return {
-    hooks: {
-      setScale: [(u, key) => {
-        if (key !== 'x' || t0 == null) return;
-        const sc = u.scales.x;
-        const zoomed = sc && (sc.min > t0 + 1 || sc.max < t1 - 1);
-        const btn = document.getElementById('chart-zoom-reset');
-        if (btn) btn.hidden = !zoomed;
-      }],
-    },
-  };
-}
-
-function resetChartZoom() {
-  if (!uplot || !uplot.data?.[0]?.length) return;
-  const xs = uplot.data[0];
-  uplot.setScale('x', { min: xs[0], max: xs[xs.length - 1] });
-}
-
-// Compose a clean PNG of the chart (with title, station, timestamp) for copy/share.
-async function exportChartPng() {
-  if (!uplot) return null;
-  const src = uplot.ctx.canvas;
-  const dpr = window.devicePixelRatio || 1;
-  const padTop = 56 * dpr, padBot = 36 * dpr, padX = 24 * dpr;
-  const out = document.createElement('canvas');
-  out.width  = src.width  + padX * 2;
-  out.height = src.height + padTop + padBot;
-  const ctx = out.getContext('2d');
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, out.width, out.height);
-  // Title
-  ctx.fillStyle = '#e8e0d0';
-  ctx.font = `${14 * dpr}px "NHG Display", -apple-system, sans-serif`;
-  ctx.textBaseline = 'top';
-  const cfg = FIELD_LABELS[currentField] || { label: currentField };
-  const rangeLabel = rangeLabelFor(currentHours);
-  ctx.fillText(`${cfg.label.toUpperCase()} · ${rangeLabel}`, padX, 14 * dpr);
-  ctx.fillStyle = '#666';
-  ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
-  ctx.fillText('MIDTOWN MANHATTAN, NEW YORK', padX, 34 * dpr);
-  // Chart
-  ctx.drawImage(src, padX, padTop);
-  // Footer
-  ctx.fillStyle = '#444';
-  ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
-  ctx.fillText(`wx.jamestannahill.com · ${new Date().toLocaleString()}`, padX, padTop + src.height + 10 * dpr);
-  return new Promise(res => out.toBlob(b => res(b), 'image/png'));
-}
-
-async function copyChartImage() {
-  const blob = await exportChartPng();
-  if (!blob) return false;
-  try {
-    if (navigator.clipboard && window.ClipboardItem) {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      return true;
-    }
-  } catch (e) { console.warn('[copy chart]', e); }
-  // Fallback: open in a new tab so the user can save/copy manually
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener,noreferrer');
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return false;
-}
-
-async function shareChartImage() {
-  const blob = await exportChartPng();
-  if (!blob) return false;
-  const file = new File([blob], 'wx-chart.png', { type: 'image/png' });
-  const cfg = FIELD_LABELS[currentField] || { label: currentField };
-  const rangeLabel = rangeLabelFor(currentHours);
-  const shareData = {
-    title: `${cfg.label} · ${rangeLabel} — Midtown Manhattan`,
-    text:  `${cfg.label} · ${rangeLabel} — wx.jamestannahill.com`,
-    url:   'https://wx.jamestannahill.com',
-  };
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ ...shareData, files: [file] });
-      return true;
-    }
-    if (navigator.share) {
-      await navigator.share(shareData);
-      return true;
-    }
-  } catch (e) {
-    if (e?.name !== 'AbortError') console.warn('[share chart]', e);
-  }
-  // Desktop fallback: copy + open Twitter intent
-  await copyChartImage();
-  const tweetText = `${shareData.text} (chart copied to clipboard — paste into the tweet)`;
-  window.open(
-    `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareData.url)}`,
-    '_blank', 'noopener,noreferrer,width=600,height=450',
-  );
-  return false;
-}
-
-function renderChart(history, field, hours) {
-  if (!history?.readings?.length) return;
-  setTimeout(() => _renderChart(history, field, hours), 50);
-}
-
-function _renderChart(history, field, hours) {
-  const wrap = document.getElementById('wx-chart-wrap');
-  const dbg  = document.getElementById('wx-chart-status');
-  const cfg      = { ...(FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 }) };
-  if (useCelsius && (field === 'tempf' || field === 'uhi_delta')) cfg.unit = '°C';
-  const readings = history.readings;
-
-  const ts      = readings.map(r => new Date(r.timestamp).getTime() / 1000);
-  const vals    = readings.map(r => r[field] ?? null);
-  const base    = readings.map(r => r[`baseline_${field}`] ?? null);
-  const upper   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b+s : null; });
-  const lower   = readings.map(r => { const b = r[`baseline_${field}`], s = r[`baseline_std_${field}`]; return b!=null&&s!=null ? b-s : null; });
-  if (useCelsius) {
-    const cvt = field === 'tempf' ? toC : field === 'uhi_delta' ? toDC : null;
-    if (cvt) {
-      for (let i = 0; i < vals.length; i++) {
-        if (vals[i]  != null) vals[i]  = cvt(vals[i]);
-        if (base[i]  != null) base[i]  = cvt(base[i]);
-        if (upper[i] != null) upper[i] = cvt(upper[i]);
-        if (lower[i] != null) lower[i] = cvt(lower[i]);
-      }
-    }
-  }
-  const rain    = readings.map(r => r.hourlyrainin ?? null);
-  const maxRain = Math.max(0.01, ...rain.filter(v => v != null && isFinite(v)));
-
-  if (uplot) { uplot.destroy(); uplot = null; }
-  wrap.innerHTML = '';
-
-  // Show/hide legend rows based on available data
-  const hasBaseline = base.some(v => v != null);
-  const hasRain     = rain.some(v => v != null && v > 0);
-  const legend = document.getElementById('wx-chart-legend');
-  if (legend) {
-    legend.querySelectorAll('.chart-legend-item').forEach(el => {
-      const sw = el.querySelector('.chart-legend-swatch');
-      if (!sw) return;
-      if (sw.classList.contains('swatch-baseline') || sw.classList.contains('swatch-band'))
-        el.style.display = hasBaseline ? '' : 'none';
-      if (sw.classList.contains('swatch-rain'))
-        el.style.display = hasRain ? '' : 'none';
-    });
-    legend.style.display = '';
-  }
-
-  const W = Math.max(100, Math.floor(wrap.getBoundingClientRect().width) || (window.innerWidth - 48));
-  const H = window.innerWidth < 480 ? 180 : 220;
-
-  try {
-    uplot = new uPlot({
-      width:  W,
-      height: H,
-      cursor: { y: false, drag: { x: false, y: false }, points: { size: 0 } },
-      legend: { show: false },
-      axes: [
-        {
-          stroke: '#999',
-          ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
-          grid:   { stroke: '#1e1e1e', width: 1 },
-          values: (u, ticks) => ticks.map(v => {
-            if (v == null) return null;
-            const d = new Date(v * 1000);
-            if (hours > 24) return `${d.getMonth()+1}/${d.getDate()}`;
-            const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
-            return `${h===0?12:h>12?h-12:h}${ap}`;
-          }),
-          font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
-          size: 28, gap: 6,
-        },
-        {
-          stroke: '#999',
-          ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
-          grid:   { stroke: '#1e1e1e', width: 1 },
-          values: (u, ticks) => ticks.map(v => v != null ? `${Number(v).toFixed(cfg.decimals)}${cfg.unit}` : null),
-          font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
-          size: window.innerWidth < 480 ? 48 : 56, gap: 6,
-        },
-        { show: false, scale: 'rain' },
-      ],
-      scales: { x: {}, y: { auto: true }, rain: { range: [0, maxRain * 14] } },
-      series: [
-        {},
-        { stroke: '#c8b97a', width: 2, fill: 'rgba(200,185,122,0.08)' },
-        { scale: 'rain', stroke: 'rgba(90,140,210,0.7)', fill: 'rgba(90,140,210,0.20)', width: 1 },
-      ],
-      plugins: [
-        makeDrawPlugin(ts, base, upper, lower),
-        makeTooltipPlugin(readings, hours, field),
-        makeNowLinePlugin(),
-        makeZoomTrackerPlugin(ts),
-        makeChartGesturesPlugin(),
-      ],
-    }, [ts, vals, rain], wrap);
-    if (dbg) dbg.textContent = '';
-    // Double-click anywhere on the chart to reset zoom
-    wrap.ondblclick = () => resetChartZoom();
-  } catch (e) {
-    console.error('[wx chart]', e);
-    if (dbg) dbg.textContent = `ERR: ${e.message}`;
-    wrap.innerHTML = `<div style="color:#c8b97a;font-size:11px;letter-spacing:0.08em;padding:20px 16px">CHART ERROR — ${e.message}</div>`;
-  }
-}
-
-// Resize chart with window
-const _chartWrap = document.getElementById('wx-chart-wrap');
-new ResizeObserver(() => {
-  if (uplot) {
-    const w = Math.floor(_chartWrap.getBoundingClientRect().width);
-    if (w > 0) uplot.setSize({ width: w, height: window.innerWidth < 480 ? 180 : 220 });
-  }
-}).observe(_chartWrap);
 
 // ── Tomorrow forecast (WeatherKit) ───────────────────────────────────────────
 function renderTomorrow(nws, attr) {
@@ -1090,7 +578,6 @@ async function refresh(forceHistory = false) {
       cacheSet('history_' + currentHours, history);
       lastHistory = history;
     }
-    if (lastHistory) renderChart(lastHistory, currentField, currentHours);
     renderTodayContext(current, lastHistory);
   } catch (e) {
     console.error('Refresh failed:', e);
@@ -1098,31 +585,9 @@ async function refresh(forceHistory = false) {
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
-document.querySelectorAll('.chart-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentField = btn.dataset.field;
-    if (lastHistory) renderChart(lastHistory, currentField, currentHours);
-  });
-});
-
-document.querySelectorAll('.range-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentHours = parseInt(btn.dataset.hours, 10);
-    // Show cached range immediately if available
-    const cached = cacheGet('history_' + currentHours);
-    if (cached) { lastHistory = cached; renderChart(lastHistory, currentField, currentHours); }
-    try {
-      const history = await fetchHistory(currentHours);
-      cacheSet('history_' + currentHours, history);
-      lastHistory = history;
-      renderChart(lastHistory, currentField, currentHours);
-    } catch (e) { console.error('Range fetch failed:', e); }
-  });
-});
+// Chart field/range controls + chart engine moved into the Preact island
+// (src/components/Chart.tsx). app.js dispatches wx:unitChange and
+// wx:fieldChange events that the island subscribes to.
 
 const unitToggleBtn = document.getElementById('unit-toggle');
 unitToggleBtn.textContent = useCelsius ? '°C' : '°F';
@@ -1141,7 +606,7 @@ unitToggleBtn.addEventListener('click', () => {
     renderTodayContext(_bootCurrent, lastHistory);
   }
   if (_lastSummaries) renderComfortCalendar(_lastSummaries);
-  if (lastHistory) renderChart(lastHistory, currentField, currentHours);
+  document.dispatchEvent(new CustomEvent('wx:unitChange', { detail: { useCelsius } }));
 });
 
 const refreshBtn = document.getElementById('refresh-btn');
@@ -1224,12 +689,10 @@ document.querySelectorAll('.has-tooltip').forEach(bindTip);
 document.querySelectorAll('.card[data-chart-field]').forEach(card => {
   card.addEventListener('click', () => {
     const field = card.dataset.chartField;
-    document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.querySelector(`.chart-btn[data-field="${field}"]`);
-    if (btn) btn.classList.add('active');
     currentField = field;
-    if (lastHistory) renderChart(lastHistory, currentField, currentHours);
-    document.querySelector('.chart-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.dispatchEvent(new CustomEvent('wx:fieldChange', { detail: { field } }));
+    const section = document.querySelector('.chart-section');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
 
@@ -1311,11 +774,11 @@ async function boot() {
   }
   if (ch) {
     lastHistory = ch;
-    renderChart(ch, currentField, currentHours);
     if (cc) renderTodayContext(cc, ch);
   }
 
-  // Phase 1 — fetch current + history in parallel (not sequential)
+  // Phase 1 — fetch current + history in parallel (chart island handles its
+  // own chart render; we still need history for renderTodayContext).
   const [rCur, rHist] = await Promise.allSettled([
     fetchCurrent(),
     fetchHistory(currentHours),
@@ -1339,7 +802,6 @@ async function boot() {
     const hist = rHist.value;
     cacheSet('history_' + currentHours, hist);
     lastHistory = hist;
-    renderChart(hist, currentField, currentHours);
     if (_bootCurrent) renderTodayContext(_bootCurrent, lastHistory);
   } else {
     console.error('History fetch failed:', rHist.reason);
