@@ -99,7 +99,12 @@ wx-api (Lambda, API Gateway HTTP API → CloudFront)
    • /rain-events — parsed rain events
    • /daily-summaries — pre-computed day summaries
 
-S3 + CloudFront → wx.jamestannahill.com  (dashboard)
+Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
+   • SSR fetches /current at request time → real values in initial HTML
+   • Edge-cached 60s (s-maxage=60, stale-while-revalidate=300)
+   • /og.png is proxied to the legacy CloudFront/S3 origin where wx_poller
+     keeps a fresh OG image (5-min refresh)
+
 API Gateway + CloudFront → api.wx.jamestannahill.com
 ```
 
@@ -114,8 +119,8 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | Scheduling | AWS EventBridge |
 | Storage | AWS DynamoDB (on-demand, 12 tables) |
 | API | AWS API Gateway HTTP API |
-| CDN | AWS CloudFront (API + dashboard) |
-| Dashboard | Vanilla JS, uPlot, NHG Display font |
+| CDN | AWS CloudFront (API), Cloudflare (dashboard via Worker) |
+| Dashboard | Astro 6 (SSR on Cloudflare Workers), vanilla JS, uPlot, NHG Display font |
 | IaC | AWS CDK (Python) |
 | Email | AWS SES |
 | Secrets | AWS Secrets Manager |
@@ -176,9 +181,11 @@ lambdas/
   wx_summarizer/    # Daily prose summaries
   wx_records_tracker/ # Weekly station records
 astro/
-  src/pages/        # index.astro, docs.astro
+  src/pages/        # index.astro (SSR), docs.astro (prerender), og.png.ts (proxy)
   src/layouts/      # Base layout (shared head/schema)
-  public/           # app.js, style.css, uplot.*, fonts, llms.txt, sitemap.xml
+  src/components/   # SchemaOrgIndex.astro, SchemaOrgDocs.astro
+  public/           # app.js, style.css, uplot.*, llms.txt, sitemap.xml
+  wrangler/         # auto-generated at build (dist/server/wrangler.json)
 cdk/
   wx_stack.py       # CDK stack (all infrastructure)
   app.py            # CDK entry point
@@ -189,11 +196,17 @@ cdk/
 ## Deployment
 
 ```bash
-# Deploy infrastructure
+# Deploy AWS infrastructure (Lambdas, DynamoDB, API Gateway, etc.)
 cd cdk && npx cdk deploy --require-approval never
 
-# Deploy dashboard (builds Astro, syncs astro/dist/, invalidates CF)
-bash scripts/deploy_astro.sh
+# Deploy dashboard Worker to Cloudflare
+#   - Builds Astro (SSR for /, prerender for /docs.html)
+#   - Patches the auto-generated wrangler.json (name, vars, custom domain)
+#   - wrangler deploy → wx.jamestannahill.com
+bash scripts/deploy_worker.sh
 ```
 
-Estimated AWS cost: **~$4–6/month**.
+First-time setup needs `npx wrangler login` (one-shot OAuth) and a DNS record
+for `wx.jamestannahill.com` that doesn't conflict with the Custom Domain.
+
+Estimated cost: **~$4–6/month** AWS, Worker on the free tier.
