@@ -25,13 +25,14 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 
 ### Chart
 - Multi-field selector: Temperature, Humidity, Wind, Pressure, Urban Heat
-- Time ranges: 24h / 7d / 30d with automatic downsampling
+- Time ranges: 12h / 24h / 7d / 30d with automatic downsampling
 - Historical baseline overlay (dotted line)
 - **±1σ anomaly bands** — shaded region between ±1 standard deviation of the baseline, derived from Welford's online variance computed across 90 days of readings
-- **Drag-to-zoom** on the x-axis with a Reset button; double-click resets
+- **Drag-to-zoom**, wheel/trackpad zoom centered on cursor, two-finger pinch on mobile, double-click to reset
 - **Copy** the rendered chart to the clipboard as a branded PNG (title, location, timestamp baked in)
 - **Share** uses the Web Share API on mobile (image + URL) and falls back to clipboard + Twitter intent on desktop
 - Rendered with **uPlot** for high-performance canvas drawing
+- Shipped as a **Preact island** (`client:visible`) — ~90 KB of chart JS only loads when the chart scrolls into view
 
 ### API
 Public, read-only, no authentication required.
@@ -100,10 +101,13 @@ wx-api (Lambda, API Gateway HTTP API → CloudFront)
    • /daily-summaries — pre-computed day summaries
 
 Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
-   • SSR fetches /current at request time → real values in initial HTML
+   • Hero + 12 conditions cards SSR'd at request time from /current
+     → first paint shows real values, AI crawlers see the whole dashboard
    • Edge-cached 60s (s-maxage=60, stale-while-revalidate=300)
-   • /og.png is proxied to the legacy CloudFront/S3 origin where wx_poller
-     keeps a fresh OG image (5-min refresh)
+   • /og.png generated on demand at the edge via Satori + resvg-wasm
+     (workers-og), 5-min cache; no AWS dependency
+   • Chart shipped as Preact island, hydrates on client:visible
+   • Partytown moves GA off the main thread; /docs.html prefetched on hover
 
 API Gateway + CloudFront → api.wx.jamestannahill.com
 ```
@@ -115,12 +119,13 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | Layer | Technology |
 |---|---|
 | Station | Ambient Weather WS-2902, Wi-Fi gateway |
-| Compute | AWS Lambda (Python 3.12, arm64) |
+| Compute | AWS Lambda (Python 3.12, arm64) — API + ingest only |
 | Scheduling | AWS EventBridge |
 | Storage | AWS DynamoDB (on-demand, 12 tables) |
 | API | AWS API Gateway HTTP API |
-| CDN | AWS CloudFront (API), Cloudflare (dashboard via Worker) |
-| Dashboard | Astro 6 (SSR on Cloudflare Workers), vanilla JS, uPlot, NHG Display font |
+| CDN | AWS CloudFront (API only); Cloudflare Workers (dashboard + OG) |
+| Dashboard | Astro 6 server-rendered on Cloudflare Workers, Preact island for the chart, vanilla JS for everything else, uPlot, NHG Display font |
+| OG image | Generated at the edge via workers-og (Satori + resvg-wasm), bundled NHG Display TTF |
 | IaC | AWS CDK (Python) |
 | Email | AWS SES |
 | Secrets | AWS Secrets Manager |
@@ -170,7 +175,7 @@ On each `/current` call, `climate_context.py` loads the NOAA + ERA5 normals for 
 ```
 lambdas/
   shared/           # DynamoDB client, Secrets Manager, UHI fetch
-  wx_poller/        # 5-min data collection + OG image
+  wx_poller/        # 5-min station data collection
   wx_api/           # REST API + all signal computation
   wx_alerter/       # Anomaly alert emails
   wx_bootstrap/     # One-time ERA5 + WU backfill (readings)
@@ -181,14 +186,22 @@ lambdas/
   wx_summarizer/    # Daily prose summaries
   wx_records_tracker/ # Weekly station records
 astro/
-  src/pages/        # index.astro (SSR), docs.astro (prerender), og.png.ts (proxy)
-  src/layouts/      # Base layout (shared head/schema)
-  src/components/   # SchemaOrgIndex.astro, SchemaOrgDocs.astro
-  public/           # app.js, style.css, uplot.*, llms.txt, sitemap.xml
-  wrangler/         # auto-generated at build (dist/server/wrangler.json)
+  src/pages/
+    index.astro     # SSR dashboard (hero + conditions grid pre-rendered)
+    docs.astro      # Prerendered (export const prerender = true)
+    og.png.ts       # Edge-rendered OG image (workers-og + Satori)
+  src/layouts/      # Base.astro — shared head, schema, fonts
+  src/components/
+    Chart.tsx       # Preact island for uPlot chart (client:visible)
+    SchemaOrgIndex.astro / SchemaOrgDocs.astro
+  src/og-fonts/     # NHG Display TTFs bundled into the worker for OG render
+  public/           # app.js, style.css, llms.txt, sitemap.xml, weatherkit.png
+  astro.config.mjs  # cloudflare adapter, partytown, preact, prefetch
 cdk/
-  wx_stack.py       # CDK stack (all infrastructure)
+  wx_stack.py       # CDK stack (Lambdas, DynamoDB, API Gateway, API CloudFront)
   app.py            # CDK entry point
+scripts/
+  deploy_worker.sh  # Build Astro, patch wrangler.json, wrangler deploy
 ```
 
 ---
