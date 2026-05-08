@@ -1,0 +1,49 @@
+---
+const schema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://wx.jamestannahill.com/#website",
+      "name": "wx.jamestannahill.com",
+      "url": "https://wx.jamestannahill.com",
+      "description": "Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes.",
+      "author": { "@id": "https://wx.jamestannahill.com/#person" },
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://wx.jamestannahill.com/#app",
+      "name": "wx.jamestannahill.com Weather Dashboard",
+      "url": "https://wx.jamestannahill.com",
+      "applicationCategory": "WeatherApplication",
+      "operatingSystem": "Web",
+      "description": "Real-time personal weather station dashboard for Midtown Manhattan. Live temperature, humidity, wind, pressure, UV, rainfall, comfort score, rain probability, urban heat island delta, analog forecast, and 30-day station records.",
+      "author": { "@id": "https://wx.jamestannahill.com/#person" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://wx.jamestannahill.com/#dataset",
+      "name": "Midtown Manhattan Hyperlocal Weather Data",
+      "description": "5-minute resolution personal weather station data from Midtown Manhattan (40.75°N 73.98°W). Fields: temperature, humidity, wind speed/direction/gust, barometric pressure, UV index, solar radiation, hourly/daily rainfall, dew point, feels-like, comfort score, rain probability, urban heat island delta.",
+      "url": "https://api.wx.jamestannahill.com/current",
+      "spatialCoverage": {
+        "@type": "Place",
+        "name": "Midtown Manhattan, New York",
+        "geo": { "@type": "GeoCoordinates", "latitude": 40.75, "longitude": -73.98 },
+      },
+      "temporalCoverage": "2024/..",
+      "measurementTechnique": "Personal Weather Station (Ambient Weather KNYNEWYO2140)",
+      "creator": { "@id": "https://wx.jamestannahill.com/#person" },
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+    },
+    {
+      "@type": "Person",
+      "@id": "https://wx.jamestannahill.com/#person",
+      "name": "James Tannahill",
+      "url": "https://jamestannahill.com",
+    },
+  ],
+};
+---
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

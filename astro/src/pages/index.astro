@@ -1,10 +1,223 @@
 ---
 import Base from '../layouts/Base.astro';
+import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
 ---
 <Base
   title="wx.jamestannahill.com — Midtown Manhattan Weather"
   description="Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes."
   canonical="https://wx.jamestannahill.com"
 >
-  <p>placeholder</p>
+  <SchemaOrgIndex slot="schema" />
+
+  <main>
+    <header>
+      <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
+      <span class="updated-at" id="updated-at">—</span>
+      <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C">°F</button>
+      <button class="share-btn" id="share-btn" title="Share on X">𝕏</button>
+      <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
+    </header>
+
+    <div class="stale-banner" id="stale-banner" hidden>
+      <span id="stale-msg">Station data may be delayed</span>
+    </div>
+
+    <section class="hero">
+      <div class="temp-block">
+        <span class="temp" id="temp">—</span>
+        <span class="temp-unit" id="temp-unit">°F</span>
+      </div>
+      <div class="feels-like" id="feels-like">Feels like —°F</div>
+      <div class="condition" id="condition">—</div>
+      <div class="anomaly-headline" id="anomaly-headline">—</div>
+      <div class="anomaly-subline" id="anomaly-subline"></div>
+      <div class="percentile-rank" id="percentile-rank"></div>
+    </section>
+
+    <section class="climate-panel sr" id="climate-panel" hidden>
+      <div class="climate-panel-header">
+        <span class="section-title">TODAY IN HISTORY</span>
+        <span class="source-tag has-tooltip" id="climate-source-tag" data-tooltip="">NOAA / ERA5</span>
+      </div>
+      <div id="climate-metrics"></div>
+      <div class="climate-footer" id="climate-footer"></div>
+    </section>
+
+    <section class="summary-section tomorrow-section" id="tomorrow-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" id="tomorrow-date" style="margin:0"></p>
+        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" style="display:inline-flex;align-items:center;gap:5px" data-tooltip="Apple WeatherKit — daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">WEATHERKIT</span>
+      </div>
+      <p class="summary-text" id="tomorrow-text"></p>
+    </section>
+
+    <section class="summary-section today-section" id="today-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" style="margin:0">TODAY <span class="live-dot"></span></p>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
+      <p class="summary-text" id="today-text"></p>
+    </section>
+
+    <section class="summary-section" id="summary-section" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <p class="summary-date" id="summary-date" style="margin:0"></p>
+        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      </div>
+      <p class="summary-text" id="summary-text"></p>
+    </section>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</span>
+      <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+    </div>
+    <section class="conditions-grid sr">
+      <div class="card card-clickable" data-chart-field="windspeedmph">
+        <div class="card-label">WIND</div>
+        <div class="card-value" id="wind-speed">—</div>
+        <div class="card-sub" id="wind-detail">—</div>
+      </div>
+      <div class="card card-clickable" data-chart-field="humidity">
+        <div class="card-label">HUMIDITY</div>
+        <div class="card-value" id="humidity">—</div>
+        <div class="card-sub" id="dewpoint">Dew point —°F</div>
+      </div>
+      <div class="card card-clickable" data-chart-field="baromrelin">
+        <div class="card-label">PRESSURE</div>
+        <div class="card-value" id="pressure">—</div>
+        <div class="card-sub" id="pressure-trend">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">UV INDEX</div>
+        <div class="card-value" id="uv">—</div>
+        <div class="card-sub" id="solar">— W/m²</div>
+      </div>
+      <div class="card">
+        <div class="card-label">RAINFALL</div>
+        <div class="card-value" id="rain-hourly">—</div>
+        <div class="card-sub" id="rain-daily">Daily: —"</div>
+      </div>
+      <div class="card card-clickable" data-chart-field="windspeedmph">
+        <div class="card-label">WIND GUST</div>
+        <div class="card-value" id="wind-gust">—</div>
+        <div class="card-sub" id="wind-dir">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label has-tooltip" data-tooltip="Microclimate Comfort Score (0–100). Composite of feels-like temperature deviation from 71°F ideal, humidity, wind speed, UV index, and rain rate. Season-weighted and adjusted for anomalies vs. this station's own baseline.">COMFORT</div>
+        <div class="card-value" id="comfort-score">—</div>
+        <div class="card-sub" id="comfort-label">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label has-tooltip" data-tooltip="Probability of rain in the next 60 minutes. Logistic regression on humidity, 1-hour pressure trend, dew-point depression, and hour-of-day. Heuristic coefficients calibrated for NYC (~120 rain days/yr). Boosts automatically if rain is currently falling.">RAIN NEXT HR</div>
+        <div class="card-value" id="rain-prob">—</div>
+        <div class="card-sub" id="rain-prob-label">—</div>
+      </div>
+      <div class="card card-clickable" data-chart-field="uhi_delta">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div class="card-label has-tooltip" style="margin-bottom:0" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
+          <span class="source-tag source-external" style="font-size:8px;padding:1px 5px">NOAA</span>
+        </div>
+        <div class="card-value" id="uhi-delta">—</div>
+        <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
+        <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px;color:#555"></div>
+      </div>
+    </section>
+
+    <section class="comfort-calendar-section sr" id="comfort-calendar-section" hidden>
+      <div class="section-header">
+        <span class="section-title">COMFORT CALENDAR</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="comfort-meta">30-day history</span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+        </div>
+      </div>
+      <div class="comfort-grid" id="comfort-grid"></div>
+    </section>
+
+    <section class="forecast-section sr" id="forecast-section" hidden>
+      <div class="forecast-header">
+        <span class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="forecast-meta" id="forecast-meta"></span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+        </div>
+      </div>
+      <div class="forecast-grid" id="forecast-grid"></div>
+    </section>
+
+    <section class="chart-section">
+      <div class="chart-section-header">
+        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
+        <div class="chart-actions">
+          <button class="chart-action-btn" id="chart-zoom-reset" title="Reset zoom" hidden>↻</button>
+          <button class="chart-action-btn" id="chart-copy-btn" title="Copy chart">⧉</button>
+          <button class="chart-action-btn" id="chart-share-btn" title="Share chart">↗</button>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        </div>
+      </div>
+      <div class="chart-controls">
+        <div class="chart-controls-row">
+          <button class="chart-btn active" data-field="tempf">Temperature</button>
+          <button class="chart-btn" data-field="humidity">Humidity</button>
+          <button class="chart-btn" data-field="windspeedmph">Wind</button>
+          <button class="chart-btn" data-field="baromrelin">Pressure</button>
+          <button class="chart-btn" data-field="uhi_delta">Urban Heat</button>
+        </div>
+        <div class="chart-controls-row range-row">
+          <button class="range-btn" data-hours="12">12h</button>
+          <button class="range-btn active" data-hours="24">24h</button>
+          <button class="range-btn" data-hours="168">7d</button>
+          <button class="range-btn" data-hours="720">30d</button>
+        </div>
+      </div>
+      <div id="wx-chart-wrap" class="wx-chart-wrap"></div>
+      <div class="chart-legend" id="wx-chart-legend">
+        <span class="chart-legend-item">
+          <span class="chart-legend-swatch swatch-observed"></span>Observed
+        </span>
+        <span class="chart-legend-item">
+          <span class="chart-legend-swatch swatch-baseline"></span>Historical avg
+        </span>
+        <span class="chart-legend-item">
+          <span class="chart-legend-swatch swatch-band"></span>±1σ normal range
+        </span>
+        <span class="chart-legend-item">
+          <span class="chart-legend-swatch swatch-rain"></span>Rainfall
+        </span>
+      </div>
+      <div class="chart-hint">Scroll / pinch to zoom · Drag to pan · Double-click to reset</div>
+    </section>
+
+    <section class="records-section sr" id="records-section" hidden>
+      <div class="section-header">
+        <span class="section-title">STATION RECORDS</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="records-month"></span>
+          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        </div>
+      </div>
+      <div class="records-grid" id="records-grid"></div>
+    </section>
+
+    <!-- Nearby Stations -->
+    <section class="nearby-section sr" id="nearby-section" style="display:none">
+      <div class="section-header">
+        <span class="section-title">NEARBY STATIONS</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-meta" id="nearby-meta"></span>
+          <span class="source-tag source-external">AMBIENT NETWORK</span>
+        </div>
+      </div>
+      <div class="nearby-strip" id="nearby-strip"></div>
+    </section>
+
+    <footer>
+      <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
+      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> &nbsp;·&nbsp; <a href="/docs">How It Works</a></p>
+    </footer>
+  </main>
+
+  <script src="/uplot.min.js" is:inline></script>
+  <script src="/app.js" is:inline></script>
+
 </Base>
