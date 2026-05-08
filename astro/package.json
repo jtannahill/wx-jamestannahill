@@ -1,0 +1,22 @@
+{
+  "name": "wx-astro",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^6.2.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
+  }
+}
