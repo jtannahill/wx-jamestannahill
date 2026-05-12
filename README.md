@@ -1,5 +1,12 @@
 # wx.jamestannahill.com
 
+![Status](https://img.shields.io/badge/status-active-success)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white)
+![Ambient Weather](https://img.shields.io/badge/sensor-Ambient_WS--2902-orange)
+[![Live](https://img.shields.io/badge/live-wx.jamestannahill.com-blue)](https://wx.jamestannahill.com)
+![Last Commit](https://img.shields.io/github/last-commit/jtannahill/wx-jamestannahill)
+
 Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a private **Ambient Weather WS-2902** station, updated every 5 minutes.
 
 **Live:** [wx.jamestannahill.com](https://wx.jamestannahill.com) · **API:** [api.wx.jamestannahill.com/current](https://api.wx.jamestannahill.com/current)
