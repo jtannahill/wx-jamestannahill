@@ -16,30 +16,30 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 ## Features
 
 ### Dashboard
-- **Live conditions** — temperature, feels-like, humidity, dew point, wind, gusts, pressure, UV index, solar radiation, rainfall
-- **Anomaly headline** — how today compares to the station's own rolling baseline for this month and hour
-- **Percentile rank** — where current temperature falls in the station's historical distribution
-- **Yesterday's summary** — prose recap of the prior day (high/low, rain events, notable winds), auto-generated nightly
-- **Today in History** — daily verdict panel backed by 156 years of NOAA Central Park records and 85 years of ERA5 reanalysis. Shows whether today's high and low are hotter/cooler/normal vs. the historical average, with deviation bars spanning p5→p95 in actual °F and a tick at the long-run mean
-- **WeatherKit forecast** — Apple WeatherKit 7-day outlook with daily high/low, condition, precipitation probability, and UV index
-- **NWS alerts** — active National Weather Service warnings and advisories for the station area
-- **Nearby stations** — personal weather stations in the area with current conditions for local comparison
-- **Comfort calendar** — 30-day heatmap grid, color-coded by daily comfort score (0–100)
-- **Station records** — current-month extremes: temp high/low, max gust, peak rain rate, pressure range, each with the date it was set
-- **Analog forecast** — +1h/+2h/+3h predictions via nearest-neighbor pattern matching on 90 days of station data, with running MAE accuracy
-- **Urban Heat Island delta** — this station vs. the average of JFK, LGA, and EWR METAR readings, updated every 5 minutes
-- **Rain probability** — logistic regression model fitted weekly on labeled station history, with persistence boost if currently raining
+- **Live conditions**: temperature, feels-like, humidity, dew point, wind, gusts, pressure, UV index, solar radiation, rainfall
+- **Anomaly headline**: how today compares to the station's own rolling baseline for this month and hour
+- **Percentile rank**: where current temperature falls in the station's historical distribution
+- **Yesterday's summary**: prose recap of the prior day (high/low, rain events, notable winds), auto-generated nightly
+- **Today in History**: daily verdict panel backed by 156 years of NOAA Central Park records and 85 years of ERA5 reanalysis. Shows whether today's high and low are hotter/cooler/normal vs. the historical average, with deviation bars spanning p5→p95 in actual °F and a tick at the long-run mean
+- **WeatherKit forecast**: Apple WeatherKit 7-day outlook with daily high/low, condition, precipitation probability, and UV index
+- **NWS alerts**: active National Weather Service warnings and advisories for the station area
+- **Nearby stations**: personal weather stations in the area with current conditions for local comparison
+- **Comfort calendar**: 30-day heatmap grid, color-coded by daily comfort score (0–100)
+- **Station records**: current-month extremes: temp high/low, max gust, peak rain rate, pressure range, each with the date it was set
+- **Analog forecast**: +1h/+2h/+3h predictions via nearest-neighbor pattern matching on 90 days of station data, with running MAE accuracy
+- **Urban Heat Island delta**: this station vs. the average of JFK, LGA, and EWR METAR readings, updated every 5 minutes
+- **Rain probability**: logistic regression model fitted weekly on labeled station history, with persistence boost if currently raining
 
 ### Chart
 - Multi-field selector: Temperature, Humidity, Wind, Pressure, Urban Heat
 - Time ranges: 12h / 24h / 7d / 30d with automatic downsampling
 - Historical baseline overlay (dotted line)
-- **±1σ anomaly bands** — shaded region between ±1 standard deviation of the baseline, derived from Welford's online variance computed across 90 days of readings
+- **±1σ anomaly bands**: shaded region between ±1 standard deviation of the baseline, derived from Welford's online variance computed across 90 days of readings
 - **Drag-to-zoom**, wheel/trackpad zoom centered on cursor, two-finger pinch on mobile, double-click to reset
 - **Copy** the rendered chart to the clipboard as a branded PNG (title, location, timestamp baked in)
 - **Share** uses the Web Share API on mobile (image + URL) and falls back to clipboard + Twitter intent on desktop
 - Rendered with **uPlot** for high-performance canvas drawing
-- Shipped as a **Preact island** (`client:visible`) — ~90 KB of chart JS only loads when the chart scrolls into view
+- Shipped as a **Preact island** (`client:visible`): ~90 KB of chart JS only loads when the chart scrolls into view
 
 ### API
 Public, read-only, no authentication required.
@@ -102,10 +102,10 @@ wx-poller (Lambda, EventBridge 5-min)
                • Keeps climate baseline current
 
 wx-api (Lambda, API Gateway HTTP API → CloudFront)
-   • /current   — live reading + all ML signals + climate context + daily summary + records
-   • /history   — downsampled readings with baselines + std dev
-   • /rain-events — parsed rain events
-   • /daily-summaries — pre-computed day summaries
+   • /current  : live reading + all ML signals + climate context + daily summary + records
+   • /history  : downsampled readings with baselines + std dev
+   • /rain-events: parsed rain events
+   • /daily-summaries: pre-computed day summaries
 
 Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
    • Hero + 12 conditions cards SSR'd at request time from /current
@@ -126,7 +126,7 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | Layer | Technology |
 |---|---|
 | Station | Ambient Weather WS-2902, Wi-Fi gateway |
-| Compute | AWS Lambda (Python 3.12, arm64) — API + ingest only |
+| Compute | AWS Lambda (Python 3.12, arm64): API + ingest only |
 | Scheduling | AWS EventBridge |
 | Storage | AWS DynamoDB (on-demand, 12 tables) |
 | API | AWS API Gateway HTTP API |
@@ -197,7 +197,7 @@ astro/
     index.astro     # SSR dashboard (hero + conditions grid pre-rendered)
     docs.astro      # Prerendered (export const prerender = true)
     og.png.ts       # Edge-rendered OG image (workers-og + Satori)
-  src/layouts/      # Base.astro — shared head, schema, fonts
+  src/layouts/      # Base.astro: shared head, schema, fonts
   src/components/
     Chart.tsx       # Preact island for uPlot chart (client:visible)
     SchemaOrgIndex.astro / SchemaOrgDocs.astro
