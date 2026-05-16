@@ -61,15 +61,22 @@ const compass = (deg: number | null | undefined) =>
 const fmt = (v: unknown, d = 0) =>
   v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(d);
 
-function nowET(): string {
+function etLabel(ms: number): string {
   // -4h offset (ET, summer); for an OG image this is close enough year-round.
-  const d = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  const d = new Date(ms - 4 * 60 * 60 * 1000);
   let h = d.getUTCHours();
   const m = String(d.getUTCMinutes()).padStart(2, '0');
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   return `${h}:${m} ${ampm} ET`;
 }
+
+const nowET = () => etLabel(Date.now());
+
+// A reading is usable for a snapshot only if the core hero value is present.
+// A degraded render (all "—") must never be edge-cached behind ?v=.
+const hasReading = (r: any) =>
+  r != null && r.tempf != null && !Number.isNaN(Number(r.tempf));
 
 function buildJsx(reading: any) {
   const tempStr  = `${fmt(reading?.tempf, 0)}°`;
@@ -95,10 +102,15 @@ function buildJsx(reading: any) {
 
   // Whitespace between tags becomes phantom text nodes that break Satori's
   // "div with >1 child needs display:flex" rule. Build with no whitespace.
+  // Stamp the reading's own time, not wall-clock — the card must not claim to
+  // be fresher than the data it shows. Fall back to now only if absent.
+  const ts = reading?.timestamp ? new Date(reading.timestamp).getTime() : NaN;
+  const updatedLabel = Number.isNaN(ts) ? nowET() : etLabel(ts);
+
   const headerHtml =
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:52px ${PAD}px 0;font-size:15px;letter-spacing:0.12em;color:${COLORS.muted};font-weight:400;">` +
       `<span>MIDTOWN MANHATTAN, NEW YORK</span>` +
-      `<span>Updated ${nowET()}</span>` +
+      `<span>Updated ${updatedLabel}</span>` +
     `</div>`;
 
   const heroHtml =
@@ -146,15 +158,22 @@ export async function GET({ request }: { request: Request }) {
   // stable → edge hit → no re-render. New bucket → edge miss → render fresh
   // from a freshly fetched /current. Bypass any internal cache on /current
   // so the rendered snapshot matches the latest poller write.
-  let reading: any = null;
-  try {
+  const fetchCurrent = async () => {
     const r = await fetch(`${apiBase}/current`, {
       signal: AbortSignal.timeout(3000),
       cf: { cacheTtl: 0, cacheEverything: false } as any,
       headers: { 'cache-control': 'no-cache' },
     });
-    if (r.ok) reading = await r.json();
-  } catch {}
+    return r.ok ? await r.json() : null;
+  };
+
+  // One retry on a transient blip: without this, a single failed scrape
+  // pins an all-"—" card at the edge for 5 min behind ?v=.
+  let reading: any = null;
+  try { reading = await fetchCurrent(); } catch {}
+  if (!hasReading(reading)) {
+    try { reading = await fetchCurrent(); } catch {}
+  }
 
   const { bold, regular } = await loadFonts(new URL(request.url).origin);
 
@@ -174,9 +193,12 @@ export async function GET({ request }: { request: Request }) {
   // - Without ?v= → no edge cache; render fresh every request (matches the
   //   "actual snapshot" guarantee for crawlers that strip query params).
   const headers = new Headers(r.headers);
-  if (url.searchParams.has('v')) {
+  if (url.searchParams.has('v') && hasReading(reading)) {
+    // Snapshot is real and keyed by the bucket → cache hard at the edge.
     headers.set('cache-control', 'public, max-age=300, s-maxage=300, immutable');
   } else {
+    // No ?v=, OR a degraded render: never pin it. The next scrape re-fetches
+    // and recovers the current snapshot instead of freezing a broken card.
     headers.set('cache-control', 'public, max-age=0, s-maxage=0, must-revalidate');
   }
   return new Response(r.body, { status: 200, headers });

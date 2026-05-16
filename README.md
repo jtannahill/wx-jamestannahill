@@ -112,7 +112,9 @@ Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
      → first paint shows real values, AI crawlers see the whole dashboard
    • Edge-cached 60s (s-maxage=60, stale-while-revalidate=300)
    • /og.png generated on demand at the edge via Satori + resvg-wasm
-     (workers-og), 5-min cache; no AWS dependency
+     (workers-og); a real snapshot keyed by ?v= is edge-cached 5 min,
+     a degraded render (API miss) is served uncached so the next
+     crawler scrape recovers the current snapshot; no AWS dependency
    • Chart shipped as Preact island, hydrates on client:visible
    • Partytown moves GA off the main thread; /docs.html prefetched on hover
 
