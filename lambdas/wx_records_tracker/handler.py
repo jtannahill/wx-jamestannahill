@@ -47,8 +47,9 @@ def handler(event, context):
     readings = [_floatify(r) for r in items if not r.get('quality_flag')]
     print(f"Processing {len(readings)} clean readings")
 
-    # Group by local calendar month
+    # Group by local calendar month (+ keep a flat list for the all-time row)
     by_month = defaultdict(list)
+    all_pairs = []
     for r in readings:
         ts_str = r.get('timestamp', '')
         try:
@@ -57,10 +58,28 @@ def handler(event, context):
                 ts = ts.replace(tzinfo=timezone.utc)
             local = ts.astimezone(STATION_TZ)
             by_month[str(local.month).zfill(2)].append((r, local))
+            all_pairs.append((r, local))
         except Exception:
             pass
 
     records_table = get_table(RECORDS_TABLE)
+
+    # Persistent, monotonic all-time row: survives the 90-day window slide so
+    # a past peak can never silently regress or disappear.
+    if all_pairs:
+        existing = records_table.get_item(
+            Key={'station_id': mac, 'month': 'ALL'}).get('Item')
+        merged = merge_all_time(existing, _compute_records(all_pairs))
+        records_table.put_item(Item={
+            'station_id':  mac,
+            'month':       'ALL',
+            'scope':       'all-time',
+            'computed_at': datetime.now(timezone.utc).isoformat(),
+            **{k: (_dec(v) if isinstance(v, float) else v)
+               for k, v in merged.items()},
+        })
+        print(f"ALL-time: {merged}")
+
     for month, group in by_month.items():
         rec = _compute_records(group)
         records_table.put_item(Item={
@@ -75,6 +94,34 @@ def handler(event, context):
         print(f"Month {month}: {rec}")
 
     return {"status": "ok", "months_processed": len(by_month)}
+
+
+# (field, at_field, keep_when) — keep_when(new, cur) True => new value wins.
+_ALL_TIME_SPEC = [
+    ('temp_high',     'temp_high_at',     lambda n, c: n > c),
+    ('temp_low',      'temp_low_at',      lambda n, c: n < c),
+    ('max_gust',      'max_gust_at',      lambda n, c: n > c),
+    ('max_rain_rate', 'max_rain_rate_at', lambda n, c: n > c),
+    ('max_pressure',  'max_pressure_at',  lambda n, c: n > c),
+    ('min_pressure',  'min_pressure_at',  lambda n, c: n < c),
+]
+
+
+def merge_all_time(existing: dict | None, observed: dict) -> dict:
+    """Monotonically fold newly-observed extremes into the persistent all-time
+    record. Highs only ever rise, lows only ever fall, and a record never
+    vanishes just because its month left the rolling scan window. Ties keep
+    the existing (older) date."""
+    existing = existing or {}
+    out = {}
+    for field, at_field, keep_new in _ALL_TIME_SPEC:
+        cur_val, new_val = existing.get(field), observed.get(field)
+        if new_val is not None and (
+                cur_val is None or keep_new(float(new_val), float(cur_val))):
+            out[field], out[at_field] = new_val, observed.get(at_field)
+        elif cur_val is not None:
+            out[field], out[at_field] = cur_val, existing.get(at_field)
+    return out
 
 
 def _compute_records(group: list) -> dict:
