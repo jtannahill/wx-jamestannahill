@@ -45,6 +45,7 @@ def test_current_endpoint_returns_200():
     assert 'tempf' in body
     assert 'anomalies' in body
     assert 'updated_at' in body
+    assert 'wk_hourly' in body  # present even when WeatherKit is unavailable
 
 def test_history_endpoint_returns_readings_array():
     from wx_api.handler import handler
@@ -64,6 +65,17 @@ def test_history_endpoint_returns_readings_array():
     body = json.loads(result['body'])
     assert 'readings' in body
     assert body['count'] == 2
+
+    # Payload is trimmed to chart-consumed fields only, with rounded floats
+    r0 = body['readings'][0]
+    for kept in ('timestamp', 'tempf', 'humidity', 'windspeedmph',
+                 'windgustmph', 'baromrelin', 'hourlyrainin', 'uhi_delta'):
+        assert kept in r0, f"missing {kept}"
+    for dropped in ('station_id', 'ttl', 'feelsLike', 'dewPoint', 'winddir',
+                    'solarradiation', 'uv', 'dailyrainin'):
+        assert dropped not in r0, f"should be trimmed: {dropped}"
+    assert r0['tempf'] == 61.3
+    assert r0['baromrelin'] == 29.92
 
 def test_unknown_route_returns_404():
     from wx_api.handler import handler

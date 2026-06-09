@@ -14,6 +14,10 @@ STATION_TZ = ZoneInfo('America/New_York')
 READINGS_TABLE     = os.environ.get('READINGS_TABLE', 'wx-readings')
 STATS_TABLE        = os.environ.get('STATS_TABLE', 'wx-daily-stats')
 UHI_SEASONAL_TABLE = os.environ.get('UHI_SEASONAL_TABLE', 'wx-uhi-seasonal')
+NEARBY_TABLE       = os.environ.get('NEARBY_TABLE', 'wx-nearby-snapshots')
+# Nearby refresh cadence. The v3/near + per-station flow costs ~21 WU calls
+# per snapshot; 30 min keeps usage near 1,000 calls/day (free tier is 1,500).
+NEARBY_REFRESH_MINUTES = int(os.environ.get('NEARBY_REFRESH_MINUTES', '30'))
 STAT_FIELDS        = ['tempf', 'feelsLike', 'humidity', 'windspeedmph', 'baromrelin', 'uv']
 STD_FIELDS         = ['tempf', 'humidity', 'windspeedmph', 'baromrelin']  # fields that need std dev for chart bands
 MAX_SAMPLE_COUNT   = 8640  # 30 days × 288 readings/day
@@ -63,9 +67,10 @@ def handler(event, context):
     # --- Fetch and store nearby WU stations (non-critical) --------------------
     if quality_flag is None and wu_key:
         try:
-            nearby = fetch_nearby(wu_key, limit=20)
-            if nearby:
-                _write_nearby_snapshot(mac, now, nearby)
+            if _nearby_refresh_due(mac, now):
+                nearby = fetch_nearby(wu_key, limit=20)
+                if nearby:
+                    _write_nearby_snapshot(mac, now, nearby)
         except Exception as e:
             print(f"[poller] nearby fetch/write failed (non-critical): {e}")
 
@@ -223,10 +228,33 @@ def _update_uhi_seasonal(station_id: str, month: str, delta: float):
     })
 
 
+def _nearby_refresh_due(station_id: str, now: datetime) -> bool:
+    """True when the latest nearby snapshot is missing or older than the cadence."""
+    try:
+        table  = get_table(NEARBY_TABLE)
+        result = table.query(
+            KeyConditionExpression=Key('station_id').eq(station_id),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = result.get('Items', [])
+        if not items:
+            return True
+        last = datetime.fromisoformat(str(items[0]['snapshot_at']))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        age_min = (now - last).total_seconds() / 60
+        # 1-minute slack so 5-minute poll jitter can't skip a whole cycle
+        return age_min >= NEARBY_REFRESH_MINUTES - 1
+    except Exception as e:
+        print(f"[poller] nearby freshness check failed (refreshing anyway): {e}")
+        return True
+
+
 def _write_nearby_snapshot(station_id: str, now, nearby: list):
     """Write the latest nearby station snapshot to wx-nearby-snapshots."""
     import json as _json
-    table = get_table(os.environ.get('NEARBY_TABLE', 'wx-nearby-snapshots'))
+    table = get_table(NEARBY_TABLE)
     table.put_item(Item={
         'station_id':    station_id,
         'snapshot_at':   now.isoformat(),

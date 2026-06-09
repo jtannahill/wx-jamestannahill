@@ -233,6 +233,9 @@ class WxStack(Stack):
         # Poller writes nearby snapshots; API reads them
         self.nearby_table.grant_read_write_data(self.poller_fn)
         self.poller_fn.add_environment("NEARBY_TABLE", self.nearby_table.table_name)
+        # WU nearby refresh cadence (v3/near + per-station calls ≈ 21 WU
+        # requests per snapshot; 30 min stays inside the 1,500/day free tier)
+        self.poller_fn.add_environment("NEARBY_REFRESH_MINUTES", "30")
         self.nearby_table.grant_read_data(self.api_fn)
         self.api_fn.add_environment("NEARBY_TABLE", self.nearby_table.table_name)
 
@@ -369,6 +372,10 @@ class WxStack(Stack):
             min_ttl=Duration.seconds(0),
             max_ttl=Duration.minutes(5),
             query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
+            # Required for CloudFront edge compression of JSON responses
+            # (the /history payload gzips ~25x). In-place policy update.
+            enable_accept_encoding_gzip=True,
+            enable_accept_encoding_brotli=True,
         )
         # Custom domain + cert were originally attached manually in the console;
         # codified here so deploys don't strip them.

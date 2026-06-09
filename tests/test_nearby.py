@@ -15,27 +15,50 @@ def test_haversine_central_park():
     d = _haversine_mi(40.755, -73.984, 40.785, -73.968)
     assert 2.0 < d < 3.5, f"Expected ~2.5 mi, got {d}"
 
-def test_fetch_nearby_returns_list_on_api_success():
-    from unittest.mock import patch, MagicMock
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        'observations': [
-            {
-                'stationID': 'KNYNEWYO2140',
-                'neighborhood': 'Midtown Manhattan',
-                'lat': 40.760,
-                'lon': -73.990,
-                'winddir': 90,
-                'humidity': 42,
-                'obsTimeLocal': '2026-04-08 12:00:00',
-                'imperial': {
-                    'temp': 64, 'windSpeed': 8, 'windGust': 12,
-                    'pressure': 30.22, 'precipRate': 0.0,
-                },
-            }
-        ]
+def _make_wu_mocks(station_ids, observations_by_id, near_status=200):
+    """
+    Build a requests.get side_effect serving the two-phase WU flow:
+    v3/location/near first, then v2/pws/observations/current per station.
+    observations_by_id values: dict (observation), 204 (not reporting).
+    """
+    from unittest.mock import MagicMock
+
+    def _get(url, params=None, timeout=None):
+        resp = MagicMock()
+        if 'location/near' in url:
+            resp.status_code = near_status
+            resp.json.return_value = {'location': {'stationId': station_ids}}
+        else:
+            obs = observations_by_id.get(params['stationId'])
+            if obs == 204:
+                resp.status_code = 204
+            else:
+                resp.status_code = 200
+                resp.json.return_value = {'observations': [obs]}
+        return resp
+
+    return _get
+
+def _obs(station_id, lat=40.760, lon=-73.990, precip_rate=0.0):
+    return {
+        'stationID': station_id,
+        'neighborhood': 'Midtown Manhattan',
+        'lat': lat,
+        'lon': lon,
+        'winddir': 90,
+        'humidity': 42,
+        'obsTimeLocal': '2026-04-08 12:00:00',
+        'imperial': {
+            'temp': 64, 'windSpeed': 8, 'windGust': 12,
+            'pressure': 30.22, 'precipRate': precip_rate,
+        },
     }
-    with patch('wx_poller.nearby.requests.get', return_value=mock_resp):
+
+def test_fetch_nearby_returns_list_on_api_success():
+    from unittest.mock import patch
+    side_effect = _make_wu_mocks(
+        ['KNYNEWYO2140'], {'KNYNEWYO2140': _obs('KNYNEWYO2140')})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
         result = fetch_nearby('fake_key', limit=5)
     assert isinstance(result, list)
     assert len(result) == 1
@@ -51,48 +74,50 @@ def test_fetch_nearby_returns_empty_on_error():
     assert result == []
 
 def test_fetch_nearby_excludes_home_station():
-    from unittest.mock import patch, MagicMock
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        'observations': [
-            {
-                'stationID': 'HOME',
-                'neighborhood': 'Midtown',
-                'lat': 40.7549,
-                'lon': -73.984,
-                'winddir': 90, 'humidity': 42,
-                'obsTimeLocal': '2026-04-08 12:00:00',
-                'imperial': {'temp': 64, 'windSpeed': 8, 'windGust': 12,
-                             'pressure': 30.22, 'precipRate': 0.0},
-            }
-        ]
-    }
-    with patch('wx_poller.nearby.requests.get', return_value=mock_resp):
+    from unittest.mock import patch
+    side_effect = _make_wu_mocks(
+        ['HOME'], {'HOME': _obs('HOME', lat=40.7549, lon=-73.984)})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
         result = fetch_nearby('fake_key')
     assert result == []
 
-def test_fetch_nearby_handles_trace_precipitation():
-    from unittest.mock import patch, MagicMock
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        'observations': [
-            {
-                'stationID': 'KNYTEST01',
-                'neighborhood': 'Hell\'s Kitchen',
-                'lat': 40.760, 'lon': -73.990,
-                'winddir': 90, 'humidity': 42,
-                'obsTimeLocal': '2026-04-08 12:00:00',
-                'imperial': {
-                    'temp': 64, 'windSpeed': 8, 'windGust': 12,
-                    'pressure': 30.22, 'precipRate': 'T',  # WU trace value
-                },
-            }
-        ]
-    }
-    with patch('wx_poller.nearby.requests.get', return_value=mock_resp):
+def test_fetch_nearby_skips_204_stations():
+    from unittest.mock import patch
+    side_effect = _make_wu_mocks(
+        ['KDEAD01', 'KNYTEST01'],
+        {'KDEAD01': 204, 'KNYTEST01': _obs('KNYTEST01')})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
         result = fetch_nearby('fake_key')
     assert len(result) == 1
-    assert result[0]['rain_rate_in_hr'] == 0.0  # trace → 0.0, no crash
+    assert result[0]['station_id'] == 'KNYTEST01'
+
+def test_fetch_nearby_skips_stale_observations():
+    from unittest.mock import patch
+    stale = _obs('KSTALE01')
+    stale['obsTimeUtc'] = '2020-01-01T00:00:00Z'
+    side_effect = _make_wu_mocks(['KSTALE01'], {'KSTALE01': stale})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
+        result = fetch_nearby('fake_key')
+    assert result == []
+
+def test_fetch_nearby_sorted_by_distance():
+    from unittest.mock import patch
+    far  = _obs('KFAR01',  lat=40.80, lon=-73.95)
+    near = _obs('KNEAR01', lat=40.76, lon=-73.99)
+    side_effect = _make_wu_mocks(
+        ['KFAR01', 'KNEAR01'], {'KFAR01': far, 'KNEAR01': near})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
+        result = fetch_nearby('fake_key')
+    assert [s['station_id'] for s in result] == ['KNEAR01', 'KFAR01']
+
+def test_fetch_nearby_handles_trace_precipitation():
+    from unittest.mock import patch
+    side_effect = _make_wu_mocks(
+        ['KNYTEST01'], {'KNYTEST01': _obs('KNYTEST01', precip_rate='T')})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
+        result = fetch_nearby('fake_key')
+    assert len(result) == 1
+    assert result[0]['rain_rate_in_hr'] == 0.0  # trace value, no crash
 
 
 # ── spatial_rain_boost tests ──────────────────────────────────────────────────

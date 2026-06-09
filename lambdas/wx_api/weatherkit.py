@@ -9,7 +9,7 @@ import json
 import time
 import base64
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -25,12 +25,18 @@ _WK_URL = (
     f'?dataSets=forecastDaily&timezone=America/New_York'
 )
 _WK_ATTR_URL = 'https://weatherkit.apple.com/api/v1/attribution/en'
+_WK_HOURLY_URL = (
+    f'https://weatherkit.apple.com/api/v1/weather/en/{_LAT}/{_LON}'
+    f'?dataSets=forecastHourly&timezone=America/New_York'
+)
 
 # In-memory caches (survive warm Lambda invocations)
 _jwt_cache      = {'token': None, 'exp': 0}
 _forecast_cache = {'data': None, 'ts': 0}
 _attr_cache     = {'data': None, 'ts': 0}
+_hourly_cache   = {'data': None, 'ts': 0}
 _FORECAST_TTL   = 900    # 15 minutes
+_HOURLY_TTL     = 1800   # 30 minutes — hourly forecast hit at most ~2x/hour
 _ATTR_TTL       = 86400  # 24 hours — attribution assets rarely change
 
 _CONDITION = {
@@ -188,6 +194,54 @@ def fetch_attribution(creds: dict) -> dict | None:
         'service_name':   data.get('serviceName', 'Weather'),
     }
     _attr_cache.update({'data': result, 'ts': now})
+    return result
+
+
+def fetch_hourly_forecast(creds: dict, hours: int = 12) -> list | None:
+    """
+    Fetch the next `hours` hours from WeatherKit's forecastHourly dataset.
+    Returns a list of dicts, oldest first, or None on failure / no data:
+      {"time": ISO8601 UTC, "tempf": int, "condition": conditionCode,
+       "precip_prob": float 0..1}
+    """
+    now = time.time()
+    if _hourly_cache['data'] and now - _hourly_cache['ts'] < _HOURLY_TTL:
+        return _hourly_cache['data']
+
+    token = _get_jwt(creds)
+    req = urllib.request.Request(_WK_HOURLY_URL, headers={
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+    })
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        data = json.loads(resp.read())
+
+    entries = data.get('forecastHourly', {}).get('hours', [])
+    cutoff = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    result = []
+    for h in entries:
+        start = h.get('forecastStart')
+        if not start:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(start).replace('Z', '+00:00')).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        if dt < cutoff:
+            continue
+        temp_c = h.get('temperature')
+        result.append({
+            'time':        dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'tempf':       _c_to_f(temp_c) if temp_c is not None else None,
+            'condition':   h.get('conditionCode', ''),
+            'precip_prob': round(float(h.get('precipitationChance') or 0.0), 2),
+        })
+        if len(result) >= hours:
+            break
+
+    if not result:
+        return None
+    _hourly_cache.update({'data': result, 'ts': now})
     return result
 
 

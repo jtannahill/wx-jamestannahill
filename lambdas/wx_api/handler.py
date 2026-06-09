@@ -12,7 +12,11 @@ from wx_api.climate_context import live_context, daily_verdict, anomaly_headline
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
 from wx_api.nearby import nearby_route, _fetch_nearby_snapshot
-from wx_api.weatherkit import fetch_tomorrow_forecast as _wk_fetch, fetch_attribution as _wk_attr
+from wx_api.weatherkit import (
+    fetch_tomorrow_forecast as _wk_fetch,
+    fetch_attribution as _wk_attr,
+    fetch_hourly_forecast as _wk_hourly,
+)
 from boto3.dynamodb.conditions import Key
 
 READINGS_TABLE     = os.environ.get('READINGS_TABLE',     'wx-readings')
@@ -124,10 +128,17 @@ def _current():
     def _get_wk():
         try:
             creds = get_secret('weatherkit/credentials')
-            return _wk_fetch(creds), _wk_attr(creds)
         except Exception as e:
-            print(f"WeatherKit fetch failed (non-critical): {e}")
-            return None, None
+            print(f"WeatherKit creds load failed (non-critical): {e}")
+            return None, None, None
+        results = []
+        for fetch in (_wk_fetch, _wk_attr, _wk_hourly):
+            try:
+                results.append(fetch(creds))
+            except Exception as e:
+                print(f"WeatherKit fetch failed (non-critical): {e}")
+                results.append(None)
+        return tuple(results)
 
     with ThreadPoolExecutor(max_workers=9) as ex:
         f_uhi            = ex.submit(_get_uhi)
@@ -146,7 +157,7 @@ def _current():
     uhi_seasonal         = f_seasonal.result()
     station_records      = f_records.result()
     daily_summary        = f_summary.result()
-    nws_tomorrow, wk_attribution = f_wk.result()
+    nws_tomorrow, wk_attribution, wk_hourly = f_wk.result()
     climate_doy_stats    = f_climate_doy.result()
     climate_hourly_stats = f_climate_hourly.result()
 
@@ -189,6 +200,7 @@ def _current():
         "daily_summary":         daily_summary,
         "nws_tomorrow":          nws_tomorrow,
         "wk_attribution":        wk_attribution,
+        "wk_hourly":             wk_hourly,
         "nearby_stations":       nearby[:8],
         **uhi,
     }
@@ -228,7 +240,44 @@ def _history(hours: int):
     # Attach per-slot baselines so the chart can draw the overlay
     floated = _attach_baselines(floated, mac)
 
+    # Trim to the fields the chart consumes and round floats — the raw rows
+    # carry unused sensor fields and full float precision that bloat the payload
+    floated = _trim_history(floated)
+
     return _resp(200, {"readings": floated, "count": len(floated), "hours": hours})
+
+
+# Fields the frontend chart (Chart.tsx + app.js today-context) actually reads,
+# mapped to the number of decimals each is rounded to.
+HISTORY_FIELD_DECIMALS = {
+    'tempf':                     1,
+    'humidity':                  1,
+    'windspeedmph':              1,
+    'windgustmph':               1,
+    'uhi_delta':                 1,
+    'hourlyrainin':              2,
+    'baromrelin':                2,
+    'baseline_tempf':            1,
+    'baseline_std_tempf':        1,
+    'baseline_humidity':         1,
+    'baseline_std_humidity':     1,
+    'baseline_windspeedmph':     1,
+    'baseline_std_windspeedmph': 1,
+    'baseline_baromrelin':       2,
+    'baseline_std_baromrelin':   2,
+}
+
+
+def _trim_history(readings: list) -> list:
+    """Keep only chart-consumed fields, rounded. Response shape is unchanged."""
+    trimmed = []
+    for r in readings:
+        t = {'timestamp': r.get('timestamp')}
+        for field, decimals in HISTORY_FIELD_DECIMALS.items():
+            v = r.get(field)
+            t[field] = round(v, decimals) if isinstance(v, (int, float)) else None
+        trimmed.append(t)
+    return trimmed
 
 
 def _downsample(readings: list, bucket_hours: int) -> list:
