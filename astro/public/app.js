@@ -185,6 +185,7 @@ function renderCurrent(data) {
   const updated = data.updated_at ? new Date(data.updated_at).toLocaleTimeString() : '—';
   document.getElementById('updated-at').textContent = `Updated ${updated}`;
 
+  renderHourlyStrip(data.wk_hourly);
   renderForecast(data.forecast, data.tempf);
 
   // Stale / quality warnings
@@ -204,12 +205,102 @@ function renderCurrent(data) {
   }
 }
 
+// ── Hourly strip (WeatherKit) ────────────────────────────────────────────────
+// Restrained glyph set for WeatherKit conditionCodes. Quarter-fill circles
+// trace the clear-to-overcast progression; ︎ forces text presentation
+// (no emoji color noise). Unknown codes fall back to a 3-letter abbreviation.
+const GLYPH_RAIN = '☂︎'; // umbrella, text style
+const GLYPH_SNOW = '❄︎'; // snowflake, text style
+const WK_GLYPHS = {
+  Clear:                  '○', // ○
+  MostlyClear:            '◔', // ◔
+  PartlyCloudy:           '◐', // ◐
+  MostlyCloudy:           '◕', // ◕
+  Cloudy:                 '●', // ●
+  Overcast:               '●',
+  Haze:                   '≡', // ≡
+  Smoky:                  '≡',
+  Foggy:                  '≡',
+  Breezy:                 '≈', // ≈
+  Windy:                  '≈',
+  Drizzle:                GLYPH_RAIN,
+  Rain:                   GLYPH_RAIN,
+  HeavyRain:              GLYPH_RAIN,
+  SunShowers:             GLYPH_RAIN,
+  IsolatedThunderstorms:  '↯', // ↯
+  ScatteredThunderstorms: '↯',
+  Thunderstorms:          '↯',
+  StrongStorms:           '↯',
+  Flurries:               GLYPH_SNOW,
+  Snow:                   GLYPH_SNOW,
+  HeavySnow:              GLYPH_SNOW,
+  Sleet:                  GLYPH_SNOW,
+  FreezingDrizzle:        GLYPH_SNOW,
+  FreezingRain:           GLYPH_SNOW,
+  WintryMix:              GLYPH_SNOW,
+  Blizzard:               GLYPH_SNOW,
+  BlowingSnow:            GLYPH_SNOW,
+  Hail:                   GLYPH_SNOW,
+  Frigid:                 GLYPH_SNOW,
+  Hot:                    '◉', // ◉
+};
+
+const _hourlyHourFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', timeZone: 'America/New_York' });
+
+// The forecast section holds two independent blocks (hourly strip + analog
+// cards). Hide the whole section only when both blocks are empty.
+function _syncForecastSection() {
+  const section = document.getElementById('forecast-section');
+  if (!section) return;
+  const hourly = document.getElementById('hourly-block');
+  const analog = document.getElementById('analog-block');
+  const hourlyHidden = !hourly || hourly.style.display === 'none';
+  const analogHidden = !analog || analog.style.display === 'none';
+  section.hidden = hourlyHidden && analogHidden;
+}
+
+function renderHourlyStrip(hours) {
+  const block = document.getElementById('hourly-block');
+  const strip = document.getElementById('hourly-strip');
+  if (!block || !strip) return;
+  if (!hours || !hours.length) { block.style.display = 'none'; _syncForecastSection(); return; }
+  block.style.display = '';
+  _syncForecastSection();
+
+  strip.innerHTML = hours.slice(0, 12).map(h => {
+    const label = _hourlyHourFmt.format(new Date(h.time)).replace(/\s+/g, ''); // "6 PM" -> "6PM"
+    const cond  = h.condition || '';
+    const glyph = WK_GLYPHS[cond] || (cond ? cond.slice(0, 3).toUpperCase() : '·');
+    // WeatherKit precipitationChance is 0-1; tolerate a backend that already
+    // converted to percent.
+    const raw = h.precip_prob ?? 0;
+    const pp  = Math.round(raw <= 1 ? raw * 100 : raw);
+    const fullCond = cond ? cond.replace(/([a-z])([A-Z])/g, '$1 $2') : '—';
+    const tip = pp >= 10 ? `${fullCond} · ${pp}% precip` : fullCond;
+    return `<div class="hourly-cell has-tooltip" data-tooltip="${tip}">
+      <div class="hourly-hour">${label}</div>
+      <div class="hourly-glyph" aria-hidden="true">${glyph}</div>
+      <div class="hourly-temp">${fmtT(h.tempf, 0)}°</div>
+      <div class="hourly-precip">${pp >= 10 ? `${pp}%` : ''}</div>
+    </div>`;
+  }).join('');
+  strip.removeAttribute('aria-busy');
+
+  // Re-bind tooltips on the rebuilt cells (innerHTML wipe = no duplicates)
+  strip.querySelectorAll('.has-tooltip').forEach(bindTip);
+}
+
 // ── Forecast ─────────────────────────────────────────────────────────────────
 function renderForecast(forecast, nowTempF) {
-  const section = document.getElementById('forecast-section');
-  if (!forecast || !forecast.hours?.length) { section.hidden = true; return; }
+  const analog = document.getElementById('analog-block');
+  if (!forecast || !forecast.hours?.length) {
+    if (analog) analog.style.display = 'none';
+    _syncForecastSection();
+    return;
+  }
 
-  section.hidden = false;
+  if (analog) analog.style.display = '';
+  _syncForecastSection();
 
   // Delta line vs current temp ("↓ 2°F from now") so near-identical absolute
   // temps across the three cards still read as a trajectory.

@@ -215,21 +215,38 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     </section>
 
     <section class="forecast-section" id="forecast-section">
-      <div class="forecast-header">
-        <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="forecast-meta" id="forecast-meta"></span>
-          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
+      <div class="hourly-block" id="hourly-block">
+        <div class="hourly-header">
+          <h2 class="section-title has-tooltip" data-tooltip="Hour-by-hour conditions, temperature, and precipitation chance for the next 12 hours at 40.75°N 73.98°W.">NEXT 12 HOURS</h2>
+          <span id="hourly-attr-tag" class="source-tag source-external has-tooltip" style="display:inline-flex;align-items:center;gap:5px" data-tooltip="Apple WeatherKit hourly forecast for 40.75°N 73.98°W. Condition, temperature, and precipitation probability from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">WEATHERKIT</span>
+        </div>
+        <div class="hourly-strip" id="hourly-strip" aria-busy="true">
+          {Array.from({ length: 12 }).map(() => (
+            <div class="hourly-cell skel-card" aria-hidden="true">
+              <span class="skel skel-line" style="width:24px;height:8px" />
+              <span class="skel skel-line" style="width:14px;height:13px" />
+              <span class="skel skel-line" style="width:26px;height:12px" />
+            </div>
+          ))}
         </div>
       </div>
-      <div class="forecast-grid" id="forecast-grid" aria-busy="true">
-        {Array.from({ length: 3 }).map(() => (
-          <div class="forecast-card skel-card" aria-hidden="true">
-            <span class="skel skel-line" style="width:48px" />
-            <span class="skel skel-line skel-tall" style="width:72px" />
-            <span class="skel skel-line" style="width:110px" />
+      <div class="analog-block" id="analog-block">
+        <div class="forecast-header">
+          <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="forecast-meta" id="forecast-meta"></span>
+            <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
           </div>
-        ))}
+        </div>
+        <div class="forecast-grid" id="forecast-grid" aria-busy="true">
+          {Array.from({ length: 3 }).map(() => (
+            <div class="forecast-card skel-card" aria-hidden="true">
+              <span class="skel skel-line" style="width:48px" />
+              <span class="skel skel-line skel-tall" style="width:72px" />
+              <span class="skel skel-line" style="width:110px" />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
 

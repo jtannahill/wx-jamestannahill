@@ -163,6 +163,38 @@ header {
 .card-clickable:hover, .card-clickable:active { border-top-color: var(--anomaly); background: #161616; }
 
 .forecast-section { margin-bottom: 48px; }
+
+/* ── Hourly strip (WeatherKit, next 12 hours) ────────────────────────────── */
+.hourly-block { margin-bottom: 28px; }
+.hourly-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.hourly-strip {
+  display: flex;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;        /* Firefox */
+}
+.hourly-strip::-webkit-scrollbar { display: none; }  /* WebKit */
+.hourly-cell {
+  flex: 1 0 auto;
+  min-width: 52px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 10px 6px 8px;
+  text-align: center;
+}
+.hourly-cell:last-child { border-right: none; }
+.hourly-cell.skel-card { align-items: center; justify-content: center; gap: 7px; }
+.hourly-hour {
+  font-size: 9px; letter-spacing: 0.1em; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 7px;
+}
+.hourly-glyph { font-size: 13px; color: #999; line-height: 1; margin-bottom: 7px; }
+.hourly-temp  { font-size: 14px; color: var(--text); letter-spacing: -0.01em; }
+.hourly-precip { font-size: 9px; color: #4ab8e8; margin-top: 3px; min-height: 11px; }
 .forecast-header {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 16px;

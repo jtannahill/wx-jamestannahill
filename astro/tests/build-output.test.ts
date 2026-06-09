@@ -21,6 +21,27 @@ describe('build output — worker', () => {
   });
 });
 
+describe('build output — hourly strip assets', () => {
+  it('app.js ships the hourly strip renderer and glyph map', () => {
+    const js = read('app.js');
+    expect(js).toContain('function renderHourlyStrip');
+    expect(js).toContain('WK_GLYPHS');
+    expect(js).toContain('renderHourlyStrip(data.wk_hourly)');
+    // Glyph map covers the common WeatherKit conditionCodes
+    for (const code of ['Clear', 'MostlyClear', 'PartlyCloudy', 'MostlyCloudy', 'Cloudy', 'Drizzle', 'Rain']) {
+      expect(js).toMatch(new RegExp(`${code}:\\s+`));
+    }
+  });
+
+  it('style.css ships the hourly strip styles', () => {
+    const css = read('style.css');
+    expect(css).toContain('.hourly-strip');
+    expect(css).toContain('.hourly-cell');
+    // No visible scrollbar clutter on the horizontal strip
+    expect(css).toContain('.hourly-strip::-webkit-scrollbar { display: none; }');
+  });
+});
+
 describe('build output — docs (prerendered)', () => {
   const html = () => read('docs.html');
 
