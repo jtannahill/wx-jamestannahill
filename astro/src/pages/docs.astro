@@ -14,6 +14,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     .docs-body { max-width: 680px; }
     h1 { font-size: 44px; font-weight: 400; letter-spacing: -0.025em; margin-bottom: 14px; line-height: 1.05; }
     h2 { font-size: 15px; letter-spacing: 0.12em; color: var(--muted); margin: 48px 0 20px; font-weight: 500; }
+    h2[id] { scroll-margin-top: 24px; }
     p { font-size: 15px; line-height: 1.75; color: #ccc; margin-bottom: 16px; }
     .lead { font-size: 17px; line-height: 1.65; color: #b8b8b8; margin-bottom: 0; max-width: 60ch; }
     .docs-kicker {
@@ -118,8 +119,8 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 
     <hr class="divider">
 
-    <h2>DATA COLLECTION</h2>
-    <p>The station is an <a href="https://www.ambientweather.com/ws-2902" target="_blank" rel="noopener"><strong>Ambient Weather WS-2902</strong></a> mounted at the property. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway and is also registered with Weather Underground as <strong>KNYNEWYO2140</strong>. Live readings are visible at <a href="https://ambientweather.net/dashboard/4d5daff008263473b2bb72e0d64f5c35" target="_blank" rel="noopener">ambientweather.net</a> and <a href="https://preview.wunderground.com/dashboard/pws/KNYNEWYO2140" target="_blank" rel="noopener">wunderground.com/dashboard/pws/KNYNEWYO2140</a>.</p>
+    <h2 id="cathouz">DATA COLLECTION: THE CATHOUZ STATION</h2>
+    <p>The station is an <a href="https://www.ambientweather.com/ws-2902" target="_blank" rel="noopener"><strong>Ambient Weather WS-2902</strong></a> mounted at the property, callsign <strong>CatHouz</strong>. On the dashboard, every reading or signal tagged <strong>CATHOUZ</strong> comes from this station: its raw sensors plus the in-house statistics and ML layer (anomalies, comfort score, analog forecast, records) described below. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway and is also registered with Weather Underground as <strong>KNYNEWYO2140</strong>. Live readings are visible at <a href="https://ambientweather.net/dashboard/4d5daff008263473b2bb72e0d64f5c35" target="_blank" rel="noopener">ambientweather.net</a> and <a href="https://preview.wunderground.com/dashboard/pws/KNYNEWYO2140" target="_blank" rel="noopener">wunderground.com/dashboard/pws/KNYNEWYO2140</a>.</p>
     <p>A scheduled AWS Lambda (<code>wx-poller</code>) fires every 5 minutes via EventBridge and calls the Ambient Weather REST API to fetch the latest reading:</p>
     <pre><code>GET https://api.ambientweather.net/v1/devices/&#123;mac&#125;
     ?apiKey=...&applicationKey=...&limit=1</code></pre>
@@ -164,8 +165,8 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 
     <hr class="divider">
 
-    <h2>BASELINES — OPEN-METEO ERA5</h2>
-    <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong> — actual measured atmospheric data going back to 1940, free and public.</p>
+    <h2 id="era5">BASELINES — OPEN-METEO ERA5</h2>
+    <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong> — ECMWF's climate reanalysis dataset, actual measured atmospheric data going back to 1940, free and public. Wherever the dashboard tags a value <strong>(ERA5)</strong>, that number is benchmarked against this reanalysis baseline rather than the station's own history.</p>
     <p>A bootstrap Lambda fetches the 14th of each month for 2019–2023 (5 years × 12 months) at the station's coordinates and averages the hourly values into per-month-per-hour climate normals:</p>
     <pre><code>GET https://archive-api.open-meteo.com/v1/archive
     ?latitude=40.7549&longitude=-73.984

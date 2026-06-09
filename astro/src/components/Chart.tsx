@@ -338,8 +338,24 @@ interface Props {
 export default function Chart({ apiBase }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const uplotRef = useRef<any>(null);
-  const [field, setField] = useState<FieldKey>('tempf');
-  const [hours, setHours] = useState<number>(24);
+  // Honor clicks made before the island hydrated: app.js records them on
+  // window.__wxPendingField / __wxPendingHours (see its capture-phase
+  // listeners), and we use them as the initial state instead of clobbering
+  // the user's choice back to the defaults at boot.
+  const [field, setField] = useState<FieldKey>(() => {
+    if (typeof window !== 'undefined') {
+      const f = (window as any).__wxPendingField;
+      if (f && FIELD_OPTIONS.includes(f)) return f as FieldKey;
+    }
+    return 'tempf';
+  });
+  const [hours, setHours] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const h = Number((window as any).__wxPendingHours);
+      if (HOURS_OPTIONS.includes(h)) return h;
+    }
+    return 24;
+  });
   const [useCelsius, setUseCelsius] = useState<boolean>(false);
   const [history, setHistory] = useState<any | null>(null);
   const [zoomed, setZoomed] = useState<boolean>(false);
@@ -536,25 +552,25 @@ export default function Chart({ apiBase }: Props) {
   };
 
   return (
-    <section class="chart-section">
+    <section class="chart-section" id="history">
       <div class="chart-section-header">
         <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</h2>
         <div class="chart-actions">
           {zoomed && <button class="chart-action-btn" title="Reset zoom" onClick={resetZoom}>↻</button>}
           <button class="chart-action-btn" title="Copy chart" onClick={onCopy}>⧉</button>
           <button class="chart-action-btn" title="Share chart" onClick={onShare}>↗</button>
-          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
         </div>
       </div>
       <div class="chart-controls">
         <div class="chart-controls-row">
           {FIELD_OPTIONS.map(f => (
-            <button class={`chart-btn${f === field ? ' active' : ''}`} onClick={() => setField(f)}>{FIELD_BTN_LABELS[f]}</button>
+            <button class={`chart-btn${f === field ? ' active' : ''}`} data-field={f} onClick={() => setField(f)}>{FIELD_BTN_LABELS[f]}</button>
           ))}
         </div>
         <div class="chart-controls-row range-row">
           {HOURS_OPTIONS.map(h => (
-            <button class={`range-btn${h === hours ? ' active' : ''}`} onClick={() => setHours(h)}>
+            <button class={`range-btn${h === hours ? ' active' : ''}`} data-hours={h} onClick={() => setHours(h)}>
               {h === 12 ? '12h' : h === 24 ? '24h' : h === 168 ? '7d' : '30d'}
             </button>
           ))}

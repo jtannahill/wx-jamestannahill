@@ -13,6 +13,20 @@
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
 
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* Visible keyboard focus for all interactive controls */
+button:focus-visible, a:focus-visible,
+.card-clickable:focus-visible, [tabindex]:focus-visible {
+  outline: 1px solid var(--anomaly);
+  outline-offset: 2px;
+}
+
+/* Anchor targets land clear of the viewport edge */
+section[id], div[id="conditions"] { scroll-margin-top: 16px; }
+
 main {
   max-width: 900px; margin: 0 auto;
   padding: 40px 24px 80px;
@@ -24,8 +38,25 @@ main {
 
 header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 56px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
+  margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 16px;
 }
+
+/* ── Jump-row anchor nav ─────────────────────────────────────────────────── */
+.jump-row {
+  display: flex; gap: 24px;
+  margin-bottom: 28px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.jump-row::-webkit-scrollbar { display: none; }
+.jump-row a {
+  font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: #555; text-decoration: none; white-space: nowrap;
+  padding: 2px 0; flex-shrink: 0;
+  transition: color 0.15s;
+}
+.jump-row a:hover { color: var(--accent); }
 .station-label { margin: 0; font-size: 11px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
 .updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
 .unit-toggle {
@@ -68,14 +99,14 @@ header {
   padding: 8px 14px; margin-bottom: 32px;
 }
 
-.hero { margin-bottom: 48px; }
+.hero { margin-bottom: 36px; }
 .temp-block { display: flex; align-items: flex-start; line-height: 1; }
 .temp { font-size: clamp(80px, 15vw, 140px); font-weight: 400; letter-spacing: -0.02em; }
 .temp-unit { font-size: 40px; margin-top: 20px; color: var(--muted); }
-.feels-like { font-size: 18px; color: var(--muted); margin-top: 8px; }
-.condition { font-size: 20px; font-weight: 500; margin-top: 16px; }
+.feels-like { font-size: 18px; color: var(--muted); margin-top: 6px; }
+.condition { font-size: 20px; font-weight: 500; margin-top: 10px; }
 .anomaly-headline {
-  font-size: 16px; color: var(--anomaly); margin-top: 12px;
+  font-size: 16px; color: var(--anomaly); margin-top: 8px;
   font-style: italic; letter-spacing: 0.01em;
   position: relative; display: inline-block;
 }
@@ -142,6 +173,7 @@ header {
 .forecast-card  { background: var(--surface); padding: 20px 18px; border: 1px solid var(--border); }
 .forecast-offset { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; }
 .forecast-temp   { font-size: 28px; font-weight: 400; letter-spacing: -0.01em; }
+.forecast-delta  { font-size: 11px; color: #777; letter-spacing: 0.04em; margin-top: 3px; }
 .forecast-fields { margin-top: 8px; }
 .forecast-field  { font-size: 12px; color: var(--muted); line-height: 1.7; }
 
@@ -360,6 +392,15 @@ header {
   white-space: nowrap; flex-shrink: 0;
 }
 .source-tag.source-external { color: #4a5a6a; border-color: #2a3540; }
+a.source-tag { text-decoration: none; transition: color 0.15s, border-color 0.15s; }
+a.source-tag:hover { color: #666; border-color: #333; }
+
+/* (ERA5) inline chip → docs link */
+.era5-chip {
+  font-size: 9px; color: #444; text-decoration: none;
+  border-bottom: 1px dotted #333;
+}
+.era5-chip:hover { color: #666; border-bottom-color: #555; }
 
 /* section-header already has flex; source-tag goes on the right */
 .section-source-row {
@@ -374,6 +415,8 @@ footer a { color: var(--muted); text-decoration: underline; }
 
 @media (max-width: 600px) {
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Last odd card spans both columns — no orphan with an empty neighbor */
+  .conditions-grid .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   /* Compact analog forecast: row layout — offset | big temp | inline fields */
   .forecast-grid   { grid-template-columns: 1fr; }
   .forecast-card   {
@@ -392,13 +435,18 @@ footer a { color: var(--muted); text-decoration: underline; }
   .temp            { font-size: clamp(72px, 20vw, 96px); }
   .card-value      { font-size: 26px; }
   .card            { padding: 18px 14px; }
-  /* Header: station label shrinks, refresh stays right */
+  /* Header: two tidy rows — station name on its own line, then
+     updated-time left + compact buttons right */
   header {
-    flex-wrap: nowrap; gap: 8px; align-items: center;
-    margin-bottom: 32px;
+    flex-wrap: wrap; gap: 0 8px; row-gap: 10px; align-items: center;
+    margin-bottom: 12px; padding-bottom: 12px;
   }
-  .station-label { font-size: 10px; letter-spacing: 0.1em; flex: 1; min-width: 0; }
-  .updated-at    { font-size: 10px; white-space: nowrap; }
+  .station-label { font-size: 10px; letter-spacing: 0.1em; flex: 1 1 100%; white-space: nowrap; }
+  .updated-at    { font-size: 10px; white-space: nowrap; margin-right: auto; }
+  .unit-toggle   { width: 32px; height: 32px; font-size: 10px; }
+  .share-btn     { width: 32px; height: 32px; font-size: 12px; }
+  .refresh-btn   { width: 32px; height: 32px; font-size: 14px; }
+  .jump-row      { gap: 18px; margin-bottom: 24px; }
   /* Chart controls wrap nicely */
   .chart-controls-row { gap: 6px; }
   .chart-btn  { padding: 6px 10px; font-size: 11px; }
@@ -412,6 +460,50 @@ footer a { color: var(--muted); text-decoration: underline; }
   .climate-metric-pct { font-size: 10px; }
   .dev-bar { margin: 4px 0 18px; }
   .climate-footer { font-size: 9px; }
+}
+
+/* ── Skeleton placeholders ───────────────────────────────────────────────────
+   Server-rendered stand-ins for lazily filled sections. Replaced when the
+   real render lands (grids rebuild their innerHTML). */
+.skel {
+  display: inline-block;
+  background: linear-gradient(90deg, #151515 25%, #1d1d1d 40%, #151515 60%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 2s linear infinite;
+  border-radius: 1px;
+}
+@keyframes skel-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background: #161616; }
+}
+.skel-line { height: 10px; }
+.skel-line.skel-tall { height: 22px; }
+.skel-cell {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 2px;
+}
+.skel-card { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 600px) {
+  .skel-cell { width: 30px; height: 30px; }
+  /* On mobile the forecast card switches to a 3-column row grid */
+  .forecast-card.skel-card { display: grid; }
+}
+
+/* Empty chart canvas (island not yet hydrated / history loading) gets a
+   quiet shimmer block instead of a collapsed frame */
+.wx-chart-wrap:empty {
+  min-height: 220px;
+  background: linear-gradient(90deg, #0e0e0e 25%, #141414 40%, #0e0e0e 60%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 2s linear infinite;
+}
+@media (max-width: 480px) {
+  .wx-chart-wrap:empty { min-height: 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wx-chart-wrap:empty { animation: none; background: #0e0e0e; }
 }
 
 /* Scroll reveal */

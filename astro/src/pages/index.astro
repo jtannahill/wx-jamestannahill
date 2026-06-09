@@ -36,7 +36,10 @@ const heroTemp     = fmt(boot?.tempf, 1);
 const heroFeels    = boot?.feelsLike != null ? `Feels like ${fmt(boot.feelsLike, 0)}°F` : 'Feels like —°F';
 const heroCond     = boot?.condition ?? '—';
 const anomHead     = boot?.climate_context?.headline ?? '—';
-const percentile   = boot?.percentile_rank?.label ?? '';
+const monthName    = new Date().toLocaleString('en-US', { month: 'long', timeZone: 'America/New_York' });
+const percentile   = boot?.percentile_rank?.label
+  ? `Temp vs typical ${monthName}: ${boot.percentile_rank.label}`
+  : '';
 
 const windSpeed    = `${fmt(boot?.windspeedmph, 0)} mph`;
 const windDetail   = boot?.winddir != null ? `From ${compass(boot.winddir)} (${fmt(boot.winddir, 0)}°)` : '—';
@@ -80,10 +83,18 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <header>
       <h1 class="station-label">MIDTOWN MANHATTAN, NEW YORK</h1>
       <span class="updated-at" id="updated-at">—</span>
-      <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C">°F</button>
-      <button class="share-btn" id="share-btn" title="Share on X">𝕏</button>
-      <button class="refresh-btn" id="refresh-btn" title="Refresh">↻</button>
+      <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C" aria-label="Toggle °F / °C">°F</button>
+      <button class="share-btn" id="share-btn" title="Share current conditions on X" aria-label="Share current conditions on X">𝕏</button>
+      <button class="refresh-btn" id="refresh-btn" title="Refresh now (auto-updates every 5 minutes)" aria-label="Refresh now (auto-updates every 5 minutes)">↻</button>
     </header>
+
+    <nav class="jump-row" aria-label="Page sections">
+      <a href="#conditions">Conditions</a>
+      <a href="#comfort-calendar-section">Calendar</a>
+      <a href="#forecast-section">Forecast</a>
+      <a href="#history">History</a>
+      <a href="#records-section">Records</a>
+    </nav>
 
     <div class="stale-banner" id="stale-banner" hidden>
       <span id="stale-msg">Station data may be delayed</span>
@@ -121,7 +132,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="summary-section today-section" id="today-section" hidden>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
         <p class="summary-date" style="margin:0">TODAY <span class="live-dot"></span></p>
-        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
       </div>
       <p class="summary-text" id="today-text"></p>
     </section>
@@ -129,14 +140,14 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="summary-section" id="summary-section" hidden>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
         <p class="summary-date" id="summary-date" style="margin:0"></p>
-        <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+        <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
       </div>
       <p class="summary-text" id="summary-text"></p>
     </section>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div id="conditions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</h2>
-      <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+      <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
     </div>
     <section class="conditions-grid">
       <div class="card card-clickable" data-chart-field="windspeedmph">
@@ -190,43 +201,61 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       </div>
     </section>
 
-    <section class="comfort-calendar-section sr" id="comfort-calendar-section" hidden>
+    <section class="comfort-calendar-section" id="comfort-calendar-section">
       <div class="section-header">
         <h2 class="section-title">COMFORT CALENDAR</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="comfort-meta">30-day history</span>
-          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
         </div>
       </div>
-      <div class="comfort-grid" id="comfort-grid"></div>
+      <div class="comfort-grid" id="comfort-grid" aria-busy="true">
+        {Array.from({ length: 30 }).map(() => <span class="skel skel-cell" aria-hidden="true" />)}
+      </div>
     </section>
 
-    <section class="forecast-section sr" id="forecast-section" hidden>
+    <section class="forecast-section" id="forecast-section">
       <div class="forecast-header">
         <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="forecast-meta" id="forecast-meta"></span>
-          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
+          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
         </div>
       </div>
-      <div class="forecast-grid" id="forecast-grid"></div>
+      <div class="forecast-grid" id="forecast-grid" aria-busy="true">
+        {Array.from({ length: 3 }).map(() => (
+          <div class="forecast-card skel-card" aria-hidden="true">
+            <span class="skel skel-line" style="width:48px" />
+            <span class="skel skel-line skel-tall" style="width:72px" />
+            <span class="skel skel-line" style="width:110px" />
+          </div>
+        ))}
+      </div>
     </section>
 
     <Chart apiBase={API_BASE} client:visible />
 
-    <section class="records-section sr" id="records-section" hidden>
+    <section class="records-section" id="records-section">
       <div class="section-header">
         <h2 class="section-title">STATION RECORDS</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="records-month"></span>
-          <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
+          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
         </div>
       </div>
-      <div class="records-grid" id="records-grid"></div>
+      <div class="records-grid" id="records-grid" aria-busy="true">
+        {Array.from({ length: 6 }).map(() => (
+          <div class="record-card skel-card" aria-hidden="true">
+            <span class="skel skel-line" style="width:64px" />
+            <span class="skel skel-line skel-tall" style="width:88px" />
+            <span class="skel skel-line" style="width:52px" />
+          </div>
+        ))}
+      </div>
     </section>
 
     <!-- Nearby Stations -->
-    <section class="nearby-section sr" id="nearby-section" style="display:none">
+    <section class="nearby-section" id="nearby-section">
       <div class="section-header">
         <h2 class="section-title">NEARBY STATIONS</h2>
         <div style="display:flex;align-items:center;gap:8px">
@@ -234,7 +263,15 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
           <span class="source-tag source-external">AMBIENT NETWORK</span>
         </div>
       </div>
-      <div class="nearby-strip" id="nearby-strip"></div>
+      <div class="nearby-strip" id="nearby-strip" aria-busy="true">
+        {Array.from({ length: 5 }).map(() => (
+          <div class="nearby-chip skel-card" aria-hidden="true">
+            <span class="skel skel-line" style="width:70px" />
+            <span class="skel skel-line skel-tall" style="width:44px" />
+            <span class="skel skel-line" style="width:36px" />
+          </div>
+        ))}
+      </div>
     </section>
 
     <footer>

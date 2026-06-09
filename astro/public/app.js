@@ -103,8 +103,13 @@ function renderCurrent(data) {
   document.getElementById('feels-like').textContent = `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`;
   document.getElementById('condition').textContent = data.condition || '—';
 
+  // Percentile rank = current temp vs this station's distribution for the
+  // month. Prefix it so it can't be misread against the "Warmest June 9th"
+  // daily-high percentile above it.
   const pr = data.percentile_rank;
-  document.getElementById('percentile-rank').textContent = pr ? pr.label : '';
+  const monthName = new Date().toLocaleString('en-US', { month: 'long' });
+  document.getElementById('percentile-rank').textContent =
+    pr ? `Temp vs typical ${monthName}: ${pr.label}` : '';
 
   const topAnomaly = data.anomalies?.temp;
   const anomalyEl = document.getElementById('anomaly-headline');
@@ -180,7 +185,7 @@ function renderCurrent(data) {
   const updated = data.updated_at ? new Date(data.updated_at).toLocaleTimeString() : '—';
   document.getElementById('updated-at').textContent = `Updated ${updated}`;
 
-  renderForecast(data.forecast);
+  renderForecast(data.forecast, data.tempf);
 
   // Stale / quality warnings
   const banner  = document.getElementById('stale-banner');
@@ -200,11 +205,22 @@ function renderCurrent(data) {
 }
 
 // ── Forecast ─────────────────────────────────────────────────────────────────
-function renderForecast(forecast) {
+function renderForecast(forecast, nowTempF) {
   const section = document.getElementById('forecast-section');
   if (!forecast || !forecast.hours?.length) { section.hidden = true; return; }
 
   section.hidden = false;
+
+  // Delta line vs current temp ("↓ 2°F from now") so near-identical absolute
+  // temps across the three cards still read as a trajectory.
+  const deltaLine = (h) => {
+    if (nowTempF == null || h.tempf == null) return '';
+    const dF = h.tempf - nowTempF;
+    const d  = useCelsius ? dF / 1.8 : dF;
+    if (Math.abs(d) < 0.5) return `<div class="forecast-delta">→ steady vs now</div>`;
+    const arrow = d > 0 ? '↑' : '↓';
+    return `<div class="forecast-delta">${arrow} ${Math.abs(d).toFixed(0)}${tempUnit()} from now</div>`;
+  };
 
   const confidence = forecast.confidence ?? 0;
   const confLabel  = confidence >= 70 ? 'High confidence'
@@ -227,7 +243,10 @@ function renderForecast(forecast) {
     return `
       <div class="forecast-card">
         <div class="forecast-offset">${label}</div>
-        <div class="forecast-temp">${fmtT(h.tempf, 0)}${tempUnit()}</div>
+        <div>
+          <div class="forecast-temp">${fmtT(h.tempf, 0)}${tempUnit()}</div>
+          ${deltaLine(h)}
+        </div>
         <div class="forecast-fields">
           <div class="forecast-field">Humidity ${fmt(h.humidity, 0)}%</div>
           <div class="forecast-field">Wind ${fmt(h.windspeedmph, 0)} mph</div>
@@ -235,6 +254,7 @@ function renderForecast(forecast) {
         </div>
       </div>`;
   }).join('');
+  grid.removeAttribute('aria-busy');
 }
 
 // ── Tomorrow forecast (WeatherKit) ───────────────────────────────────────────
@@ -386,7 +406,7 @@ function renderClimatePanel(data) {
       container.innerHTML += `
         <div class="climate-metric" style="opacity:0.6">
           <div class="climate-metric-row">
-            <span class="climate-metric-label">Dew Point <span style="font-size:9px;color:#444">(ERA5)</span></span>
+            <span class="climate-metric-label">Dew Point <a class="era5-chip has-tooltip" href="/docs.html#era5" data-tooltip="ERA5: ECMWF climate reanalysis baseline. Hourly climate history for this exact lat/lon back to 1940. Click for docs.">(ERA5)</a></span>
             <span class="climate-metric-value" style="color:#4ab8e8">${fmtT(dp.value, 0)}${tempUnit()}
               <span class="climate-metric-pct">${dp.percentile}th pct</span>
             </span>
@@ -449,6 +469,10 @@ function renderClimatePanel(data) {
     );
     document.getElementById('climate-source-tag').textContent = 'ERA5';
   }
+
+  // Bind tooltips on dynamically created chips (container is rebuilt each
+  // render, so no duplicate listeners accumulate)
+  container.querySelectorAll('.has-tooltip').forEach(bindTip);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
@@ -484,6 +508,8 @@ function renderComfortCalendar(summaries) {
     </div>`;
   }).join('');
 
+  grid.removeAttribute('aria-busy');
+
   // Re-bind tooltip to dynamically created cells
   grid.querySelectorAll('.has-tooltip').forEach(bindTip);
 
@@ -507,12 +533,14 @@ function renderStationRecords(records) {
   if (records.min_pressure != null) items.push({ label: 'MIN PRESSURE',  value: `${records.min_pressure}"`,   date: records.min_pressure_at });
   if (records.max_pressure != null) items.push({ label: 'MAX PRESSURE',  value: `${records.max_pressure}"`,   date: records.max_pressure_at });
 
-  document.getElementById('records-grid').innerHTML = items.map(it => `
+  const recordsGrid = document.getElementById('records-grid');
+  recordsGrid.innerHTML = items.map(it => `
     <div class="record-card">
       <div class="record-label">${it.label}</div>
       <div class="record-value">${it.value}</div>
       <div class="record-date">${it.date || ''}</div>
     </div>`).join('');
+  recordsGrid.removeAttribute('aria-busy');
 }
 
 // ── Nearby Stations ───────────────────────────────────────────────────────────
@@ -537,6 +565,7 @@ function renderNearby(stations, snapshotAt) {
       <div class="nearby-chip-dist">${dist}</div>
     </div>`;
   }).join('');
+  strip.removeAttribute('aria-busy');
 }
 
 // ── Rain Events ───────────────────────────────────────────────────────────────
@@ -685,11 +714,31 @@ function bindTip(el) {
 document.getElementById('anomaly-headline') && bindTip(document.getElementById('anomaly-headline'));
 document.querySelectorAll('.has-tooltip').forEach(bindTip);
 
+// ── Chart pre-boot click capture ─────────────────────────────────────────────
+// The chart island (client:visible) may not have hydrated yet when a range or
+// field button is clicked. Record the request on window so the island can use
+// it as its initial state instead of clobbering back to the defaults.
+// Capture phase so this works whether or not Preact's handlers exist yet.
+document.addEventListener('click', (e) => {
+  const rangeBtn = e.target.closest?.('.range-btn[data-hours]');
+  if (rangeBtn) {
+    window.__wxPendingHours = Number(rangeBtn.dataset.hours);
+    // Pre-hydration visual feedback (Preact re-syncs classes after boot)
+    rangeBtn.parentElement.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', b === rangeBtn));
+  }
+  const fieldBtn = e.target.closest?.('.chart-btn[data-field]');
+  if (fieldBtn) {
+    window.__wxPendingField = fieldBtn.dataset.field;
+    fieldBtn.parentElement.querySelectorAll('.chart-btn').forEach(b => b.classList.toggle('active', b === fieldBtn));
+  }
+}, true);
+
 // ── KPI card click-ins ────────────────────────────────────────────────────────
 document.querySelectorAll('.card[data-chart-field]').forEach(card => {
   card.addEventListener('click', () => {
     const field = card.dataset.chartField;
     currentField = field;
+    window.__wxPendingField = field;
     document.dispatchEvent(new CustomEvent('wx:fieldChange', { detail: { field } }));
     const section = document.querySelector('.chart-section');
     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
