@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_apigatewayv2_integrations as integrations,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
+    aws_certificatemanager as acm,
     aws_iam as iam,
 )
 from constructs import Construct
@@ -369,13 +370,24 @@ class WxStack(Stack):
             max_ttl=Duration.minutes(5),
             query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
         )
+        # Custom domain + cert were originally attached manually in the console;
+        # codified here so deploys don't strip them.
+        api_cert = acm.Certificate.from_certificate_arn(
+            self, "WxApiCert",
+            "arn:aws:acm:us-east-1:216890068001:certificate/dd33b0b7-ce5b-40d9-b4f1-ce957383ed2b",
+        )
         self.api_distribution = cloudfront.Distribution(
             self, "WxApiDistribution",
+            domain_names=["api.wx.jamestannahill.com"],
+            certificate=api_cert,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=api_origin,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=api_cache_policy,
-                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                # CloudFront adds CORS (+ preflight) and security headers on every
+                # response, hits and misses alike, overriding the origin's headers.
+                response_headers_policy=cloudfront.ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS_WITH_PREFLIGHT_AND_SECURITY_HEADERS,
             ),
         )
         cdk.CfnOutput(self, "ApiDistributionDomain", value=self.api_distribution.distribution_domain_name)
