@@ -538,7 +538,7 @@ export default function Chart({ apiBase }: Props) {
   return (
     <section class="chart-section">
       <div class="chart-section-header">
-        <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</span>
+        <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</h2>
         <div class="chart-actions">
           {zoomed && <button class="chart-action-btn" title="Reset zoom" onClick={resetZoom}>↻</button>}
           <button class="chart-action-btn" title="Copy chart" onClick={onCopy}>⧉</button>

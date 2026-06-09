@@ -50,6 +50,9 @@ Public, read-only, no authentication required.
 | `GET /history?hours=N` | Last N hours of readings (max 720), downsampled for longer ranges, with per-slot baselines and std dev |
 | `GET /rain-events?days=N` | Parsed rain events from the last N days (default 30) |
 | `GET /daily-summaries?days=N` | Pre-computed daily summaries from the last N days (default 30) |
+| `GET /nearby` | Latest snapshot of nearby personal weather stations |
+
+The analog forecast, station records, and daily summary are embedded in the `GET /current` response (`forecast`, `station_records`, `daily_summary`); there are no standalone endpoints for them.
 
 ---
 
@@ -106,6 +109,7 @@ wx-api (Lambda, API Gateway HTTP API → CloudFront)
    • /history  : downsampled readings with baselines + std dev
    • /rain-events: parsed rain events
    • /daily-summaries: pre-computed day summaries
+   • /nearby   : latest nearby-stations snapshot
 
 Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
    • Hero + 12 conditions cards SSR'd at request time from /current
@@ -199,12 +203,15 @@ astro/
     index.astro     # SSR dashboard (hero + conditions grid pre-rendered)
     docs.astro      # Prerendered (export const prerender = true)
     og.png.ts       # Edge-rendered OG image (workers-og + Satori)
+    sitemap.xml.ts  # Dynamic sitemap (lastmod = render date)
+    404.astro       # Branded 404 page
+  src/middleware.ts # Security headers (HSTS, nosniff, frame, referrer) on all SSR responses
   src/layouts/      # Base.astro: shared head, schema, fonts
   src/components/
     Chart.tsx       # Preact island for uPlot chart (client:visible)
     SchemaOrgIndex.astro / SchemaOrgDocs.astro
   src/og-fonts/     # NHG Display TTFs bundled into the worker for OG render
-  public/           # app.js, style.css, llms.txt, sitemap.xml, weatherkit.png
+  public/           # app.js, style.css, llms.txt, _headers, weatherkit.png
   astro.config.mjs  # cloudflare adapter, partytown, preact, prefetch
 cdk/
   wx_stack.py       # CDK stack (Lambdas, DynamoDB, API Gateway, API CloudFront)

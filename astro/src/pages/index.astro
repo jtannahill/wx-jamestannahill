@@ -71,14 +71,14 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 <Base
   title="wx.jamestannahill.com — Midtown Manhattan Weather"
   description="Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes."
-  canonical="https://wx.jamestannahill.com"
+  canonical="https://wx.jamestannahill.com/"
   ogImage={ogImageUrl}
 >
   <SchemaOrgIndex slot="schema" />
 
   <main>
     <header>
-      <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
+      <h1 class="station-label">MIDTOWN MANHATTAN, NEW YORK</h1>
       <span class="updated-at" id="updated-at">—</span>
       <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C">°F</button>
       <button class="share-btn" id="share-btn" title="Share on X">𝕏</button>
@@ -103,7 +103,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <section class="climate-panel sr" id="climate-panel" hidden>
       <div class="climate-panel-header">
-        <span class="section-title">TODAY IN HISTORY</span>
+        <h2 class="section-title">TODAY IN HISTORY</h2>
         <span class="source-tag has-tooltip" id="climate-source-tag" data-tooltip="">NOAA / ERA5</span>
       </div>
       <div id="climate-metrics"></div>
@@ -135,7 +135,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     </section>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <span style="font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</span>
+      <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</h2>
       <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
     </div>
     <section class="conditions-grid">
@@ -192,7 +192,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <section class="comfort-calendar-section sr" id="comfort-calendar-section" hidden>
       <div class="section-header">
-        <span class="section-title">COMFORT CALENDAR</span>
+        <h2 class="section-title">COMFORT CALENDAR</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="comfort-meta">30-day history</span>
           <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
@@ -203,7 +203,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <section class="forecast-section sr" id="forecast-section" hidden>
       <div class="forecast-header">
-        <span class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</span>
+        <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="forecast-meta" id="forecast-meta"></span>
           <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ · COMPUTED</span>
@@ -216,7 +216,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <section class="records-section sr" id="records-section" hidden>
       <div class="section-header">
-        <span class="section-title">STATION RECORDS</span>
+        <h2 class="section-title">STATION RECORDS</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="records-month"></span>
           <span class="source-tag has-tooltip" data-tooltip="CatHouz — KNYNEWYO2140">CATHOUZ</span>
@@ -228,7 +228,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <!-- Nearby Stations -->
     <section class="nearby-section sr" id="nearby-section" style="display:none">
       <div class="section-header">
-        <span class="section-title">NEARBY STATIONS</span>
+        <h2 class="section-title">NEARBY STATIONS</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="nearby-meta"></span>
           <span class="source-tag source-external">AMBIENT NETWORK</span>

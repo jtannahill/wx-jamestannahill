@@ -18,11 +18,13 @@ The dashboard includes derived metrics not available from commercial weather ser
 
 **Base URL**: https://api.wx.jamestannahill.com
 
-- `GET /current` — Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, comfort_score, rain_prob, uhi_delta, dateutc.
-- `GET /history?hours=24` — Historical readings. hours param: 24, 168 (7d), 720 (30d).
-- `GET /forecast` — Analog forecast (nearest-neighbor pattern match on 90 days of 5-min data).
-- `GET /records` — Station records by month.
-- `GET /summary` — AI-generated plain-language weather summary for today and tomorrow.
+- `GET /current` — Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, condition, pressure_trend, anomalies, comfort, rain_probability, percentile_rank, climate_context, uhi_delta, forecast (analog forecast), station_records, daily_summary, nearby_stations, timestamp.
+- `GET /history?hours=24` — Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
+- `GET /daily-summaries?days=30` — Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
+- `GET /rain-events?days=30` — Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
+- `GET /nearby` — Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
+
+Note: the analog forecast, station records, and daily summary are embedded in the `GET /current` response (fields `forecast`, `station_records`, `daily_summary`) — there are no standalone endpoints for them.
 
 ## Pages
 

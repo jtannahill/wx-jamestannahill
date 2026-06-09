@@ -1,0 +1,39 @@
+---
+Astro.response.status = 404;
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — Not Found · wx.jamestannahill.com</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        background: #0a0a0a; color: #f0f0f0; min-height: 100vh;
+        font-family: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
+      }
+      main {
+        min-height: 100vh; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 16px; padding: 24px;
+        text-align: center;
+      }
+      .station-label { font-size: 11px; letter-spacing: 0.15em; color: #666; font-weight: 500; }
+      h1 { font-size: 48px; font-weight: 500; letter-spacing: -0.02em; }
+      p { color: #666; font-size: 14px; }
+      a { color: #e8e0d0; text-decoration: none; border-bottom: 1px solid #222; padding-bottom: 2px; }
+      a:hover { border-color: #e8e0d0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
+      <h1>404 — Not Found</h1>
+      <p>That page doesn't exist.</p>
+      <a href="/">← Back to the dashboard</a>
+    </main>
+  </body>
+</html>
