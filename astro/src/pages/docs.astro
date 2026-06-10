@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 ---
 <Base
-  title="wx.jamestannahill.com — How It Works"
+  title="wx.jamestannahill.com - How It Works"
   description="Technical documentation: how weather data is collected, processed, and served at wx.jamestannahill.com."
   canonical="https://wx.jamestannahill.com/docs.html"
 >
@@ -95,7 +95,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <section style="margin: 48px 0 56px;">
       <div class="docs-kicker">TECHNICAL OVERVIEW</div>
       <h1>How It Works</h1>
-      <p class="lead">wx.jamestannahill.com publishes live hyperlocal weather from a private station in Midtown Manhattan. Below is the full data pipeline — physical sensor, AWS Lambdas, ML signals, and 156 years of climate context — that produces every reading on the dashboard.</p>
+      <p class="lead">wx.jamestannahill.com publishes live hyperlocal weather from a private station in Midtown Manhattan. Below is the full data pipeline - physical sensor, AWS Lambdas, ML signals, and 156 years of climate context - that produces every reading on the dashboard.</p>
       <p class="docs-byline">By <a href="https://jamestannahill.com" target="_blank" rel="noopener">James Tannahill</a> &nbsp;·&nbsp; <a href="https://github.com/jtannahill/wx-jamestannahill" target="_blank" rel="noopener">Source on GitHub</a> &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener">Public API</a></p>
       <div class="docs-meta-strip">
         <div class="docs-meta-cell">
@@ -149,14 +149,14 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <h2>SOURCE VALIDATION</h2>
     <p>Before storing a reading, the poller runs two quality checks:</p>
     <ul>
-      <li><strong>Range check</strong> — each field is tested against physical bounds (e.g., temperature −40°F to 140°F, humidity 0–100%). Fields that fall outside the bounds are nulled and the reading is flagged <code>range_error</code>.</li>
-      <li><strong>Stuck sensor detection</strong> — if the last 6 temperature readings are identical, the reading is flagged <code>stuck</code>. This catches a common failure mode in home weather stations where the outdoor sensor freezes on a stale value.</li>
+      <li><strong>Range check</strong> - each field is tested against physical bounds (e.g., temperature −40°F to 140°F, humidity 0–100%). Fields that fall outside the bounds are nulled and the reading is flagged <code>range_error</code>.</li>
+      <li><strong>Stuck sensor detection</strong> - if the last 6 temperature readings are identical, the reading is flagged <code>stuck</code>. This catches a common failure mode in home weather stations where the outdoor sensor freezes on a stale value.</li>
     </ul>
     <p>Flagged readings are still stored in <code>wx-readings</code> so the history is complete, but they are excluded from baseline updates. The dashboard shows a banner when the station data is stale or suspect.</p>
 
     <hr class="divider">
 
-    <h2>HISTORICAL BACKFILL — WEATHER UNDERGROUND</h2>
+    <h2>HISTORICAL BACKFILL - WEATHER UNDERGROUND</h2>
     <p>When the station was first set up, the baseline table had no station data. To bootstrap it with real hyperlocal history, a one-time backfill script fetched 90 days of 5-minute readings from <strong>Weather Underground's PWS history API</strong> for the nearest private station (KNYNEWYO2140):</p>
     <pre><code>GET https://api.weather.com/v2/pws/history/all
     ?stationId=KNYNEWYO2140&format=json&units=e
@@ -165,8 +165,8 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 
     <hr class="divider">
 
-    <h2 id="era5">BASELINES — OPEN-METEO ERA5</h2>
-    <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong> — ECMWF's climate reanalysis dataset, actual measured atmospheric data going back to 1940, free and public. Wherever the dashboard tags a value <strong>(ERA5)</strong>, that number is benchmarked against this reanalysis baseline rather than the station's own history.</p>
+    <h2 id="era5">BASELINES - OPEN-METEO ERA5</h2>
+    <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong>, ECMWF's climate reanalysis dataset, actual measured atmospheric data going back to 1940, free and public. Wherever the dashboard tags a value <strong>(ERA5)</strong>, that number is benchmarked against this reanalysis baseline rather than the station's own history.</p>
     <p>A bootstrap Lambda fetches the 14th of each month for 2019–2023 (5 years × 12 months) at the station's coordinates and averages the hourly values into per-month-per-hour climate normals:</p>
     <pre><code>GET https://archive-api.open-meteo.com/v1/archive
     ?latitude=40.7549&longitude=-73.984
@@ -174,25 +174,25 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     &hourly=temperature_2m,relativehumidity_2m,
             windspeed_10m,surface_pressure
     &temperature_unit=fahrenheit&windspeed_unit=mph</code></pre>
-    <p>This produces 288 baseline slots (12 months × 24 hours) stored in <code>wx-daily-stats</code>, weighted as 288 samples. Real station readings blend in via a rolling weighted average — after a few months the baselines are fully derived from the station itself.</p>
+    <p>This produces 288 baseline slots (12 months × 24 hours) stored in <code>wx-daily-stats</code>, weighted as 288 samples. Real station readings blend in via a rolling weighted average. After a few months the baselines are fully derived from the station itself.</p>
 
     <hr class="divider">
 
-    <h2>TODAY IN HISTORY — HISTORICAL CLIMATE CONTEXT</h2>
-    <p>Separate from the rolling-average baseline system, the dashboard surfaces a deeper historical perspective: how does today's temperature rank against every recorded year at Central Park? This uses two independent data sources — <strong>NOAA GHCN-Daily</strong> for 156 years of station records, and <strong>ERA5 reanalysis</strong> for 85 years of hourly distribution data.</p>
+    <h2>TODAY IN HISTORY - HISTORICAL CLIMATE CONTEXT</h2>
+    <p>Separate from the rolling-average baseline system, the dashboard surfaces a deeper historical perspective: how does today's temperature rank against every recorded year at Central Park? This uses two independent data sources - <strong>NOAA GHCN-Daily</strong> for 156 years of station records, and <strong>ERA5 reanalysis</strong> for 85 years of hourly distribution data.</p>
 
     <p><strong>NOAA GHCN-Daily (daily high/low context).</strong> Station <code>USW00094728</code> ("NY CITY CNTRL PARK") has daily temperature records going back to 1869. The data is fetched directly from NOAA's public S3 bucket in long format and parsed into per-DOY (day-of-year) distributions:</p>
     <pre><code>s3://noaa-ghcn-pds/csv/by_station/USW00094728.csv
 # format: ID, DATE (YYYYMMDD), ELEMENT, DATA_VALUE, ...
 # elements: TMAX, TMIN, AWND (daily high, low, avg wind)</code></pre>
-    <p>A bootstrap Lambda (<code>WxClimateBootstrap</code>) runs once to load all years, compute per-DOY statistics, and write them to the <code>wx-climate-doy</code> DynamoDB table — 366 rows keyed by <code>MMDD</code>. A nightly Lambda (<code>WxClimateUpdater</code>) refreshes the current year's data each night. Each row stores:</p>
+    <p>A bootstrap Lambda (<code>WxClimateBootstrap</code>) runs once to load all years, compute per-DOY statistics, and write them to the <code>wx-climate-doy</code> DynamoDB table, 366 rows keyed by <code>MMDD</code>. A nightly Lambda (<code>WxClimateUpdater</code>) refreshes the current year's data each night. Each row stores:</p>
     <ul>
-      <li><strong>annual_highs</strong> — array of <code>&#123;year, tmax, tmin, awnd&#125;</code> for every recorded year, used for "warmest since YEAR" narratives</li>
-      <li><strong>p5/p25/p50/p75/p95</strong> — percentile distribution of historical daily highs and lows</li>
-      <li><strong>mean/std</strong> — mean and standard deviation for normal CDF lookups</li>
-      <li><strong>sample_count</strong> — number of years contributing to the distribution</li>
+      <li><strong>annual_highs</strong> - array of <code>&#123;year, tmax, tmin, awnd&#125;</code> for every recorded year, used for "warmest since YEAR" narratives</li>
+      <li><strong>p5/p25/p50/p75/p95</strong> - percentile distribution of historical daily highs and lows</li>
+      <li><strong>mean/std</strong> - mean and standard deviation for normal CDF lookups</li>
+      <li><strong>sample_count</strong> - number of years contributing to the distribution</li>
     </ul>
-    <p>On each <code>/current</code> request, <code>climate_context.py</code> calls <code>daily_verdict()</code> to rank the current station's confirmed daily high against the full historical distribution. The result produces statements like "Warmest April 13th since 1987 · 95th percentile" — scanning the year-descending record to find the most recent year that exceeded today's high.</p>
+    <p>On each <code>/current</code> request, <code>climate_context.py</code> calls <code>daily_verdict()</code> to rank the current station's confirmed daily high against the full historical distribution. The result produces statements like "Warmest April 13th since 1987 · 95th percentile", scanning the year-descending record to find the most recent year that exceeded today's high.</p>
 
     <p><strong>ERA5 hourly distribution (live percentile context).</strong> A second table, <code>wx-climate-hourly</code>, stores 8,784 slots (366 DOY × 24 hours), each containing the ERA5 hourly distribution for temperature, dew point, and wind speed at this exact coordinate going back to 1940. These are loaded once by <code>WxClimateBootstrap</code> from the Open-Meteo archive API. <code>live_context()</code> in <code>climate_context.py</code> uses a normal CDF against the slot's mean and std to express the current reading as a percentile: "currently 91st percentile for this hour on April 13th in 85 years of records."</p>
 
@@ -204,7 +204,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <p>On every <code>/current</code> request, the API looks up the baseline for the current month and hour (New York local time) and computes a delta:</p>
     <pre><code>delta = current_value − rolling_avg_value
 label = "8.2°F above average for 9am in April"</code></pre>
-    <p>Anomalies are computed for temperature, humidity, wind speed, and UV index. The dashboard surfaces the most notable one as a headline subline beneath the main temperature. Baselines are keyed by <code>MM-HH</code> (month + local hour). When a NOAA GHCN verdict is available, it takes precedence over the rolling-average anomaly label in the headline — the two systems run in parallel and complement each other.</p>
+    <p>Anomalies are computed for temperature, humidity, wind speed, and UV index. The dashboard surfaces the most notable one as a headline subline beneath the main temperature. Baselines are keyed by <code>MM-HH</code> (month + local hour). When a NOAA GHCN verdict is available, it takes precedence over the rolling-average anomaly label in the headline. The two systems run in parallel and complement each other.</p>
 
     <hr class="divider">
 
@@ -220,7 +220,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
         <tr><td>Rapid pressure drop</td><td>Pressure drops &gt; 0.08" in ~1 hour</td><td>2 hours</td></tr>
       </tbody>
     </table>
-    <p>Wind gust thresholds are statistically calibrated — the alert fires only when the gust is significantly above the baseline average wind for that hour, not just above a fixed value. Alert state and debounce timestamps are persisted in <code>wx-alerts</code>. Triggered alerts are delivered via SES email.</p>
+    <p>Wind gust thresholds are statistically calibrated. The alert fires only when the gust is significantly above the baseline average wind for that hour, not just above a fixed value. Alert state and debounce timestamps are persisted in <code>wx-alerts</code>. Triggered alerts are delivered via SES email.</p>
 
     <hr class="divider">
 
@@ -261,14 +261,14 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
     <h2>RAIN PROBABILITY MODEL FITTING</h2>
     <p>A scheduled Lambda (<code>wx-ml-fitter</code>) runs every Sunday at 3:00 UTC. It scans all 90-day readings, labels each reading with whether measurable rain (<code>hourlyrainin &gt; 0.01</code>) occurred in any reading within the following 60 minutes, then fits logistic regression via gradient descent with L2 regularization (300 epochs, learning rate 0.05).</p>
-    <p>Rain events are rare (~8–9% of readings), so training uses <strong>class weighting</strong>: positive examples (rain) are upweighted by <code>n_neg / n_pos</code>. This produces a recall-biased model — appropriate for weather, where a missed rain event is worse than a false alarm.</p>
+    <p>Rain events are rare (~8–9% of readings), so training uses <strong>class weighting</strong>: positive examples (rain) are upweighted by <code>n_neg / n_pos</code>. This produces a recall-biased model, appropriate for weather, where a missed rain event is worse than a false alarm.</p>
     <p>Fitted weights are stored in <code>wx-ml-models</code>. On the next <code>wx-api</code> cold start, <code>ml.py</code> loads them and uses them for all subsequent calls in that warm instance. The model is only stored if F1 ≥ 0.05; otherwise the heuristic coefficients remain active. Training metrics (accuracy, precision, recall, F1, confusion matrix) are stored alongside the weights.</p>
     <p>Current model: <strong>24,348 training examples, F1=0.396, recall=82%, precision=26%</strong>.</p>
 
     <hr class="divider">
 
     <h2>NEARBY STATIONS</h2>
-    <p>Every 5 minutes, alongside the primary station reading, the poller fetches up to 20 nearby Personal Weather Stations from the Weather Underground API using the geocode endpoint (centered on 40.7549°N, 73.984°W). Each result is filtered to exclude the home station (distance &lt; 0.05 mi) and sorted by distance. The snapshot — station ID, temperature, humidity, rain rate, wind, bearing, and distance — is written to the <code>wx-nearby-snapshots</code> DynamoDB table with a 30-day TTL.</p>
+    <p>Every 5 minutes, alongside the primary station reading, the poller fetches up to 20 nearby Personal Weather Stations from the Weather Underground API using the geocode endpoint (centered on 40.7549°N, 73.984°W). Each result is filtered to exclude the home station (distance &lt; 0.05 mi) and sorted by distance. The snapshot - station ID, temperature, humidity, rain rate, wind, bearing, and distance - is written to the <code>wx-nearby-snapshots</code> DynamoDB table with a 30-day TTL.</p>
     <p>The <code>/nearby</code> API endpoint returns the most recent snapshot. The dashboard Nearby Stations strip shows up to 8 of the closest stations with their current temperature and rain rate.</p>
 
     <hr class="divider">
@@ -302,15 +302,15 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <hr class="divider">
 
     <h2>FORECAST ACCURACY TRACKING</h2>
-    <p>On each run, <code>wx-forecaster</code> first reads the previous forecast from <code>wx-forecasts</code>. If that forecast is between 55 and 240 minutes old — meaning actual hourly readings are available for the +1h, +2h, and +3h windows — it computes mean absolute error (MAE) for all four forecast fields against the actual readings.</p>
+    <p>On each run, <code>wx-forecaster</code> first reads the previous forecast from <code>wx-forecasts</code>. If that forecast is between 55 and 240 minutes old - meaning actual hourly readings are available for the +1h, +2h, and +3h windows - it computes mean absolute error (MAE) for all four forecast fields against the actual readings.</p>
     <p>Each evaluation is written to <code>wx-forecast-accuracy</code> as a timestamped row. A <code>running</code> row in the same table accumulates the incremental mean across all evaluations. Once 5+ evaluations exist, the dashboard shows the running +1h temperature MAE alongside the confidence percentage.</p>
 
     <hr class="divider">
 
     <h2>DAILY SUMMARIES</h2>
-    <p>A scheduled Lambda (<code>wx-summarizer</code>) runs daily at 05:00 UTC (midnight ET). It processes the last 30 calendar days idempotently — safe to rerun without duplicating data. For each day it computes high/low/average temperature, total rainfall, max wind gust, and average comfort score, then generates a 2–3 sentence prose description of the day.</p>
-    <p>Prose generation is deterministic — it selects sentence templates based on temperature spread, rain event count and peak intensity, and notable wind. Rain event detection parses the 5-minute readings to find contiguous rain periods (rate &gt; 0.01"/hr), grouping them by start time, duration, total accumulation, and peak rate.</p>
-    <p>The most recent summary appears on the dashboard beneath the hero section. The full 30-day series is also used to populate the <strong>Comfort Calendar</strong> — a heatmap grid where each day is colored from red (0/100) to green (85+/100) based on the daily average comfort score.</p>
+    <p>A scheduled Lambda (<code>wx-summarizer</code>) runs daily at 05:00 UTC (midnight ET). It processes the last 30 calendar days idempotently, safe to rerun without duplicating data. For each day it computes high/low/average temperature, total rainfall, max wind gust, and average comfort score, then generates a 2–3 sentence prose description of the day.</p>
+    <p>Prose generation is deterministic. It selects sentence templates based on temperature spread, rain event count and peak intensity, and notable wind. Rain event detection parses the 5-minute readings to find contiguous rain periods (rate &gt; 0.01"/hr), grouping them by start time, duration, total accumulation, and peak rate.</p>
+    <p>The most recent summary appears on the dashboard beneath the hero section. The full 30-day series is also used to populate the <strong>Comfort Calendar</strong>, a heatmap grid where each day is colored from red (0/100) to green (85+/100) based on the daily average comfort score.</p>
     <p>Results are stored in <code>wx-daily-summaries</code> (keyed by station_id + date) and exposed via <code>GET /daily-summaries</code>.</p>
 
     <hr class="divider">
@@ -335,10 +335,10 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <h2>RAIN EVENTS</h2>
     <p>The <code>GET /rain-events</code> endpoint scans recent readings on-demand and parses them into discrete rain events. A rain event begins when <code>hourlyrainin &gt; 0.01</code> (in/hr) and ends when the rate returns to zero for a 5-minute interval. For each event the API returns:</p>
     <ul>
-      <li><strong>start</strong> — ISO timestamp of the first wet reading</li>
-      <li><strong>duration_min</strong> — total length of the rain event in minutes (5-minute resolution)</li>
-      <li><strong>total_in</strong> — accumulated rainfall in inches (<code>sum(rates) × 5/60</code>)</li>
-      <li><strong>peak_rate</strong> — highest hourly rate observed during the event (in/hr)</li>
+      <li><strong>start</strong> - ISO timestamp of the first wet reading</li>
+      <li><strong>duration_min</strong> - total length of the rain event in minutes (5-minute resolution)</li>
+      <li><strong>total_in</strong> - accumulated rainfall in inches (<code>sum(rates) × 5/60</code>)</li>
+      <li><strong>peak_rate</strong> - highest hourly rate observed during the event (in/hr)</li>
     </ul>
     <p>Small events (&lt;0.01") that result from sensor noise are naturally excluded by the rate threshold. Rainfall totals are also surfaced in the daily summaries and Comfort Calendar.</p>
 
@@ -356,9 +356,9 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <h2>DOWNSAMPLING FOR LONGER RANGES</h2>
     <p>The <code>/history</code> endpoint accepts up to 720 hours (30 days). To keep payloads manageable, readings are automatically bucketed:</p>
     <ul>
-      <li><strong>≤24h</strong> — raw 5-minute readings (~288 points)</li>
-      <li><strong>25–168h (7d)</strong> — hourly averages (~168 points)</li>
-      <li><strong>&gt;168h (30d)</strong> — daily averages (~30 points)</li>
+      <li><strong>≤24h</strong> - raw 5-minute readings (~288 points)</li>
+      <li><strong>25–168h (7d)</strong> - hourly averages (~168 points)</li>
+      <li><strong>&gt;168h (30d)</strong> - daily averages (~30 points)</li>
     </ul>
     <p>Numeric fields are averaged within each bucket. The timestamp is the floor of the bucket boundary. Per-slot baselines are batch-fetched from <code>wx-daily-stats</code> and attached to each reading so the chart can overlay the historical normal line.</p>
 
@@ -398,14 +398,14 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <h2>INFRASTRUCTURE</h2>
     <p>Everything runs on AWS in <code>us-east-1</code>. Estimated cost: ~$4–6/month.</p>
     <ul>
-      <li><strong>DynamoDB</strong> (on-demand, 12 tables) — <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes), <code>wx-nearby-snapshots</code> (nearby PWS readings, 30-day TTL), <code>wx-climate-doy</code> (NOAA GHCN per-DOY distributions, 366 rows), <code>wx-climate-hourly</code> (ERA5 per-DOY-hour distributions, 8,784 rows)</li>
-      <li><strong>Lambda</strong> (Python 3.12, arm64, 10 functions) — <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM), <code>WxClimateBootstrap</code> (one-time NOAA + ERA5 historical load), <code>WxClimateUpdater</code> (nightly current-year NOAA refresh)</li>
-      <li><strong>API Gateway HTTP API</strong> — routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, <code>/daily-summaries</code>, and <code>/nearby</code> to the API Lambda</li>
-      <li><strong>CloudFront</strong> — in front of both the API Gateway and the S3 dashboard bucket</li>
-      <li><strong>S3</strong> — static dashboard files, auto-generated OG image, and NOAA GHCN-Daily CSV source (<code>noaa-ghcn-pds</code>, public bucket)</li>
-      <li><strong>EventBridge</strong> — triggers all scheduled Lambdas</li>
-      <li><strong>SES</strong> — outbound email delivery for weather alerts</li>
-      <li><strong>Secrets Manager</strong> — Ambient Weather API keys and station config</li>
+      <li><strong>DynamoDB</strong> (on-demand, 12 tables) - <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes), <code>wx-nearby-snapshots</code> (nearby PWS readings, 30-day TTL), <code>wx-climate-doy</code> (NOAA GHCN per-DOY distributions, 366 rows), <code>wx-climate-hourly</code> (ERA5 per-DOY-hour distributions, 8,784 rows)</li>
+      <li><strong>Lambda</strong> (Python 3.12, arm64, 10 functions) - <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM), <code>WxClimateBootstrap</code> (one-time NOAA + ERA5 historical load), <code>WxClimateUpdater</code> (nightly current-year NOAA refresh)</li>
+      <li><strong>API Gateway HTTP API</strong> - routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, <code>/daily-summaries</code>, and <code>/nearby</code> to the API Lambda</li>
+      <li><strong>CloudFront</strong> - in front of both the API Gateway and the S3 dashboard bucket</li>
+      <li><strong>S3</strong> - static dashboard files, auto-generated OG image, and NOAA GHCN-Daily CSV source (<code>noaa-ghcn-pds</code>, public bucket)</li>
+      <li><strong>EventBridge</strong> - triggers all scheduled Lambdas</li>
+      <li><strong>SES</strong> - outbound email delivery for weather alerts</li>
+      <li><strong>Secrets Manager</strong> - Ambient Weather API keys and station config</li>
     </ul>
 
     <footer style="margin-top: 64px;">

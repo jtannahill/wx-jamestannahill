@@ -483,7 +483,7 @@ export default function Chart({ apiBase }: Props) {
       };
     } catch (e: any) {
       console.error('[wx chart]', e);
-      wrap.innerHTML = `<div style="color:#c8b97a;font-size:11px;letter-spacing:0.08em;padding:20px 16px">CHART ERROR — ${e.message}</div>`;
+      wrap.innerHTML = `<div style="color:#c8b97a;font-size:11px;letter-spacing:0.08em;padding:20px 16px">CHART ERROR - ${e.message}</div>`;
     }
   }, [history, field, useCelsius, hours]);
 
@@ -530,8 +530,8 @@ export default function Chart({ apiBase }: Props) {
     const cfg = FIELD_LABELS[field] || { label: field };
     const rangeLabel = RANGE_LABELS[hours] || `${hours}h`;
     const shareData = {
-      title: `${cfg.label} · ${rangeLabel} — Midtown Manhattan`,
-      text:  `${cfg.label} · ${rangeLabel} — wx.jamestannahill.com`,
+      title: `${cfg.label} · ${rangeLabel} - Midtown Manhattan`,
+      text:  `${cfg.label} · ${rangeLabel} - wx.jamestannahill.com`,
       url:   'https://wx.jamestannahill.com',
     };
     try {
@@ -544,7 +544,7 @@ export default function Chart({ apiBase }: Props) {
       if (e?.name !== 'AbortError') console.warn('[share chart]', e);
     }
     await onCopy();
-    const tweetText = `${shareData.text} (chart copied to clipboard — paste into the tweet)`;
+    const tweetText = `${shareData.text} (chart copied to clipboard, paste into the tweet)`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareData.url)}`,
       '_blank', 'noopener,noreferrer,width=600,height=450',

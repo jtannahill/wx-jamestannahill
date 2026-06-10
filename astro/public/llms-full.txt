@@ -1,4 +1,4 @@
-# wx.jamestannahill.com — Full Content Index
+# wx.jamestannahill.com - Full Content Index
 
 ## Station Identity
 wx.jamestannahill.com is a live personal weather station dashboard for Midtown Manhattan, New York City.
@@ -27,11 +27,11 @@ All fields available via API:
 - uhi_delta: Urban Heat Island delta vs JFK/LGA/EWR airports (°F, computed)
 
 ## API Endpoints
-- GET https://api.wx.jamestannahill.com/current — Latest observation (all fields + computed; includes embedded analog forecast, station records, and daily summary as `forecast`, `station_records`, `daily_summary`)
-- GET https://api.wx.jamestannahill.com/history?hours=24 — History for past N hours (24, 168, or 720 max)
-- GET https://api.wx.jamestannahill.com/daily-summaries?days=30 — Daily summaries: {summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}
-- GET https://api.wx.jamestannahill.com/rain-events?days=30 — Recent rain events: {events: [{start, peak_rate, duration_min, total_in}], days}
-- GET https://api.wx.jamestannahill.com/nearby — Nearby Ambient Weather stations: {stations, count, snapshot_at}
+- GET https://api.wx.jamestannahill.com/current - Latest observation (all fields + computed; includes embedded analog forecast, station records, and daily summary as `forecast`, `station_records`, `daily_summary`)
+- GET https://api.wx.jamestannahill.com/history?hours=24 - History for past N hours (24, 168, or 720 max)
+- GET https://api.wx.jamestannahill.com/daily-summaries?days=30 - Daily summaries: {summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}
+- GET https://api.wx.jamestannahill.com/rain-events?days=30 - Recent rain events: {events: [{start, peak_rate, duration_min, total_in}], days}
+- GET https://api.wx.jamestannahill.com/nearby - Nearby Ambient Weather stations: {stations, count, snapshot_at}
 
 ## Computed Metrics
 ### Comfort Score (0–100)
@@ -47,8 +47,8 @@ This Midtown station minus average of JFK, LGA, EWR ASOS readings via NOAA aviat
 Nearest-neighbor pattern matching on 90 days of 5-minute data. Finds 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes.
 
 ## Pages
-- / — Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations)
-- /docs.html — Technical documentation (how it works, data sources, methodology, API reference)
+- / - Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations)
+- /docs.html - Technical documentation (how it works, data sources, methodology, API reference)
 
 ## Data Sources
 - Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHouz aggregator

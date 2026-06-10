@@ -10,27 +10,27 @@ The dashboard includes derived metrics not available from commercial weather ser
 
 ## Data sources
 
-- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHouz) — private PWS, Midtown Manhattan
+- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHouz) - private PWS, Midtown Manhattan
 - **Urban Heat Island**: NOAA ASOS readings from JFK, LGA, and EWR via aviationweather.gov
-- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W — condition, high/low, wind
+- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W - condition, high/low, wind
 
 ## API
 
 **Base URL**: https://api.wx.jamestannahill.com
 
-- `GET /current` — Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, condition, pressure_trend, anomalies, comfort, rain_probability, percentile_rank, climate_context, uhi_delta, forecast (analog forecast), station_records, daily_summary, nearby_stations, timestamp.
-- `GET /history?hours=24` — Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
-- `GET /daily-summaries?days=30` — Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
-- `GET /rain-events?days=30` — Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
-- `GET /nearby` — Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
+- `GET /current` - Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, condition, pressure_trend, anomalies, comfort, rain_probability, percentile_rank, climate_context, uhi_delta, forecast (analog forecast), station_records, daily_summary, nearby_stations, timestamp.
+- `GET /history?hours=24` - Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
+- `GET /daily-summaries?days=30` - Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
+- `GET /rain-events?days=30` - Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
+- `GET /nearby` - Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
 
-Note: the analog forecast, station records, and daily summary are embedded in the `GET /current` response (fields `forecast`, `station_records`, `daily_summary`) — there are no standalone endpoints for them.
+Note: the analog forecast, station records, and daily summary are embedded in the `GET /current` response (fields `forecast`, `station_records`, `daily_summary`). There are no standalone endpoints for them.
 
 ## Pages
 
-- [Dashboard](https://wx.jamestannahill.com/) — Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events
-- [How It Works](https://wx.jamestannahill.com/docs.html) — Technical documentation on data collection, processing pipeline, ML models, and the public API
+- [Dashboard](https://wx.jamestannahill.com/) - Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events
+- [How It Works](https://wx.jamestannahill.com/docs.html) - Technical documentation on data collection, processing pipeline, ML models, and the public API
 
 ## About the operator
 
-James Tannahill — jamestannahill.com
+James Tannahill - jamestannahill.com

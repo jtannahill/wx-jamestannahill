@@ -192,10 +192,10 @@ function renderCurrent(data) {
   const banner  = document.getElementById('stale-banner');
   const staleMsg = document.getElementById('stale-msg');
   if (data.quality_flag === 'stuck') {
-    staleMsg.textContent = `Sensor may be frozen — last valid reading ${data.data_age_minutes ?? '?'} min ago`;
+    staleMsg.textContent = `Sensor may be frozen. Last valid reading ${data.data_age_minutes ?? '?'} min ago`;
     banner.hidden = false;
   } else if (data.data_stale) {
-    staleMsg.textContent = `Station data is ${data.data_age_minutes ?? '?'} minutes old — sensor may be offline`;
+    staleMsg.textContent = `Station data is ${data.data_age_minutes ?? '?'} minutes old. Sensor may be offline`;
     banner.hidden = false;
   } else if (data.quality_flag === 'range_error') {
     staleMsg.textContent = 'One or more sensor fields returned implausible values and were excluded';
