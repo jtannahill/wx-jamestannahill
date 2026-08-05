@@ -22,7 +22,7 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 - **Yesterday's summary**: prose recap of the prior day (high/low, rain events, notable winds), auto-generated nightly
 - **Today in History**: daily verdict panel backed by 156 years of NOAA Central Park records and 85 years of ERA5 reanalysis. Shows whether today's high and low are hotter/cooler/normal vs. the historical average, with deviation bars spanning p5→p95 in actual °F and a tick at the long-run mean
 - **WeatherKit forecast**: Apple WeatherKit 7-day outlook with daily high/low, condition, precipitation probability, and UV index
-- **NWS alerts**: active National Weather Service warnings and advisories for the station area
+- **NWS alerts**: active National Weather Service warnings for the station coordinates (via api.weather.gov)
 - **Nearby stations**: personal weather stations in the area with current conditions for local comparison
 - **Comfort calendar**: 30-day heatmap grid, color-coded by daily comfort score (0–100)
 - **Station records**: current-month extremes: temp high/low, max gust, peak rain rate, pressure range, each with the date it was set
@@ -51,6 +51,13 @@ Public, read-only, no authentication required.
 | `GET /rain-events?days=N` | Parsed rain events from the last N days (default 30) |
 | `GET /daily-summaries?days=N` | Pre-computed daily summaries from the last N days (default 30) |
 | `GET /nearby` | Latest snapshot of nearby personal weather stations |
+| `GET /health` | Health check: data freshness and poller status |
+| `GET /forecast` | Standalone analog forecast |
+| `GET /records` | Standalone station records |
+| `GET /climate-context` | NOAA/ERA5 climate context |
+| `GET /alerts` | Active NWS alerts for station point |
+| `GET /export?days=N&format=csv` | Bulk export (json or csv) |
+| `GET /openapi.json` | OpenAPI 3 specification |
 
 The analog forecast, station records, and daily summary are embedded in the `GET /current` response (`forecast`, `station_records`, `daily_summary`); there are no standalone endpoints for them.
 
