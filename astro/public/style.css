@@ -415,12 +415,40 @@ header {
 }
 .nearby-chip {
   background: var(--surface); border: 1px solid var(--border);
-  padding: 12px 14px; min-width: 100px;
+  padding: 12px 14px; min-width: 116px;
 }
 .nearby-chip-id { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 6px; }
 .nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
 .nearby-chip-rain { font-size: 11px; color: #6aaa6a; margin-top: 3px; }
 .nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Per-station departure from our reading, and the station's position within
+   the network's own spread. Two reference points, so each carries a label. */
+.nearby-chip-delta,
+.nearby-chip-ratio {
+  font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;
+  cursor: help; display: flex; align-items: baseline; gap: 4px;
+}
+.nearby-chip-delta { color: var(--text, #ebebeb); }
+.nc-ref { font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
+.nearby-chip-outlier { text-decoration: underline dotted currentColor; }
+
+/* Network-level readout above the strip. */
+.nearby-variance {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px;
+  padding: 10px 14px; margin-bottom: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.nv-item { display: inline-flex; align-items: baseline; gap: 8px; }
+.nv-label { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
+.nv-value { font-size: 13px; font-variant-numeric: tabular-nums; }
+.nv-verdict { font-size: 11px; color: var(--muted); font-style: italic; }
+.nv-flag { color: #d98b5f; font-style: normal; }
+
+/* Shared sigma banding: under 1 sigma is agreement, 2+ is a real split. */
+.ratio-flat { color: var(--muted); }
+.ratio-mid  { color: #c8b97a; }
+.ratio-high { color: #d98b5f; }
 
 /* ── Source tags ─────────────────────────────────────────────────────────── */
 .source-tag {

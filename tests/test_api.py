@@ -86,8 +86,10 @@ def test_unknown_route_returns_404():
 
 def test_nearby_route_returns_snapshot():
     from wx_api.handler import handler
-    snapshot = {'stations': [], 'count': 0, 'snapshot_at': None}
+    snapshot = {'stations': [], 'count': 0, 'snapshot_at': None,
+                'temp_variance': {'count': 0, 'home_ratio': None}}
     with patch('wx_api.handler.get_secret') as mock_secret, \
+         patch('wx_api.handler._home_temp_f', return_value=71.2) as mock_home_temp, \
          patch('wx_api.handler.nearby_route') as mock_nearby_route:
         mock_secret.return_value = {'mac_address': 'AA:BB:CC', 'label': 'Midtown Manhattan'}
         mock_nearby_route.return_value = snapshot
@@ -96,7 +98,11 @@ def test_nearby_route_returns_snapshot():
     assert result['statusCode'] == 200
     body = json.loads(result['body'])
     assert 'stations' in body
-    mock_nearby_route.assert_called_once_with('AA:BB:CC')
+    assert 'temp_variance' in body
+    # The home reading is threaded through so /nearby can express each
+    # neighbour as a departure from us, not just an absolute temperature.
+    mock_home_temp.assert_called_once_with('AA:BB:CC')
+    mock_nearby_route.assert_called_once_with('AA:BB:CC', 71.2)
 
 def test_current_passes_nearby_to_rain_probability():
     from wx_api.handler import handler

@@ -44,11 +44,19 @@ const og = {
     <meta property="og:url" content={canonical} />
     <meta property="og:locale" content="en_US" />
 
+    <!--
+      X card. The image is already at X's recommended 1200x630 / under 5MB
+      for summary_large_image, so the only thing missing was site attribution:
+      X renders the "@handle" byline on a large-image card from twitter:site,
+      not twitter:creator, so without it the creator tag was inert.
+      twitter:title is capped at 70 chars and description at 200 by X.
+    -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={og.title} />
     <meta name="twitter:description" content={og.description} />
     <meta name="twitter:image" content={og.image} />
     <meta name="twitter:image:alt" content="wx.jamestannahill.com - Live Midtown Manhattan Weather" />
+    <meta name="twitter:site" content="@jamestannahill" />
     <meta name="twitter:creator" content="@jamestannahill" />
 
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />

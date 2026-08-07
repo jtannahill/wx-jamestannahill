@@ -635,7 +635,25 @@ function renderStationRecords(records) {
 }
 
 // ── Nearby Stations ───────────────────────────────────────────────────────────
-function renderNearby(stations, snapshotAt) {
+// A signed delta in degrees, unit-aware. Deltas are differences, so in
+// Celsius they scale by 5/9 with no 32-degree offset. fmtT() applies the
+// full absolute conversion and would be wrong here.
+function fmtDelta(deltaF, digits = 1) {
+  const d = tempUnit() === '°C' ? deltaF * 5 / 9 : deltaF;
+  const sign = d > 0 ? '+' : d < 0 ? '−' : '±';
+  return `${sign}${Math.abs(d).toFixed(digits)}`;
+}
+
+// Bucket a sigma ratio into a class so the eye can sort the strip at a
+// glance: agreement is grey, a 1-sigma departure warms up, 2-sigma is loud.
+function ratioClass(ratio) {
+  const a = Math.abs(ratio);
+  if (a < 1) return 'ratio-flat';
+  if (a < 2) return 'ratio-mid';
+  return 'ratio-high';
+}
+
+function renderNearby(stations, snapshotAt, variance) {
   const strip = document.getElementById('nearby-strip');
   const meta = document.getElementById('nearby-meta');
   if (!stations || !stations.length) {
@@ -643,20 +661,78 @@ function renderNearby(stations, snapshotAt) {
     return;
   }
   document.getElementById('nearby-section').style.display = '';
-  if (snapshotAt) meta.textContent = new Date(snapshotAt).toLocaleTimeString();
+  const stamp = snapshotAt ? new Date(snapshotAt).toLocaleTimeString() : '';
+  meta.textContent = stamp;
+
+  renderNearbyVariance(variance);
 
   strip.innerHTML = stations.map(s => {
     const temp = s.temp_f != null ? `${fmtT(s.temp_f, 0)}${tempUnit()}` : '–';
     const rain = s.rain_rate_in_hr > 0 ? `${s.rain_rate_in_hr.toFixed(2)}" /hr` : '';
     const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
+
+    // Two different reference points, so both are labelled. The delta is
+    // measured against our station, because that is the reading this page is
+    // built around. The sigma ratio is measured from the network's own
+    // center, because how credible a station looks is a question about the
+    // network, not about us. Unlabelled they read as contradictory: a
+    // station can sit below us and above the network at the same time.
+    let deltaHtml = '';
+    if (s.temp_delta_f != null) {
+      deltaHtml += `<div class="nearby-chip-delta" title="${fmtDelta(s.temp_delta_f)}${tempUnit()} against our station">`
+        + `${fmtDelta(s.temp_delta_f)}<span class="nc-ref">vs us</span></div>`;
+    }
+    if (s.temp_ratio != null) {
+      const r = s.temp_ratio;
+      const sign = r > 0 ? '+' : r < 0 ? '−' : '±';
+      const flag = s.is_outlier ? ' nearby-chip-outlier' : '';
+      const title = s.is_outlier
+        ? `${Math.abs(r).toFixed(2)} sigma from the network center: likely a miscited or sun-exposed sensor, not weather`
+        : `${Math.abs(r).toFixed(2)} sigma from the network center`;
+      deltaHtml += `<div class="nearby-chip-ratio ${ratioClass(r)}${flag}" title="${title}">`
+        + `${sign}${Math.abs(r).toFixed(1)}σ<span class="nc-ref">vs net</span></div>`;
+    }
+
     return `<div class="nearby-chip">
       <div class="nearby-chip-id">${s.station_id ?? ''}</div>
       <div class="nearby-chip-temp">${temp}</div>
+      ${deltaHtml}
       ${rain ? `<div class="nearby-chip-rain">${rain}</div>` : ''}
       <div class="nearby-chip-dist">${dist}</div>
     </div>`;
   }).join('');
   strip.removeAttribute('aria-busy');
+}
+
+// Network-level readout: how tightly the neighbours agree, and where our
+// station sits inside that distribution.
+function renderNearbyVariance(v) {
+  const el = document.getElementById('nearby-variance');
+  if (!el) return;
+  if (!v || v.home_ratio == null || v.network_sigma_f == null) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  const sigma = fmtDelta(v.network_sigma_f, 1).replace(/^[+−±]/, '');
+  const r = v.home_ratio;
+  const sign = r > 0 ? '+' : r < 0 ? '−' : '±';
+  const parts = [
+    `<span class="nv-item"><span class="nv-label">NETWORK SPREAD</span>`
+      + `<span class="nv-value" title="Scaled median absolute deviation across ${v.count} nearby stations. Robust, so one bad sensor cannot inflate it.">σ ${sigma}${tempUnit()}</span></span>`,
+    `<span class="nv-item"><span class="nv-label">OUR DEPARTURE</span>`
+      + `<span class="nv-value ${ratioClass(r)}" title="Our reading against the network median, expressed in units of that spread.">`
+      + `${fmtDelta(v.home_delta_f)}${tempUnit()} &middot; ${sign}${Math.abs(r).toFixed(2)}σ</span></span>`,
+  ];
+  if (v.verdict) {
+    parts.push(`<span class="nv-verdict">${v.verdict}</span>`);
+  }
+  if (v.outlier_count > 0) {
+    const n = v.outlier_count;
+    parts.push(`<span class="nv-verdict nv-flag">${n} station${n > 1 ? 's' : ''} flagged as suspect</span>`);
+  }
+  el.innerHTML = parts.join('');
+  el.hidden = false;
 }
 
 // ── Rain Events ───────────────────────────────────────────────────────────────
@@ -692,7 +768,7 @@ async function refresh(forceHistory = false) {
     renderSummary(current.daily_summary);
     renderClimatePanel(current);
     renderStationRecords(current.station_records);
-    renderNearby(current.nearby_stations, null);
+    renderNearby(current.nearby_stations, null, current.nearby_variance);
 
     if (history) {
       cacheSet('history_' + currentHours, history);
@@ -722,7 +798,7 @@ unitToggleBtn.addEventListener('click', () => {
     renderCurrent(_bootCurrent);
     renderClimatePanel(_bootCurrent);
     renderStationRecords(_bootCurrent.station_records);
-    renderNearby(_bootCurrent.nearby_stations, null);
+    renderNearby(_bootCurrent.nearby_stations, null, _bootCurrent.nearby_variance);
     renderTodayContext(_bootCurrent, lastHistory);
   }
   if (_lastSummaries) renderComfortCalendar(_lastSummaries);
@@ -910,7 +986,7 @@ async function boot() {
     renderSummary(cc.daily_summary);
     renderClimatePanel(cc);
     renderStationRecords(cc.station_records);
-    renderNearby(cc.nearby_stations, null);
+    renderNearby(cc.nearby_stations, null, cc.nearby_variance);
   }
   if (ch) {
     lastHistory = ch;
@@ -933,7 +1009,7 @@ async function boot() {
     renderSummary(cur.daily_summary);
     renderClimatePanel(cur);
     renderStationRecords(cur.station_records);
-    renderNearby(cur.nearby_stations, null);
+    renderNearby(cur.nearby_stations, null, cur.nearby_variance);
   } else {
     console.error('Current fetch failed:', rCur.reason);
   }

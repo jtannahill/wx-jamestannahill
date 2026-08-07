@@ -11,7 +11,7 @@ from wx_api.anomaly import compute_anomalies, pressure_trend, condition_label, p
 from wx_api.climate_context import live_context, daily_verdict, anomaly_headline
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
-from wx_api.nearby import nearby_route, _fetch_nearby_snapshot
+from wx_api.nearby import nearby_route, _fetch_nearby_snapshot, network_variance
 from wx_api.weatherkit import (
     fetch_tomorrow_forecast as _wk_fetch,
     fetch_attribution as _wk_attr,
@@ -60,12 +60,34 @@ def handler(event, context):
         try:
             station = get_secret(STATION_SECRET)
             station_id = station['mac_address']
-            return _resp(200, nearby_route(station_id))
+            return _resp(200, nearby_route(station_id, _home_temp_f(station_id)))
         except Exception as e:
             print(f"Nearby route error: {e}")
             return _resp(500, {'error': 'nearby unavailable'})
     else:
         return _resp(404, {"error": "Not found"})
+
+
+def _home_temp_f(station_id: str):
+    """
+    Latest usable outdoor temp for the home station, or None.
+
+    Only /nearby needs this. /current already has the reading in hand and
+    passes it straight through, so this extra query never runs there.
+    """
+    try:
+        result = get_table(READINGS_TABLE).query(
+            KeyConditionExpression=Key('station_id').eq(station_id),
+            ScanIndexForward=False,
+            Limit=5,
+        )
+        for item in result.get('Items', []):
+            temp = item.get('tempf')
+            if temp is not None:
+                return float(temp)
+    except Exception as e:
+        print(f"_home_temp_f failed (non-critical): {e}")
+    return None
 
 
 def _current():
@@ -163,6 +185,11 @@ def _current():
 
     rain_prob = rain_probability(reading, recent, nearby)
 
+    # Enrich the nearby snapshot with deltas and network-relative ratios.
+    # Sigma is computed over the FULL snapshot, not the eight stations the
+    # payload carries, so the yardstick uses every sample we actually have.
+    nearby, nearby_variance = network_variance(reading.get('tempf'), nearby)
+
     # Climate context — live percentile + daily verdict
     climate_live     = live_context(reading, climate_hourly_stats, doy)
     today_high       = daily_summary.get("temp_high") if daily_summary else None
@@ -202,6 +229,7 @@ def _current():
         "wk_attribution":        wk_attribution,
         "wk_hourly":             wk_hourly,
         "nearby_stations":       nearby[:8],
+        "nearby_variance":       nearby_variance,
         **uhi,
     }
     return _resp(200, body)

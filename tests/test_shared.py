@@ -20,6 +20,11 @@ def test_get_secret_parses_json():
 from shared.dynamodb import get_table
 
 def test_get_table_returns_table_resource():
+    # get_table memoizes by table name in a module-level dict. Any earlier
+    # test that touched this table would otherwise turn the call below into a
+    # cache hit and the assertions into false negatives.
+    import shared.dynamodb as _ddb
+    _ddb._tables.pop('wx-readings', None)
     with patch('shared.dynamodb.boto3') as mock_boto3:
         mock_resource = MagicMock()
         mock_boto3.resource.return_value = mock_resource

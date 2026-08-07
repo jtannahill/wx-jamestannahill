@@ -532,7 +532,9 @@ export default function Chart({ apiBase }: Props) {
     const shareData = {
       title: `${cfg.label} · ${rangeLabel} - Midtown Manhattan`,
       text:  `${cfg.label} · ${rangeLabel} - wx.jamestannahill.com`,
-      url:   'https://wx.jamestannahill.com',
+      // Trailing slash matches the canonical URL, so X's card scraper resolves
+      // the link it was handed rather than following a redirect to find it.
+      url:   'https://wx.jamestannahill.com/',
     };
     try {
       if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
@@ -546,7 +548,9 @@ export default function Chart({ apiBase }: Props) {
     await onCopy();
     const tweetText = `${shareData.text} (chart copied to clipboard, paste into the tweet)`;
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareData.url)}`,
+      // x.com/intent/post is the current endpoint; twitter.com/intent/tweet
+      // still works but costs a redirect hop on the way in.
+      `https://x.com/intent/post?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareData.url)}`,
       '_blank', 'noopener,noreferrer,width=600,height=450',
     );
   };
