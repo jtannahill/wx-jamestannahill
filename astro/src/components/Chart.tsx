@@ -546,7 +546,7 @@ export default function Chart({ apiBase }: Props) {
       if (e?.name !== 'AbortError') console.warn('[share chart]', e);
     }
     await onCopy();
-    const tweetText = `${shareData.text} (chart copied to clipboard, paste into the tweet)`;
+    const tweetText = `${shareData.text} (chart copied to clipboard, paste into the tweet) #NYwx`;
     window.open(
       // x.com/intent/post is the current endpoint; twitter.com/intent/tweet
       // still works but costs a redirect hop on the way in.

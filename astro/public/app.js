@@ -941,7 +941,7 @@ function buildShareText(data) {
 
   // Cache-buster on the URL forces Twitter to do a fresh og.png scrape per tweet
   const v = Math.floor(Date.now() / 1000);
-  return `${line1}\n\n${line2}\n\nhttps://wx.jamestannahill.com/?v=${v} #NYC #weather`;
+  return `${line1}\n\n${line2}\n\nhttps://wx.jamestannahill.com/?v=${v} #NYwx #NYC #weather`;
 }
 
 document.getElementById('share-btn').addEventListener('click', async () => {
