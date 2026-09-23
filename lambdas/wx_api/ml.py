@@ -167,8 +167,19 @@ def rain_probability(reading: dict, recent_readings: list, nearby: list | None =
     sin_h               = math.sin(2 * math.pi * hour / 24)
     cos_h               = math.cos(2 * math.pi * hour / 24)
 
-    z = sum(w * f for w, f in zip(_rain_w, [humidity_norm, pressure_delta,
-                                             dew_depression_norm, sin_h, cos_h])) + _rain_b
+    # Feature vector (base + optional spatial when model was trained with them)
+    base_feats = [humidity_norm, pressure_delta, dew_depression_norm, sin_h, cos_h]
+    spatial_feats = [0.0, 0.0, 0.0]
+    if nearby and len(_rain_w) >= 8:
+        from shared.spatial_features import spatial_feature_vector
+        spatial_feats = spatial_feature_vector(
+            nearby,
+            float(reading.get('winddir')) if reading.get('winddir') is not None else None,
+            float(barom) if barom is not None else None,
+        )
+    feats = base_feats + (spatial_feats if len(_rain_w) >= 8 else [])
+
+    z = sum(w * f for w, f in zip(_rain_w, feats)) + _rain_b
 
     # Boost if it's already raining (persistence)
     if rain_now > 0.01:
@@ -176,10 +187,10 @@ def rain_probability(reading: dict, recent_readings: list, nearby: list | None =
 
     base_prob = _sigmoid(z)
 
-    # Spatial boost from nearby upwind stations
+    # Spatial boost from nearby upwind stations (Phase 1 runtime boost when model is 5-feature)
     spatial_boost_val = 0.0
     spatial_source = None
-    if nearby:
+    if nearby and len(_rain_w) < 8:
         from wx_api.nearby import spatial_rain_boost
         wind_dir = reading.get('winddir', 0) or 0
         spatial_boost_val, spatial_source = spatial_rain_boost(nearby, wind_dir)

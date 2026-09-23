@@ -16,6 +16,12 @@ export const GET: APIRoute = () => {
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>https://wx.jamestannahill.com/embed.html</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>
 `;
   return new Response(xml, {

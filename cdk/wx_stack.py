@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_certificatemanager as acm,
     aws_iam as iam,
+    aws_s3 as s3,
 )
 from constructs import Construct
 
@@ -205,14 +206,44 @@ class WxStack(Stack):
         self.ml_fitter_fn = make_lambda(
             "WxMlFitter", "wx_ml_fitter.handler",
             memory=512, timeout=900,
-            extra_env={"MODELS_TABLE": self.ml_models_table.table_name},
+            extra_env={
+                "MODELS_TABLE": self.ml_models_table.table_name,
+                "NEARBY_TABLE": self.nearby_table.table_name,
+            },
         )
+        self.nearby_table.grant_read_data(self.ml_fitter_fn)
         self.ml_models_table.grant_read_write_data(self.ml_fitter_fn)
         ml_fitter_rule = events.Rule(
             self, "WxMlFitterSchedule",
             schedule=events.Schedule.cron(hour="3", minute="0", week_day="SUN"),
         )
         ml_fitter_rule.add_target(targets.LambdaFunction(self.ml_fitter_fn))
+
+        # --- S3 archive bucket (long-term readings beyond DynamoDB TTL) ---
+        self.archive_bucket = s3.Bucket(
+            self, "WxReadingsArchive",
+            bucket_name=f"wx-readings-archive-{self.account}",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            lifecycle_rules=[
+                s3.LifecycleRule(transitions=[
+                    s3.Transition(storage_class=s3.StorageClass.GLACIER, transition_after=Duration.days(365)),
+                ]),
+            ],
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+
+        self.archiver_fn = make_lambda(
+            "WxArchiver", "wx_archiver.handler",
+            memory=256, timeout=300,
+            extra_env={"ARCHIVE_BUCKET": self.archive_bucket.bucket_name},
+        )
+        self.archive_bucket.grant_write(self.archiver_fn)
+        archiver_rule = events.Rule(
+            self, "WxArchiverSchedule",
+            schedule=events.Schedule.cron(hour="4", minute="30"),
+        )
+        archiver_rule.add_target(targets.LambdaFunction(self.archiver_fn))
 
         # Allow the API Lambda to read forecasts, accuracy, UHI seasonal, and ML models
         self.forecasts_table.grant_read_data(self.api_fn)
@@ -355,10 +386,17 @@ class WxStack(Stack):
         )
         lambda_integration = integrations.HttpLambdaIntegration("WxApiIntegration", self.api_fn)
         http_api.add_routes(path="/current",           methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/health",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/history",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/rain-events",        methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         http_api.add_routes(path="/daily-summaries",    methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
-        http_api.add_routes(path="/nearby",         methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/nearby",             methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/forecast",           methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/records",            methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/climate-context",    methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/alerts",             methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/export",             methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
+        http_api.add_routes(path="/openapi.json",       methods=[apigwv2.HttpMethod.GET], integration=lambda_integration)
         # /og.png and /refresh-og routes exist in API GW (added manually) — managed outside CDK
 
         # --- CloudFront in front of API Gateway ---

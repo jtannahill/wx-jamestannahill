@@ -563,7 +563,7 @@ export default function Chart({ apiBase }: Props) {
           {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>}
           <button class="chart-action-btn" title="Copy chart" aria-label="Copy chart" onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
           <button class="chart-action-btn" title="Share chart" aria-label="Share chart" onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
-          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
+          <a class="source-tag has-tooltip" href="/docs.html#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
         </div>
       </div>
       <div class="chart-controls">

@@ -77,6 +77,24 @@ def test_history_endpoint_returns_readings_array():
     assert r0['tempf'] == 61.3
     assert r0['baromrelin'] == 29.92
 
+def test_health_endpoint_returns_freshness():
+    from wx_api.handler import handler
+    from datetime import datetime, timezone
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    with patch('wx_api.handler.get_secret') as mock_secret, \
+         patch('wx_api.handler.get_table') as mock_table_fn:
+        mock_secret.return_value = {'mac_address': 'AA:BB:CC', 'label': 'Midtown Manhattan'}
+        mock_table = MagicMock()
+        mock_table_fn.return_value = mock_table
+        mock_table.query.return_value = {'Items': [_make_reading(timestamp=fresh_ts)]}
+        event = {'rawPath': '/health', 'requestContext': {'http': {'method': 'GET'}}}
+        result = handler(event, {})
+    assert result['statusCode'] == 200
+    body = json.loads(result['body'])
+    assert body['ok'] is True
+    assert 'data_age_minutes' in body
+    assert body['poller_healthy'] is True
+
 def test_unknown_route_returns_404():
     from wx_api.handler import handler
     event = {'rawPath': '/unknown', 'requestContext': {'http': {'method': 'GET'}}}

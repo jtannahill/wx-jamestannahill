@@ -24,8 +24,10 @@ from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
+from shared.spatial_features import spatial_feature_vector
 
 READINGS_TABLE = os.environ.get('READINGS_TABLE', 'wx-readings')
+NEARBY_TABLE   = os.environ.get('NEARBY_TABLE', 'wx-nearby-snapshots')
 MODELS_TABLE   = os.environ.get('MODELS_TABLE',   'wx-ml-models')
 STATION_SECRET = 'ambient-weather/station-config'
 
@@ -46,7 +48,11 @@ def handler(event, context):
         print("Insufficient data — skipping fit")
         return {"status": "insufficient_data"}
 
-    labeled = _build_labeled_dataset(readings)
+    nearby_timeline = _load_nearby_timeline(mac)
+    use_spatial = len(nearby_timeline) >= 100
+    print(f"Nearby snapshots: {len(nearby_timeline)} — spatial features {'on' if use_spatial else 'off'}")
+
+    labeled = _build_labeled_dataset(readings, nearby_timeline if use_spatial else None)
     n_pos   = sum(y for _, y in labeled)
     print(f"Labeled dataset: {len(labeled)} examples, {n_pos} positive ({100*n_pos/len(labeled):.1f}%)")
 
@@ -90,7 +96,7 @@ def handler(event, context):
 
 # ── Dataset construction ──────────────────────────────────────────────────────
 
-def _build_labeled_dataset(readings: list) -> list:
+def _build_labeled_dataset(readings: list, nearby_timeline: list | None = None) -> list:
     """
     For each clean reading, extract features and label: did it rain (>0.01 in/hr)
     in any of the next 12 readings (≈ 60 minutes at 5-min intervals)?
@@ -102,7 +108,8 @@ def _build_labeled_dataset(readings: list) -> list:
         if r.get('quality_flag'):
             continue
 
-        features = _features(r, readings, i)
+        nearby = _nearby_at(r.get('timestamp', ''), nearby_timeline) if nearby_timeline else None
+        features = _features(r, readings, i, nearby)
         if features is None:
             continue
 
@@ -123,7 +130,7 @@ def _build_labeled_dataset(readings: list) -> list:
     return labeled
 
 
-def _features(r: dict, readings: list, idx: int):
+def _features(r: dict, readings: list, idx: int, nearby: list | None = None):
     """Return feature vector or None if required fields are missing."""
     humidity = r.get('humidity')
     tempf    = r.get('tempf')
@@ -153,13 +160,20 @@ def _features(r: dict, readings: list, idx: int):
     ts   = _parse_ts(ts_str)
     hour = ts.hour if ts else 12
 
-    return [
+    base = [
         (humidity - 50.0) / 50.0,                    # humidity_norm
         pressure_delta,                               # pressure_delta (in Hg)
         (max(0.0, tempf - dewpoint) - 20.0) / 20.0,  # dew_depression_norm
         math.sin(2 * math.pi * hour / 24),            # sin_hour
         math.cos(2 * math.pi * hour / 24),            # cos_hour
     ]
+    if nearby is not None:
+        base.extend(spatial_feature_vector(
+            nearby,
+            float(r.get('winddir')) if r.get('winddir') is not None else None,
+            float(r.get('baromrelin')) if r.get('baromrelin') is not None else None,
+        ))
+    return base
 
 
 # ── Logistic regression ───────────────────────────────────────────────────────
@@ -182,8 +196,10 @@ def _fit(labeled: list) -> tuple[list, float]:
     n_pos   = sum(y for _, y in labeled) or 1
     n_neg   = len(labeled) - n_pos
     pos_w   = n_neg / n_pos   # class weight for positive examples
-    # Initialise near the heuristic values so we converge faster
-    w = [1.6, -9.0, -1.0, 0.15, -0.05][:n_feat] + [0.0] * max(0, n_feat - 5)
+    # Initialise near heuristic (+ zeros for spatial if 8 features)
+    n_feat = len(labeled[0][0])
+    w = [1.6, -9.0, -1.0, 0.15, -0.05] + ([0.0] * max(0, n_feat - 5))
+    w = w[:n_feat]
     b = -2.1
 
     n = len(labeled)
@@ -249,6 +265,48 @@ def _evaluate(labeled, w, b):
 
 
 # ── Fetch helpers ─────────────────────────────────────────────────────────────
+
+def _load_nearby_timeline(mac: str) -> list[tuple[datetime, list]]:
+    """Load nearby snapshots sorted by time."""
+    table = get_table(NEARBY_TABLE)
+    items, kwargs = [], dict(
+        KeyConditionExpression=Key('station_id').eq(mac),
+        ScanIndexForward=True,
+    )
+    while True:
+        result = table.query(**kwargs)
+        items.extend(result.get('Items', []))
+        last = result.get('LastEvaluatedKey')
+        if not last:
+            break
+        kwargs['ExclusiveStartKey'] = last
+
+    timeline = []
+    for item in items:
+        ts = _parse_ts(item.get('snapshot_at', ''))
+        if not ts:
+            continue
+        try:
+            stations = json.loads(item.get('stations_json', '[]'))
+        except Exception:
+            stations = []
+        timeline.append((ts, stations))
+    return timeline
+
+
+def _nearby_at(ts_str: str, timeline: list[tuple[datetime, list]]) -> list | None:
+    ts = _parse_ts(ts_str)
+    if not ts or not timeline:
+        return None
+    best = None
+    best_delta = timedelta(hours=1)
+    for snap_ts, stations in timeline:
+        delta = abs(snap_ts - ts)
+        if delta < best_delta:
+            best_delta = delta
+            best = stations
+    return best if best_delta <= timedelta(minutes=45) else None
+
 
 def _fetch_all_readings(mac: str) -> list:
     table = get_table(READINGS_TABLE)

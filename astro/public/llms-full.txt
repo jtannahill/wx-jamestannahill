@@ -32,6 +32,13 @@ All fields available via API:
 - GET https://api.wx.jamestannahill.com/daily-summaries?days=30 - Daily summaries: {summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}
 - GET https://api.wx.jamestannahill.com/rain-events?days=30 - Recent rain events: {events: [{start, peak_rate, duration_min, total_in}], days}
 - GET https://api.wx.jamestannahill.com/nearby - Nearby Ambient Weather stations: {stations, count, snapshot_at}
+- GET https://api.wx.jamestannahill.com/health - Health check: {ok, last_reading_at, data_age_minutes, poller_healthy}
+- GET https://api.wx.jamestannahill.com/forecast - Standalone analog forecast
+- GET https://api.wx.jamestannahill.com/records - Standalone station records
+- GET https://api.wx.jamestannahill.com/climate-context - NOAA/ERA5 climate context
+- GET https://api.wx.jamestannahill.com/alerts - Active NWS alerts for station point
+- GET https://api.wx.jamestannahill.com/export?days=30&format=json|csv - Bulk export
+- GET https://api.wx.jamestannahill.com/openapi.json - OpenAPI 3 specification
 
 ## Computed Metrics
 ### Comfort Score (0–100)
@@ -47,13 +54,16 @@ This Midtown station minus average of JFK, LGA, EWR ASOS readings via NOAA aviat
 Nearest-neighbor pattern matching on 90 days of 5-minute data. Finds 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes.
 
 ## Pages
-- / - Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations)
+- / - Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations, NWS alerts)
 - /docs.html - Technical documentation (how it works, data sources, methodology, API reference)
+- /embed.html - Badge widget and iframe embed instructions
 
 ## Data Sources
-- Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHouz aggregator
+- Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHaus aggregator
+- Redistribution: Weather Underground (KNYNEWYO2140), Windy.com (CatHaus, station ID 0Gpj0rbF), NOAA CWOP (GW7880)
 - Airport ASOS: NOAA aviationweather.gov (JFK, LGA, EWR) for UHI delta
 - Daily forecast: Apple WeatherKit (tomorrow's conditions)
+- NWS alerts: api.weather.gov active alerts for station coordinates
 
 ## License
 Station data: CC BY 4.0

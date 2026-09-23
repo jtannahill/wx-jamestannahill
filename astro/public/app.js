@@ -206,6 +206,8 @@ function renderCurrent(data) {
   } else {
     banner.hidden = true;
   }
+
+  renderNwsAlerts(data.nws_alerts);
 }
 
 // ── Hourly strip (WeatherKit) ────────────────────────────────────────────────
@@ -744,19 +746,86 @@ function renderNearbyVariance(v) {
   el.hidden = false;
 }
 
+// ── NWS alerts banner ─────────────────────────────────────────────────────────
+function renderNwsAlerts(alerts) {
+  const banner = document.getElementById('alerts-banner');
+  const msg = document.getElementById('alerts-msg');
+  if (!banner || !msg) return;
+  if (!alerts || !alerts.length) {
+    banner.hidden = true;
+    return;
+  }
+  const primary = alerts[0];
+  const extra = alerts.length > 1 ? ` (+${alerts.length - 1} more)` : '';
+  msg.textContent = `${primary.event || 'Weather alert'}: ${primary.headline || primary.description || ''}${extra}`;
+  banner.hidden = false;
+}
+
 // ── Rain Events ───────────────────────────────────────────────────────────────
-// ── Secondary data (comfort calendar) ────────────────────────────────────────
+function renderRainEvents(events) {
+  const list = document.getElementById('rain-events-list');
+  if (!list) return;
+
+  list.replaceChildren();
+
+  if (!events || !events.length) {
+    const empty = document.createElement('p');
+    empty.className = 'rain-events-empty';
+    empty.textContent = 'No measurable rain in this period.';
+    list.appendChild(empty);
+    list.removeAttribute('aria-busy');
+    return;
+  }
+
+  events.slice(0, 8).forEach(ev => {
+    const row = document.createElement('div');
+    row.className = 'rain-event-row';
+
+    const when = document.createElement('span');
+    when.className = 'rain-event-when';
+    when.textContent = ev.start
+      ? new Date(ev.start).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        })
+      : '—';
+
+    const detail = document.createElement('span');
+    detail.className = 'rain-event-detail';
+    const dur = ev.duration_min != null ? `${ev.duration_min} min` : '—';
+    const total = ev.total_in != null ? `${Number(ev.total_in).toFixed(2)}"` : '—';
+    const peak = ev.peak_rate != null ? ` · peak ${Number(ev.peak_rate).toFixed(2)}"/hr` : '';
+    detail.textContent = `${total} · ${dur}${peak}`;
+
+    row.appendChild(when);
+    row.appendChild(detail);
+    list.appendChild(row);
+  });
+  list.removeAttribute('aria-busy');
+}
+
+// ── Secondary data (comfort calendar + rain events) ───────────────────────────
 let secondaryLoaded = false;
 async function loadSecondaryData() {
   const cachedSummaries = cacheGet('daily_summaries');
   if (cachedSummaries) renderComfortCalendar(cachedSummaries);
 
+  const cachedRain = cacheGet('rain_events');
+  if (cachedRain) renderRainEvents(cachedRain);
+
   try {
-    const sumResp = await fetch(`${API_BASE}/daily-summaries?days=30`);
+    const [sumResp, rainResp] = await Promise.all([
+      fetch(`${API_BASE}/daily-summaries?days=30`),
+      fetch(`${API_BASE}/rain-events?days=14`),
+    ]);
     if (sumResp.ok) {
       const d = await sumResp.json();
       cacheSet('daily_summaries', d.summaries || []);
       renderComfortCalendar(d.summaries || []);
+    }
+    if (rainResp.ok) {
+      const d = await rainResp.json();
+      cacheSet('rain_events', d.events || []);
+      renderRainEvents(d.events || []);
     }
     secondaryLoaded = true;
   } catch (e) {

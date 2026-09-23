@@ -17,6 +17,7 @@ from wx_api.weatherkit import (
     fetch_attribution as _wk_attr,
     fetch_hourly_forecast as _wk_hourly,
 )
+from wx_api.alerts import fetch_active_alerts
 from boto3.dynamodb.conditions import Key
 
 READINGS_TABLE     = os.environ.get('READINGS_TABLE',     'wx-readings')
@@ -41,19 +42,19 @@ CORS_HEADERS = {
 
 def handler(event, context):
     path = event.get('rawPath', '/')
+    params = event.get('queryStringParameters') or {}
 
-    if path == '/current':
+    if path == '/health':
+        return _health()
+    elif path == '/current':
         return _current()
     elif path == '/history':
-        params = event.get('queryStringParameters') or {}
         hours = int(params.get('hours', 24))
-        return _history(min(hours, 720))  # max 30 days
+        return _history(min(hours, 720))
     elif path == '/rain-events':
-        params = event.get('queryStringParameters') or {}
         days = int(params.get('days', 30))
         return _rain_events_route(min(days, 90))
     elif path == '/daily-summaries':
-        params = event.get('queryStringParameters') or {}
         days = int(params.get('days', 90))
         return _daily_summaries_route(min(days, 365))
     elif path == '/nearby':
@@ -64,6 +65,20 @@ def handler(event, context):
         except Exception as e:
             print(f"Nearby route error: {e}")
             return _resp(500, {'error': 'nearby unavailable'})
+    elif path == '/forecast':
+        return _forecast_route()
+    elif path == '/records':
+        return _records_route()
+    elif path == '/climate-context':
+        return _climate_context_route()
+    elif path == '/alerts':
+        return _resp(200, {'alerts': fetch_active_alerts()})
+    elif path == '/export':
+        days = int(params.get('days', 7))
+        fmt = (params.get('format') or 'json').lower()
+        return _export_route(min(days, 90), fmt)
+    elif path == '/openapi.json':
+        return _openapi_route()
     else:
         return _resp(404, {"error": "Not found"})
 
@@ -162,7 +177,7 @@ def _current():
                 results.append(None)
         return tuple(results)
 
-    with ThreadPoolExecutor(max_workers=9) as ex:
+    with ThreadPoolExecutor(max_workers=10) as ex:
         f_uhi            = ex.submit(_get_uhi)
         f_nearby         = ex.submit(_fetch_nearby_snapshot, mac)
         f_forecast       = ex.submit(_fetch_forecast, mac)
@@ -172,6 +187,7 @@ def _current():
         f_wk             = ex.submit(_get_wk)
         f_climate_doy    = ex.submit(_fetch_climate_doy,    mac, doy)
         f_climate_hourly = ex.submit(_fetch_climate_hourly, mac, doy_hour)
+        f_nws_alerts     = ex.submit(fetch_active_alerts)
 
     uhi                  = f_uhi.result()
     nearby               = f_nearby.result()
@@ -182,6 +198,7 @@ def _current():
     nws_tomorrow, wk_attribution, wk_hourly = f_wk.result()
     climate_doy_stats    = f_climate_doy.result()
     climate_hourly_stats = f_climate_hourly.result()
+    nws_alerts           = f_nws_alerts.result()
 
     rain_prob = rain_probability(reading, recent, nearby)
 
@@ -230,6 +247,7 @@ def _current():
         "wk_hourly":             wk_hourly,
         "nearby_stations":       nearby[:8],
         "nearby_variance":       nearby_variance,
+        "nws_alerts":            nws_alerts,
         **uhi,
     }
     return _resp(200, body)
@@ -627,6 +645,171 @@ def _fetch_climate_hourly(mac: str, doy_hour: str) -> dict | None:
     except Exception as e:
         print(f"Climate hourly fetch (non-fatal): {e}")
         return None
+
+
+def _health():
+    """Liveness + data freshness check for monitoring."""
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        table = get_table(READINGS_TABLE)
+        result = table.query(
+            KeyConditionExpression=Key('station_id').eq(mac),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = result.get('Items', [])
+        if not items:
+            return _resp(503, {'ok': False, 'error': 'no_readings'})
+
+        ts = datetime.fromisoformat(str(items[0]['timestamp']))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60
+        stale = age_min > 15
+        return _resp(200 if not stale else 503, {
+            'ok': not stale,
+            'last_reading_at': items[0]['timestamp'],
+            'data_age_minutes': round(age_min, 1),
+            'poller_healthy': not stale,
+        })
+    except Exception as e:
+        return _resp(503, {'ok': False, 'error': str(e)})
+
+
+def _forecast_route():
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        forecast = _fetch_forecast(mac)
+        if forecast is None:
+            return _resp(404, {'error': 'no forecast'})
+        return _resp(200, forecast)
+    except Exception as e:
+        return _resp(500, {'error': str(e)})
+
+
+def _records_route():
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        records = _fetch_station_records(mac)
+        if records is None:
+            return _resp(404, {'error': 'no records'})
+        return _resp(200, records)
+    except Exception as e:
+        return _resp(500, {'error': str(e)})
+
+
+def _climate_context_route():
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        table = get_table(READINGS_TABLE)
+        result = table.query(
+            KeyConditionExpression=Key('station_id').eq(mac),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = result.get('Items', [])
+        if not items:
+            return _resp(503, {'error': 'no data'})
+
+        reading = _floatify(items[0])
+        now = datetime.now(timezone.utc).astimezone(STATION_TZ)
+        doy = now.strftime('%m%d')
+        doy_hour = f"{doy}-{now.hour:02d}"
+
+        daily_summary = _fetch_latest_summary(mac)
+        climate_doy = _fetch_climate_doy(mac, doy)
+        climate_hourly = _fetch_climate_hourly(mac, doy_hour)
+
+        climate_live = live_context(reading, climate_hourly, doy)
+        today_high = daily_summary.get('temp_high') if daily_summary else None
+        today_low = daily_summary.get('temp_low') if daily_summary else None
+        climate_verdict = daily_verdict(today_high, today_low, climate_doy, doy) if today_high else None
+        climate_mode = 'daily' if climate_verdict else 'live'
+        climate_headline = anomaly_headline(climate_live, climate_verdict)
+
+        return _resp(200, {
+            'mode': climate_mode,
+            'headline': climate_headline,
+            'metrics': climate_live['metrics'] if climate_live else {},
+            'verdict': climate_verdict,
+        })
+    except Exception as e:
+        return _resp(500, {'error': str(e)})
+
+
+def _export_route(days: int, fmt: str):
+    """Export raw readings for the last N days (JSON or CSV)."""
+    try:
+        station = get_secret(STATION_SECRET)
+        mac = station['mac_address']
+        table = get_table(READINGS_TABLE)
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        items, kwargs = [], dict(
+            KeyConditionExpression=Key('station_id').eq(mac) & Key('timestamp').gte(since),
+            ScanIndexForward=True,
+        )
+        while True:
+            result = table.query(**kwargs)
+            items.extend(result.get('Items', []))
+            last = result.get('LastEvaluatedKey')
+            if not last:
+                break
+            kwargs['ExclusiveStartKey'] = last
+
+        rows = [_floatify(r) for r in items]
+        fields = ['timestamp', 'tempf', 'humidity', 'windspeedmph', 'windgustmph', 'winddir',
+                  'baromrelin', 'hourlyrainin', 'dailyrainin', 'uv', 'solarradiation', 'uhi_delta']
+
+        if fmt == 'csv':
+            import io, csv
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=fields, extrasaction='ignore')
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: row.get(k) for k in fields})
+            return {
+                'statusCode': 200,
+                'headers': {
+                    **CORS_HEADERS,
+                    'Content-Type': 'text/csv; charset=utf-8',
+                    'Content-Disposition': f'attachment; filename="wx-export-{days}d.csv"',
+                },
+                'body': buf.getvalue(),
+            }
+
+        return _resp(200, {'readings': rows, 'count': len(rows), 'days': days})
+    except Exception as e:
+        return _resp(500, {'error': str(e)})
+
+
+def _openapi_route():
+    spec = {
+        'openapi': '3.0.3',
+        'info': {
+            'title': 'wx.jamestannahill.com API',
+            'version': '1.0.0',
+            'description': 'Public read-only weather API for Midtown Manhattan PWS KNYNEWYO2140.',
+        },
+        'servers': [{'url': 'https://api.wx.jamestannahill.com'}],
+        'paths': {
+            '/health': {'get': {'summary': 'Health and data freshness'}},
+            '/current': {'get': {'summary': 'Latest reading with ML signals'}},
+            '/history': {'get': {'summary': 'Historical readings', 'parameters': [{'name': 'hours', 'in': 'query', 'schema': {'type': 'integer', 'default': 24}}]}},
+            '/rain-events': {'get': {'summary': 'Parsed rain events'}},
+            '/daily-summaries': {'get': {'summary': 'Daily prose summaries'}},
+            '/nearby': {'get': {'summary': 'Nearby PWS snapshot with per-station and network-level temperature variance ratios'}},
+            '/forecast': {'get': {'summary': 'Analog forecast'}},
+            '/records': {'get': {'summary': 'Station records'}},
+            '/climate-context': {'get': {'summary': 'NOAA/ERA5 climate context'}},
+            '/alerts': {'get': {'summary': 'Active NWS alerts'}},
+            '/export': {'get': {'summary': 'Bulk export (json or csv)'}},
+        },
+    }
+    return _resp(200, spec)
 
 
 def _resp(status: int, body: dict) -> dict:

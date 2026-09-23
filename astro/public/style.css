@@ -498,6 +498,30 @@ button.card-clickable {
 .ratio-mid  { color: #c8b97a; }
 .ratio-high { color: #d98b5f; }
 
+/* ── NWS alerts banner ───────────────────────────────────────────────────── */
+.alerts-banner {
+  background: #1a1200;
+  border: 1px solid #3d2e0a;
+  color: #f59e0b;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 3px;
+}
+
+/* ── Rain events ─────────────────────────────────────────────────────────── */
+.rain-events-section { margin-bottom: 48px; }
+.rain-events-list { display: flex; flex-direction: column; gap: 8px; }
+.rain-event-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border); padding: 12px 14px;
+  flex-wrap: wrap;
+}
+.rain-event-when { font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
+.rain-event-detail { font-size: 13px; color: #6aaa6a; }
+.rain-events-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+
 /* ── Source tags ─────────────────────────────────────────────────────────── */
 .source-tag {
   font-size: 10px; letter-spacing: 0.08em; color: var(--faint);

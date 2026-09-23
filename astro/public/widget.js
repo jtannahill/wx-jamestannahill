@@ -1,5 +1,5 @@
 (function() {
-  const API = 'https://d2d2b3fftwrbn2.cloudfront.net/current';
+  const API = 'https://api.wx.jamestannahill.com/current';
   const TARGET_ID = 'wx-badge';
 
   function render(data) {

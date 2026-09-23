@@ -4,13 +4,14 @@
 
 ## What this is
 
-wx.jamestannahill.com is a personal weather station dashboard operated by James Tannahill at 40.75°N 73.98°W (Midtown Manhattan, New York). The station (Ambient Weather KNYNEWYO2140, callsign CatHouz) reports temperature, humidity, wind speed and direction, barometric pressure, UV index, solar radiation, and rainfall every 5 minutes.
+wx.jamestannahill.com is a personal weather station dashboard operated by James Tannahill at 40.75°N 73.98°W (Midtown Manhattan, New York). The station (Ambient Weather KNYNEWYO2140, callsign CatHaus) reports temperature, humidity, wind speed and direction, barometric pressure, UV index, solar radiation, and rainfall every 5 minutes.
 
 The dashboard includes derived metrics not available from commercial weather services: a Microclimate Comfort Score, next-hour rain probability via logistic regression on station data, Urban Heat Island delta vs. JFK/LGA/EWR airports, a nearest-neighbor Analog Forecast engine, and 30-day station records.
 
 ## Data sources
 
-- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHouz) - private PWS, Midtown Manhattan
+- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHaus) - private PWS, Midtown Manhattan
+- **Redistribution**: the same station also feeds Weather Underground (KNYNEWYO2140), Windy.com (CatHaus, station ID 0Gpj0rbF), and NOAA CWOP (GW7880)
 - **Urban Heat Island**: NOAA ASOS readings from JFK, LGA, and EWR via aviationweather.gov
 - **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W - condition, high/low, wind
 
@@ -23,13 +24,21 @@ The dashboard includes derived metrics not available from commercial weather ser
 - `GET /daily-summaries?days=30` - Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
 - `GET /rain-events?days=30` - Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
 - `GET /nearby` - Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
+- `GET /health` - Health and data freshness. Returns `{ok, last_reading_at, data_age_minutes, poller_healthy}`.
+- `GET /forecast` - Standalone analog forecast (same shape as `forecast` in `/current`).
+- `GET /records` - Standalone station records (monthly + all-time).
+- `GET /climate-context` - NOAA/ERA5 climate context for current conditions.
+- `GET /alerts` - Active NWS alerts for the station coordinates.
+- `GET /export?days=30&format=json|csv` - Bulk export of readings.
+- `GET /openapi.json` - OpenAPI 3 specification for the public API.
 
-Note: the analog forecast, station records, and daily summary are embedded in the `GET /current` response (fields `forecast`, `station_records`, `daily_summary`). There are no standalone endpoints for them.
+The `/current` response also embeds `forecast`, `station_records`, `daily_summary`, `nws_alerts`, and `nearby_stations` for one-shot dashboard loads.
 
 ## Pages
 
-- [Dashboard](https://wx.jamestannahill.com/) - Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events
+- [Dashboard](https://wx.jamestannahill.com/) - Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events, NWS alerts
 - [How It Works](https://wx.jamestannahill.com/docs.html) - Technical documentation on data collection, processing pipeline, ML models, and the public API
+- [Embed](https://wx.jamestannahill.com/embed.html) - Badge widget and iframe embed instructions
 
 ## About the operator
 
