@@ -16,6 +16,12 @@
 /app.js
   Cache-Control: public, max-age=300
 
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+
 /style.css
   Cache-Control: public, max-age=300
 

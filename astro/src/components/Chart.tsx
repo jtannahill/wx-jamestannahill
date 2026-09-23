@@ -216,17 +216,23 @@ function makeChartGesturesPlugin() {
           mousePan = { x: e.clientX, w: over.getBoundingClientRect().width, min: sx.min, max: sx.max };
           over.style.cursor = 'grabbing';
         });
-        window.addEventListener('mousemove', (e: MouseEvent) => {
+        const onMove = (e: MouseEvent) => {
           if (!mousePan) return;
           const dxFrac = (mousePan.x - e.clientX) / mousePan.w;
           const range  = mousePan.max - mousePan.min;
           u.setScale('x', clamp(mousePan.min + dxFrac * range, mousePan.max + dxFrac * range));
-        });
-        window.addEventListener('mouseup', () => {
+        };
+        const onUp = () => {
           if (!mousePan) return;
           mousePan = null;
           over.style.cursor = isZoomed(u) ? 'grab' : '';
-        });
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        u._wxCleanup = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        };
         over.addEventListener('mouseenter', () => {
           if (!mousePan) over.style.cursor = isZoomed(u) ? 'grab' : '';
         });
@@ -361,6 +367,10 @@ export default function Chart({ apiBase }: Props) {
   const [zoomed, setZoomed] = useState<boolean>(false);
   const [hasBaseline, setHasBaseline] = useState<boolean>(false);
   const [hasRain, setHasRain] = useState<boolean>(false);
+  const [summary, setSummary] = useState<string>('');
+  const [loadError, setLoadError] = useState<boolean>(false);
+  const [reloadKey, setReloadKey] = useState<number>(0);
+  const [flashed, setFlashed] = useState<'copy' | 'share' | null>(null);
 
   // Initial unit + listen for app.js unit-toggle event
   useEffect(() => {
@@ -388,13 +398,14 @@ export default function Chart({ apiBase }: Props) {
         const r = await fetch(`${apiBase}/history?hours=${hours}`);
         if (!r.ok) throw new Error(`history ${r.status}`);
         const j = await r.json();
-        if (!cancelled) setHistory(j);
+        if (!cancelled) { setLoadError(false); setHistory(j); }
       } catch (e) {
         console.error('[chart] history fetch failed:', e);
+        if (!cancelled) setLoadError(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [apiBase, hours]);
+  }, [apiBase, hours, reloadKey]);
 
   // (Re)render uPlot whenever data, field, or unit changes
   useEffect(() => {
@@ -423,9 +434,17 @@ export default function Chart({ apiBase }: Props) {
     const maxRain = Math.max(0.01, ...rain.filter((v: any) => v != null && isFinite(v)));
 
     setHasBaseline(base.some((v: any) => v != null));
+    {
+      const nums = vals.filter((v: any) => v != null && isFinite(v)) as number[];
+      if (nums.length) {
+        const f = (v: number) => `${v.toFixed(cfg.decimals)}${cfg.unit}`;
+        const lo = Math.min(...nums), hi = Math.max(...nums), last = nums[nums.length - 1];
+        setSummary(`${cfg.label}, last ${RANGE_LABELS[hours] || `${hours} hours`}: low ${f(lo)}, high ${f(hi)}, latest ${f(last)}`);
+      }
+    }
     setHasRain(rain.some((v: any) => v != null && v > 0));
 
-    if (uplotRef.current) { uplotRef.current.destroy(); uplotRef.current = null; }
+    if (uplotRef.current) { uplotRef.current._wxCleanup?.(); uplotRef.current.destroy(); uplotRef.current = null; }
     wrap.innerHTML = '';
     const W = Math.max(100, Math.floor(wrap.getBoundingClientRect().width) || (window.innerWidth - 48));
     const H = window.innerWidth < 480 ? 180 : 220;
@@ -483,7 +502,7 @@ export default function Chart({ apiBase }: Props) {
       };
     } catch (e: any) {
       console.error('[wx chart]', e);
-      wrap.innerHTML = `<div style="color:#c8b97a;font-size:11px;letter-spacing:0.08em;padding:20px 16px">CHART ERROR - ${e.message}</div>`;
+      wrap.innerHTML = '<div class="wx-chart-msg">The chart could not be drawn. Refresh the page to try again.</div>';
     }
   }, [history, field, useCelsius, hours]);
 
@@ -515,6 +534,8 @@ export default function Chart({ apiBase }: Props) {
     try {
       if (navigator.clipboard && (window as any).ClipboardItem) {
         await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
+        setFlashed('copy');
+        setTimeout(() => setFlashed(null), 1100);
         return;
       }
     } catch (e) { console.warn('[copy chart]', e); }
@@ -539,6 +560,8 @@ export default function Chart({ apiBase }: Props) {
     try {
       if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
         await (navigator as any).share({ ...shareData, files: [file] });
+        setFlashed('share');
+        setTimeout(() => setFlashed(null), 1100);
         return;
       }
       if (navigator.share) { await navigator.share(shareData); return; }
@@ -561,26 +584,32 @@ export default function Chart({ apiBase }: Props) {
         <h2 class="section-title">HISTORY</h2>
         <div class="chart-actions">
           {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>}
-          <button class="chart-action-btn" title="Copy chart" aria-label="Copy chart" onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
-          <button class="chart-action-btn" title="Share chart" aria-label="Share chart" onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
+          <button class={`chart-action-btn${flashed === 'copy' ? ' flash' : ''}`} title="Copy chart" aria-label={flashed === 'copy' ? 'Chart copied' : 'Copy chart'} onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
+          <button class={`chart-action-btn${flashed === 'share' ? ' flash' : ''}`} title="Share chart" aria-label={flashed === 'share' ? 'Chart shared' : 'Share chart'} onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
           <a class="source-tag has-tooltip" href="/docs.html#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
         </div>
       </div>
       <div class="chart-controls">
-        <div class="chart-controls-row">
+        <div class="chart-controls-row" role="group" aria-label="Chart metric">
           {FIELD_OPTIONS.map(f => (
-            <button class={`chart-btn${f === field ? ' active' : ''}`} data-field={f} onClick={() => setField(f)}>{FIELD_BTN_LABELS[f]}</button>
+            <button class={`chart-btn${f === field ? ' active' : ''}`} aria-pressed={f === field} data-field={f} onClick={() => setField(f)}>{FIELD_BTN_LABELS[f]}</button>
           ))}
         </div>
-        <div class="chart-controls-row range-row">
+        <div class="chart-controls-row range-row" role="group" aria-label="Time range">
           {HOURS_OPTIONS.map(h => (
-            <button class={`range-btn${h === hours ? ' active' : ''}`} data-hours={h} onClick={() => setHours(h)}>
+            <button class={`range-btn${h === hours ? ' active' : ''}`} aria-pressed={h === hours} data-hours={h} onClick={() => setHours(h)}>
               {h === 12 ? '12h' : h === 24 ? '24h' : h === 168 ? '7d' : '30d'}
             </button>
           ))}
         </div>
       </div>
-      <div ref={wrapRef} class="wx-chart-wrap" />
+      {loadError && !history && (
+        <div class="wx-chart-msg" role="status">
+          Chart history did not load.
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)}>Try again</button>
+        </div>
+      )}
+      <div ref={wrapRef} class="wx-chart-wrap" role="img" aria-label={summary || 'History chart, loading'} hidden={loadError && !history} />
       <div class="chart-legend">
         <span class="chart-legend-item"><span class="chart-legend-swatch swatch-observed"></span>Observed</span>
         {hasBaseline && (
@@ -591,7 +620,7 @@ export default function Chart({ apiBase }: Props) {
         )}
         {hasRain && <span class="chart-legend-item"><span class="chart-legend-swatch swatch-rain"></span>Rainfall</span>}
       </div>
-      <div class="chart-hint">Scroll or pinch to zoom, drag to pan, double-click to reset</div>
+      <div class="chart-hint">Scroll or pinch to zoom, drag to pan, double-click or use Reset zoom to reset</div>
     </section>
   );
 }

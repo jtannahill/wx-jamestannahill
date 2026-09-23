@@ -8,7 +8,7 @@
   /* Muted tiers. Both clear 4.5:1 on the ground: nothing on the page is set
      fainter than --faint. */
   --muted: #8e8e8e;
-  --faint: #7a7a7a;
+  --faint: #808080;
   --accent: #e8e0d0;
   --anomaly: #c8b97a;
   --blue: #5a9ad0;
@@ -33,7 +33,7 @@ button:focus-visible, a:focus-visible,
 button { transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s; }
 button:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
-  button { transition: border-color 0.15s, color 0.15s; }
+  button, .unit-toggle, .share-btn, .refresh-btn, .chart-action-btn, .chart-btn, .range-btn { transition: border-color 0.15s, color 0.15s; }
   button:active { transform: none; }
 }
 
@@ -75,14 +75,16 @@ header {
   padding: 2px 0; flex-shrink: 0;
   transition: color 0.15s;
 }
-.jump-row a:hover { color: var(--accent); }
+@media (hover: hover) and (pointer: fine) {
+  .jump-row a:hover { color: var(--accent); }
+}
 .station-label { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
-.updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
+.updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .unit-toggle {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 11px; letter-spacing: 0.08em; width: 36px; height: 36px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
+  transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0; font-family: inherit; font-weight: 500;
 }
@@ -94,7 +96,7 @@ header {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 14px; width: 44px; height: 44px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
+  transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0; font-family: inherit;
 }
@@ -106,7 +108,7 @@ header {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 16px; width: 44px; height: 44px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
+  transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s; padding: 0; margin-left: 8px;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
 }
@@ -261,7 +263,7 @@ button.card-clickable {
   width: 36px; height: 36px; cursor: pointer; padding: 0;
   font-family: inherit; font-size: 13px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
+  transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -284,7 +286,7 @@ button.card-clickable {
 .chart-btn, .range-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   padding: 6px 14px; font-family: var(--font); font-size: 12px;
-  letter-spacing: 0.08em; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  letter-spacing: 0.08em; cursor: pointer; transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s;
   min-height: 44px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -429,7 +431,7 @@ button.card-clickable {
   flex-shrink: 0;
 }
 .comfort-cell-label {
-  font-size: 10px; color: rgba(0,0,0,0.78); letter-spacing: 0.02em; line-height: 1; font-weight: 500;
+  font-size: 10px; color: #fff; letter-spacing: 0.02em; line-height: 1; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 /* What the shade means. Same hue ramp the cells use. */
@@ -453,7 +455,7 @@ button.card-clickable {
 }
 .record-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
 .record-value { font-size: 24px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.record-date  { font-size: 11px; color: var(--faint); margin-top: 4px; }
+.record-date  { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
 
 /* ── Nearby Stations ─────────────────────────────────────────────────────── */
@@ -467,7 +469,7 @@ button.card-clickable {
 }
 .nearby-chip-id { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
 .nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.nearby-chip-rain { font-size: 11px; color: #6aaa6a; margin-top: 3px; }
+.nearby-chip-rain { font-size: 11px; color: var(--blue); margin-top: 3px; }
 .nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 /* Per-station departure from our reading, and the station's position within
@@ -519,7 +521,7 @@ button.card-clickable {
   flex-wrap: wrap;
 }
 .rain-event-when { font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
-.rain-event-detail { font-size: 13px; color: #6aaa6a; }
+.rain-event-detail { font-size: 13px; color: var(--blue); font-variant-numeric: tabular-nums; }
 .rain-events-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
 
 /* ── Source tags ─────────────────────────────────────────────────────────── */
@@ -540,7 +542,9 @@ a.source-tag { text-decoration: none; transition: color 0.15s, border-color 0.15
   font-size: 10px; color: var(--faint); text-decoration: none;
   border-bottom: 1px dotted #444;
 }
-.era5-chip:hover { color: var(--muted); border-bottom-color: #666; }
+@media (hover: hover) and (pointer: fine) {
+  .era5-chip:hover { color: var(--muted); border-bottom-color: #666; }
+}
 
 /* section-header already has flex; source-tag goes on the right */
 .section-source-row {
@@ -643,6 +647,18 @@ footer a { color: var(--muted); text-decoration: underline; }
 }
 @media (max-width: 480px) {
   .wx-chart-wrap:empty { min-height: 180px; }
+}
+/* Loaded frame = plot height + 24px padding + 2px border; reserve it up front. */
+.wx-chart-wrap { min-height: 246px; }
+@media (max-width: 480px) { .wx-chart-wrap { min-height: 206px; } }
+.wx-chart-msg { color: var(--muted); font-size: 12px; padding: 20px 16px; }
+.wx-chart-msg button {
+  margin-left: 10px; background: none; border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: 12px; padding: 6px 12px; min-height: 36px; cursor: pointer;
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .wx-chart-wrap:empty { animation: none; background: #0e0e0e; }

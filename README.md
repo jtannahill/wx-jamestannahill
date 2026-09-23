@@ -23,7 +23,7 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 - **Today in History**: daily verdict panel backed by 156 years of NOAA Central Park records and 85 years of ERA5 reanalysis. Shows whether today's high and low are hotter/cooler/normal vs. the historical average, with deviation bars spanning p5→p95 in actual °F and a tick at the long-run mean
 - **WeatherKit forecast**: Apple WeatherKit 7-day outlook with daily high/low, condition, precipitation probability, and UV index
 - **NWS alerts**: active National Weather Service warnings for the station coordinates (via api.weather.gov)
-- **Nearby stations**: personal weather stations in the area with current conditions for local comparison
+- **Nearby stations**: Weather Underground personal weather stations in the area (the home station excluded) with current conditions for local comparison
 - **Comfort calendar**: 30-day heatmap grid, color-coded by daily comfort score (0–100)
 - **Station records**: current-month extremes: temp high/low, max gust, peak rain rate, pressure range, each with the date it was set
 - **Analog forecast**: +1h/+2h/+3h predictions via nearest-neighbor pattern matching on 90 days of station data, with running MAE accuracy
@@ -144,7 +144,7 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 | Storage | AWS DynamoDB (on-demand, 12 tables) |
 | API | AWS API Gateway HTTP API |
 | CDN | AWS CloudFront (API only); Cloudflare Workers (dashboard + OG) |
-| Dashboard | Astro 6 server-rendered on Cloudflare Workers, Preact island for the chart, vanilla JS for everything else, uPlot, NHG Display font |
+| Dashboard | Astro 6 server-rendered on Cloudflare Workers, Preact island for the chart, vanilla JS for everything else, uPlot, NHG Display font; design rules in `astro/DESIGN.md` |
 | OG image | Generated at the edge via workers-og (Satori + resvg-wasm), bundled NHG Display TTF |
 | IaC | AWS CDK (Python) |
 | Email | AWS SES |

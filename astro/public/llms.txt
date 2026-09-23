@@ -38,7 +38,7 @@ The `/current` response also embeds `forecast`, `station_records`, `daily_summar
 
 - [Dashboard](https://wx.jamestannahill.com/) - Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events, NWS alerts
 - [How It Works](https://wx.jamestannahill.com/docs.html) - Technical documentation on data collection, processing pipeline, ML models, and the public API
-- [Embed](https://wx.jamestannahill.com/embed.html) - Badge widget and iframe embed instructions
+- [Embed](https://wx.jamestannahill.com/embed.html) - Badge widget embed instructions
 
 ## About the operator
 
