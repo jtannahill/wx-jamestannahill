@@ -4,13 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>wx.jamestannahill.com - Embed Live Weather</title>
-  <meta name="description" content="Add a live Midtown Manhattan weather badge to any page with one script tag. Data refreshes every 5 minutes.">
+  <meta name="description" content="Add a live Midtown Manhattan weather badge to any page with one script tag. It shows the latest reading from the public API, which updates every 5 minutes.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://wx.jamestannahill.com/embed.html">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:site_name" content="wx.jamestannahill.com">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://wx.jamestannahill.com/embed.html">
+  <meta property="og:title" content="wx.jamestannahill.com - Embed Live Weather">
+  <meta property="og:description" content="Add a live Midtown Manhattan weather badge to any page with one script tag.">
+  <meta property="og:image" content="https://wx.jamestannahill.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@jamestannahill">
+  <link rel="preconnect" href="https://fonts.jamestannahill.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.jamestannahill.com/nhg-display.css">
   <link rel="stylesheet" href="/style.css">
   <style>
-    body { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    main { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-weight: 500; }
+    .embed-label { font-size: 11px; letter-spacing: 0.12em; color: #8e8e8e; margin: 24px 0 8px; font-weight: 500; }
+    #wx-badge { min-height: 44px; }
     pre { background: #111; border: 1px solid #222; padding: 14px; overflow-x: auto; font-size: 13px; }
     h1 { font-size: 22px; margin-bottom: 8px; }
     p { color: #8a9bb0; line-height: 1.6; }
@@ -18,17 +36,19 @@
   </style>
 </head>
 <body>
+<main>
   <h1>Embed live weather</h1>
-  <p>Add a live Midtown Manhattan weather badge to any page. Data refreshes every 5 minutes from <a href="https://api.wx.jamestannahill.com/current">the public API</a>.</p>
+  <p>Add a live Midtown Manhattan weather badge to any page. It shows the latest reading from <a href="https://api.wx.jamestannahill.com/current">the public API</a>, which updates every 5 minutes.</p>
 
-  <h2 style="font-size:11px;letter-spacing:0.12em;color:#8e8e8e;margin:24px 0 8px">HTML</h2>
-  <pre>&lt;div id="wx-badge"&gt;&lt;/div&gt;
+  <h2 class="embed-label">HTML</h2>
+  <pre tabindex="0" aria-label="Embed code">&lt;div id="wx-badge"&gt;&lt;/div&gt;
 &lt;script src="https://wx.jamestannahill.com/widget.js"&gt;&lt;/script&gt;</pre>
 
-  <h2 style="font-size:11px;letter-spacing:0.12em;color:#8e8e8e;margin:24px 0 8px">Preview</h2>
-  <div id="wx-badge" style="padding:12px 0;font-size:15px"></div>
+  <h2 class="embed-label">PREVIEW</h2>
+  <div id="wx-badge" style="padding:12px 0;font-size:15px">Loading live reading</div>
   <script src="/widget.js"></script>
 
-  <p style="margin-top:32px"><a href="/">← Dashboard</a> · <a href="/docs.html">How It Works</a></p>
+  <p style="margin-top:32px"><a href="/"><span aria-hidden="true">←</span> Dashboard</a> · <a href="/docs.html">How It Works</a></p>
+</main>
 </body>
 </html>

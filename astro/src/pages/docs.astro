@@ -34,7 +34,16 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
       margin-top: 18px;
     }
     .docs-byline a { color: #888; text-decoration: none; border-bottom: 1px dotted #444; }
-    .docs-byline a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    @media (hover: hover) and (pointer: fine) {
+      .docs-byline a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+      .back-link:hover { color: var(--accent); }
+      .docs-body > p a:hover, .docs-body td a:hover, .docs-body li a:hover { text-decoration-color: var(--accent); }
+    }
+    .docs-body > p a, .docs-body td a, .docs-body li a { color: var(--accent); text-decoration: underline; text-decoration-color: #555; text-underline-offset: 3px; }
+    h1, h2 { text-wrap: balance; }
+    h3 { font-size: 17px; font-weight: 500; letter-spacing: -0.005em; line-height: 1.3; margin: 32px 0 12px; color: var(--text); text-wrap: balance; }
+    p, li { text-wrap: pretty; }
+    p, td { overflow-wrap: anywhere; }
     .docs-meta-strip {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -58,6 +67,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
       h1 { font-size: 34px; }
       .docs-meta-strip { grid-template-columns: repeat(2, 1fr); }
       .docs-meta-cell { padding: 12px 14px; }
+      table { display: block; overflow-x: auto; }
     }
     ul { padding-left: 20px; margin-bottom: 16px; }
     li { font-size: 15px; line-height: 1.75; color: #ccc; }
@@ -68,6 +78,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
       border: 1px solid var(--border);
       padding: 2px 6px;
       color: var(--accent);
+      overflow-wrap: anywhere;
     }
     pre {
       background: var(--surface);
@@ -76,10 +87,9 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
       overflow-x: auto;
       margin-bottom: 16px;
     }
-    pre code { background: none; border: none; padding: 0; font-size: 13px; line-height: 1.6; }
+    pre code { background: none; border: none; padding: 0; font-size: 13px; line-height: 1.6; overflow-wrap: normal; }
     .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
     .back-link { font-size: 12px; letter-spacing: 0.08em; color: var(--muted); text-decoration: none; }
-    .back-link:hover { color: var(--accent); }
     table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
     th { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
     td { font-size: 14px; color: #ccc; padding: 8px 12px; border-bottom: 1px solid #1a1a1a; vertical-align: top; }
@@ -89,13 +99,13 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 
   <main class="docs-body">
     <header>
-      <a class="back-link" href="/">← wx.jamestannahill.com</a>
+      <a class="back-link" href="/"><span aria-hidden="true">←</span> wx.jamestannahill.com</a>
     </header>
 
     <section style="margin: 48px 0 56px;">
       <div class="docs-kicker">TECHNICAL OVERVIEW</div>
       <h1>How It Works</h1>
-      <p class="lead">wx.jamestannahill.com publishes live hyperlocal weather from a private station in Midtown Manhattan. Below is the full data pipeline - physical sensor, AWS Lambdas, ML signals, and 156 years of climate context - that produces every reading on the dashboard.</p>
+      <p class="lead">wx.jamestannahill.com publishes live hyperlocal weather from a private station in Midtown Manhattan. Below is the full data pipeline behind every reading on the dashboard: the physical sensor, AWS Lambdas, ML signals, and 156 years of climate context.</p>
       <p class="docs-byline">By <a href="https://jamestannahill.com" target="_blank" rel="noopener">James Tannahill</a> &nbsp;·&nbsp; <a href="https://github.com/jtannahill/wx-jamestannahill" target="_blank" rel="noopener">Source on GitHub</a> &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener">Public API</a></p>
       <div class="docs-meta-strip">
         <div class="docs-meta-cell">
@@ -112,7 +122,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
         </div>
         <div class="docs-meta-cell">
           <div class="docs-meta-label">Stack</div>
-          <div class="docs-meta-value">AWS · Python · uPlot</div>
+          <div class="docs-meta-value">AWS · Cloudflare · Astro</div>
         </div>
       </div>
     </section>
@@ -123,7 +133,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <p>The station is an <a href="https://www.ambientweather.com/ws-2902" target="_blank" rel="noopener"><strong>Ambient Weather WS-2902</strong></a> mounted at the property, callsign <strong>CatHaus</strong>. On the dashboard, every reading or signal tagged <strong>CATHAUS</strong> comes from this station: its raw sensors plus the in-house statistics and ML layer (anomalies, comfort score, analog forecast, records) described below. It transmits readings every 5 minutes to Ambient Weather's cloud via a local Wi-Fi gateway and is also registered with Weather Underground as <strong>KNYNEWYO2140</strong>, with <a href="https://stations.windy.com/" target="_blank" rel="noopener">Windy.com</a> as <strong>CatHaus</strong> (station ID <code>0Gpj0rbF</code>), and with NOAA's <a href="https://www.weather.gov/gsp/cwop" target="_blank" rel="noopener">Citizen Weather Observer Program</a> as <strong>GW7880</strong>. Live readings are visible at <a href="https://ambientweather.net/dashboard/4d5daff008263473b2bb72e0d64f5c35" target="_blank" rel="noopener">ambientweather.net</a>, <a href="https://preview.wunderground.com/dashboard/pws/KNYNEWYO2140" target="_blank" rel="noopener">wunderground.com/dashboard/pws/KNYNEWYO2140</a>, and <a href="https://www.findu.com/cgi-bin/wxpage.cgi?call=GW7880" target="_blank" rel="noopener">findu.com/GW7880</a>.</p>
     <p>The Windy and CWOP feeds are pushed by a separate Google Apps Script forwarder that reads the same Ambient Weather cloud record, so they run independently of the AWS pipeline described below. Windy receives an observation every 5 minutes; CWOP packets are relayed into APRS-IS via <code>cwop.aprs.net</code>.</p>
     <p>A scheduled AWS Lambda (<code>wx-poller</code>) fires every 5 minutes via EventBridge and calls the Ambient Weather REST API to fetch the latest reading:</p>
-    <pre><code>GET https://api.ambientweather.net/v1/devices/&#123;mac&#125;
+    <pre tabindex="0"><code>GET https://api.ambientweather.net/v1/devices/&#123;mac&#125;
     ?apiKey=...&applicationKey=...&limit=1</code></pre>
     <p>Each reading includes:</p>
     <table>
@@ -143,14 +153,14 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
         <tr><td><code>dailyrainin</code></td><td>Total rainfall since local midnight (in)</td></tr>
       </tbody>
     </table>
-    <p>On each poll, the poller also fetches the current METAR UHI delta from NOAA (see <em>Urban Heat Island</em> below) and appends it as a <code>uhi_delta</code> field on the reading before storing it. Raw readings are written to DynamoDB (<code>wx-readings</code>) with a 90-day TTL. The poller also generates and uploads a fresh OG image (<code>og.png</code>) to S3 on each run.</p>
+    <p>On each poll, the poller also fetches the current METAR UHI delta from NOAA (see <em>Urban Heat Island</em> below) and appends it as a <code>uhi_delta</code> field on the reading before storing it. Raw readings are written to DynamoDB (<code>wx-readings</code>) with a 90-day TTL.</p>
 
     <hr class="divider">
 
     <h2>SOURCE VALIDATION</h2>
     <p>Before storing a reading, the poller runs two quality checks:</p>
     <ul>
-      <li><strong>Range check</strong> - each field is tested against physical bounds (e.g., temperature −40°F to 140°F, humidity 0–100%). Fields that fall outside the bounds are nulled and the reading is flagged <code>range_error</code>.</li>
+      <li><strong>Range check</strong> - each field is tested against physical bounds (e.g., temperature −40°F to 130°F, humidity 0–100%). Fields that fall outside the bounds are nulled and the reading is flagged <code>range_error</code>.</li>
       <li><strong>Stuck sensor detection</strong> - if the last 6 temperature readings are identical, the reading is flagged <code>stuck</code>. This catches a common failure mode in home weather stations where the outdoor sensor freezes on a stale value.</li>
     </ul>
     <p>Flagged readings are still stored in <code>wx-readings</code> so the history is complete, but they are excluded from baseline updates. The dashboard shows a banner when the station data is stale or suspect.</p>
@@ -158,8 +168,8 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <hr class="divider">
 
     <h2>HISTORICAL BACKFILL - WEATHER UNDERGROUND</h2>
-    <p>When the station was first set up, the baseline table had no station data. To bootstrap it with real hyperlocal history, a one-time backfill script fetched 90 days of 5-minute readings from <strong>Weather Underground's PWS history API</strong> for the nearest private station (KNYNEWYO2140):</p>
-    <pre><code>GET https://api.weather.com/v2/pws/history/all
+    <p>When the station was first set up, the baseline table had no station data. To bootstrap it with real hyperlocal history, a one-time backfill script fetched 90 days of 5-minute readings from <strong>Weather Underground's PWS history API</strong> for this station's own Weather Underground ID (KNYNEWYO2140):</p>
+    <pre tabindex="0"><code>GET https://api.weather.com/v2/pws/history/all
     ?stationId=KNYNEWYO2140&format=json&units=e
     &date=20260115&apiKey=...</code></pre>
     <p>This produced <strong>24,914 readings</strong> going back 90 days, which were written to <code>wx-readings</code> and used to seed the <code>wx-daily-stats</code> rolling averages. The baseline is now grounded in real local station data rather than climate reanalysis alone.</p>
@@ -169,7 +179,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <h2 id="era5">BASELINES - OPEN-METEO ERA5</h2>
     <p>Anomaly labels ("8.2°F above average for 9am in April") require historical climate normals for this exact location. The initial seed uses <strong>Open-Meteo's ERA5 reanalysis archive</strong>, ECMWF's climate reanalysis dataset, actual measured atmospheric data going back to 1940, free and public. Wherever the dashboard tags a value <strong>(ERA5)</strong>, that number is benchmarked against this reanalysis baseline rather than the station's own history.</p>
     <p>A bootstrap Lambda fetches the 14th of each month for 2019–2023 (5 years × 12 months) at the station's coordinates and averages the hourly values into per-month-per-hour climate normals:</p>
-    <pre><code>GET https://archive-api.open-meteo.com/v1/archive
+    <pre tabindex="0"><code>GET https://archive-api.open-meteo.com/v1/archive
     ?latitude=40.7549&longitude=-73.984
     &start_date=2021-04-14&end_date=2021-04-14
     &hourly=temperature_2m,relativehumidity_2m,
@@ -183,7 +193,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
     <p>Separate from the rolling-average baseline system, the dashboard surfaces a deeper historical perspective: how does today's temperature rank against every recorded year at Central Park? This uses two independent data sources - <strong>NOAA GHCN-Daily</strong> for 156 years of station records, and <strong>ERA5 reanalysis</strong> for 85 years of hourly distribution data.</p>
 
     <p><strong>NOAA GHCN-Daily (daily high/low context).</strong> Station <code>USW00094728</code> ("NY CITY CNTRL PARK") has daily temperature records going back to 1869. The data is fetched directly from NOAA's public S3 bucket in long format and parsed into per-DOY (day-of-year) distributions:</p>
-    <pre><code>s3://noaa-ghcn-pds/csv/by_station/USW00094728.csv
+    <pre tabindex="0"><code>s3://noaa-ghcn-pds/csv/by_station/USW00094728.csv
 # format: ID, DATE (YYYYMMDD), ELEMENT, DATA_VALUE, ...
 # elements: TMAX, TMIN, AWND (daily high, low, avg wind)</code></pre>
     <p>A bootstrap Lambda (<code>WxClimateBootstrap</code>) runs once to load all years, compute per-DOY statistics, and write them to the <code>wx-climate-doy</code> DynamoDB table, 366 rows keyed by <code>MMDD</code>. A nightly Lambda (<code>WxClimateUpdater</code>) refreshes the current year's data each night. Each row stores:</p>
@@ -203,7 +213,7 @@ import SchemaOrgDocs from '../components/SchemaOrgDocs.astro';
 
     <h2>ANOMALY SCORING</h2>
     <p>On every <code>/current</code> request, the API looks up the baseline for the current month and hour (New York local time) and computes a delta:</p>
-    <pre><code>delta = current_value − rolling_avg_value
+    <pre tabindex="0"><code>delta = current_value − rolling_avg_value
 label = "8.2°F above average for 9am in April"</code></pre>
     <p>Anomalies are computed for temperature, humidity, wind speed, and UV index. The dashboard surfaces the most notable one as a headline subline beneath the main temperature. Baselines are keyed by <code>MM-HH</code> (month + local hour). When a NOAA GHCN verdict is available, it takes precedence over the rolling-average anomaly label in the headline. The two systems run in parallel and complement each other.</p>
 
@@ -269,7 +279,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <hr class="divider">
 
     <h2>NEARBY STATIONS</h2>
-    <p>Every 5 minutes, alongside the primary station reading, the poller fetches up to 20 nearby Personal Weather Stations from the Weather Underground API using the geocode endpoint (centered on 40.7549°N, 73.984°W). Each result is filtered to exclude the home station (distance &lt; 0.05 mi) and sorted by distance. The snapshot - station ID, temperature, humidity, rain rate, wind, bearing, and distance - is written to the <code>wx-nearby-snapshots</code> DynamoDB table with a 30-day TTL.</p>
+    <p>Every 30 minutes, alongside the primary station reading, the poller fetches up to 20 nearby Personal Weather Stations from the Weather Underground API using the geocode endpoint (centered on 40.7549°N, 73.984°W). Each result is filtered to exclude the home station (distance &lt; 0.05 mi) and sorted by distance. The snapshot - station ID, temperature, humidity, rain rate, wind, bearing, and distance - is written to the <code>wx-nearby-snapshots</code> DynamoDB table with a 30-day TTL.</p>
     <p>The <code>/nearby</code> API endpoint returns the most recent snapshot. The dashboard Nearby Stations strip shows up to 8 of the closest stations with their current temperature and rain rate.</p>
 
     <h3>Network variance ratio</h3>
@@ -282,9 +292,9 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
     <h2>SPATIAL RAIN BOOST</h2>
     <p>When nearby station data is available, the rain probability estimate is augmented with a spatial boost from upwind stations. A station is considered "upwind" if its bearing from the home station falls within ±60° of the current wind direction. The boost formula is:</p>
-    <pre><code>boost = min(0.35, √rain_rate × 0.25 / distance_mi)</code></pre>
-    <p>where <code>rain_rate</code> is in inches per hour and <code>distance_mi</code> is the straight-line distance. The boost is additive to the logistic regression base probability (capped at 0.99). The contributing station ID is surfaced in the dashboard as a "↑ boosted" annotation on the rain probability card when a boost is applied.</p>
-    <p>This is Phase 1 of the spatial rain model. Phase 2 (retraining the logistic regression with spatial features as explicit inputs) is deferred until 30+ days of nearby snapshot history accumulates.</p>
+    <pre tabindex="0"><code>boost = min(0.35, √rain_rate × 0.25 / distance_mi)</code></pre>
+    <p>where <code>rain_rate</code> is in inches per hour and <code>distance_mi</code> is the straight-line distance. The boost is additive to the logistic regression base probability (capped at 0.99). When a boost is applied, the rain probability card names the contributing station ("&lt;label&gt;, from &lt;station&gt;").</p>
+    <p>Once 100 or more nearby snapshots exist, the weekly fitter also trains spatial features as explicit model inputs. The runtime boost above applies only while the base 5-feature model is in use.</p>
 
     <hr class="divider">
 
@@ -353,9 +363,9 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
     <h2>CHART ANOMALY BANDS</h2>
     <p>In addition to the dotted baseline overlay, the history chart shows a shaded ±1σ band for each metric. The upper and lower edges of the band are <code>baseline ± std_dev</code>, where the standard deviation is computed incrementally by the poller using <strong>Welford's online algorithm</strong>:</p>
-    <pre><code>new_var = (old_var × n + (x − old_mean) × (x − new_mean)) / (n + 1)</code></pre>
+    <pre tabindex="0"><code>new_var = (old_var × n + (x − old_mean) × (x − new_mean)) / (n + 1)</code></pre>
     <p>This allows variance to be updated in O(1) per reading without storing all historical values. Once the rolling sample count reaches 8,640 (30 days × 288 readings/day), the algorithm transitions to exponential moving average variance to prevent very old data from dominating:</p>
-    <pre><code>new_var = (1 − α) × old_var + α × (x − old_mean)²</code></pre>
+    <pre tabindex="0"><code>new_var = (1 − α) × old_var + α × (x − old_mean)²</code></pre>
     <p>The resulting <code>std_&#123;field&#125;</code> values are stored per MM-HH baseline slot and attached to history readings by the API. The dashboard renders the band as a transparent fill between the upper and lower edges using uPlot's <code>bands</code> config, anchored to the upper and lower σ series.</p>
 
     <hr class="divider">
@@ -377,7 +387,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
       <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
       <tbody>
         <tr>
-          <td><a href="https://api.wx.jamestannahill.com/current" target="_blank"><code>GET /current</code></a></td>
+          <td><a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener"><code>GET /current</code></a></td>
           <td>Latest reading with all ML signals: condition label, anomaly, percentile rank, comfort score, rain probability, UHI delta, seasonal UHI curve, analog forecast with accuracy, yesterday's daily summary, current-month station records, and <code>climate_context</code> (NOAA GHCN verdict + ERA5 hourly percentile with p5/p50/p95 distribution data)</td>
         </tr>
         <tr>
@@ -396,6 +406,13 @@ label = "8.2°F above average for 9am in April"</code></pre>
           <td><code>GET /nearby</code></td>
           <td>Most recent snapshot of nearby Manhattan PWS stations.</td>
         </tr>
+        <tr><td><code>GET /forecast</code></td><td>Analog forecast for the next few hours, with its accuracy history.</td></tr>
+        <tr><td><code>GET /records</code></td><td>Station records (highs, lows, gusts, rain rate, pressure extremes).</td></tr>
+        <tr><td><code>GET /climate-context</code></td><td>NOAA GHCN and ERA5 climate context for today.</td></tr>
+        <tr><td><code>GET /alerts</code></td><td>Active NWS alerts for the station's area.</td></tr>
+        <tr><td><code>GET /export</code></td><td>Bulk export of readings as JSON or CSV.</td></tr>
+        <tr><td><code>GET /health</code></td><td>Health check and data freshness.</td></tr>
+        <tr><td><code>GET /openapi.json</code></td><td>OpenAPI description of this API.</td></tr>
       </tbody>
     </table>
     <p>All responses are JSON. CloudFront caches all endpoints for 5 minutes, keyed by path and query string. CORS is open (<code>Access-Control-Allow-Origin: *</code>).</p>
@@ -405,11 +422,12 @@ label = "8.2°F above average for 9am in April"</code></pre>
     <h2>INFRASTRUCTURE</h2>
     <p>Everything runs on AWS in <code>us-east-1</code>. Estimated cost: ~$4–6/month.</p>
     <ul>
-      <li><strong>DynamoDB</strong> (on-demand, 12 tables) - <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes), <code>wx-nearby-snapshots</code> (nearby PWS readings, 30-day TTL), <code>wx-climate-doy</code> (NOAA GHCN per-DOY distributions, 366 rows), <code>wx-climate-hourly</code> (ERA5 per-DOY-hour distributions, 8,784 rows)</li>
-      <li><strong>Lambda</strong> (Python 3.12, arm64, 10 functions) - <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM), <code>WxClimateBootstrap</code> (one-time NOAA + ERA5 historical load), <code>WxClimateUpdater</code> (nightly current-year NOAA refresh)</li>
-      <li><strong>API Gateway HTTP API</strong> - routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, <code>/daily-summaries</code>, and <code>/nearby</code> to the API Lambda</li>
-      <li><strong>CloudFront</strong> - in front of both the API Gateway and the S3 dashboard bucket</li>
-      <li><strong>S3</strong> - static dashboard files, auto-generated OG image, and NOAA GHCN-Daily CSV source (<code>noaa-ghcn-pds</code>, public bucket)</li>
+      <li><strong>DynamoDB</strong> (on-demand, 13 tables) - <code>wx-readings</code> (90-day TTL), <code>wx-daily-stats</code> (baselines + std dev), <code>wx-baselines</code>, <code>wx-alerts</code> (debounce state), <code>wx-forecasts</code> (latest forecast), <code>wx-forecast-accuracy</code> (MAE history + running), <code>wx-uhi-seasonal</code> (monthly UHI averages), <code>wx-ml-models</code> (fitted model weights), <code>wx-daily-summaries</code> (daily stats + prose), <code>wx-station-records</code> (per-month extremes), <code>wx-nearby-snapshots</code> (nearby PWS readings, 30-day TTL), <code>wx-climate-doy</code> (NOAA GHCN per-DOY distributions, 366 rows), <code>wx-climate-hourly</code> (ERA5 per-DOY-hour distributions, 8,784 rows)</li>
+      <li><strong>Lambda</strong> (Python 3.12, arm64, 11 functions) - <code>wx-archiver</code> (daily 4:30 AM UTC, readings to the S3 archive), <code>wx-poller</code> (5 min), <code>wx-api</code> (on-demand), <code>wx-bootstrap</code> (one-time), <code>wx-alerter</code> (15 min), <code>wx-forecaster</code> (30 min), <code>wx-ml-fitter</code> (weekly Sun 3AM), <code>wx-summarizer</code> (daily 5AM UTC), <code>wx-records-tracker</code> (weekly Sun 2AM), <code>WxClimateBootstrap</code> (one-time NOAA + ERA5 historical load), <code>WxClimateUpdater</code> (nightly current-year NOAA refresh)</li>
+      <li><strong>API Gateway HTTP API</strong> - routes <code>/current</code>, <code>/history</code>, <code>/rain-events</code>, <code>/daily-summaries</code>, <code>/nearby</code>, <code>/forecast</code>, <code>/records</code>, <code>/climate-context</code>, <code>/alerts</code>, <code>/export</code>, <code>/health</code> and <code>/openapi.json</code> to the API Lambda</li>
+      <li><strong>CloudFront</strong> - in front of the API Gateway</li>
+      <li><strong>Cloudflare Workers</strong> - the Astro dashboard (server-rendered) and the edge-rendered OG image</li>
+      <li><strong>S3</strong> - long-term readings archive (moves to Glacier after 365 days), and the NOAA GHCN-Daily CSV source (<code>noaa-ghcn-pds</code>, public bucket)</li>
       <li><strong>EventBridge</strong> - triggers all scheduled Lambdas</li>
       <li><strong>SES</strong> - outbound email delivery for weather alerts</li>
       <li><strong>Secrets Manager</strong> - Ambient Weather API keys and station config</li>
@@ -417,7 +435,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
     <footer style="margin-top: 64px;">
       <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
-      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="/">Dashboard</a> &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a></p>
+      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="/">Dashboard</a> &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener">API</a></p>
     </footer>
   </main>
 

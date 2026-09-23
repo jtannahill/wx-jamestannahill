@@ -203,7 +203,7 @@ function makeChartGesturesPlugin() {
           if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.4) {
             e.preventDefault();
             panBy(u, e.deltaX / over.getBoundingClientRect().width);
-          } else {
+          } else if (e.ctrlKey || isZoomed(u)) {
             e.preventDefault();
             const rect = over.getBoundingClientRect();
             const cursorVal = u.posToVal(e.clientX - rect.left, 'x');
@@ -620,7 +620,7 @@ export default function Chart({ apiBase }: Props) {
         )}
         {hasRain && <span class="chart-legend-item"><span class="chart-legend-swatch swatch-rain"></span>Rainfall</span>}
       </div>
-      <div class="chart-hint">Scroll or pinch to zoom, drag to pan, double-click or use Reset zoom to reset</div>
+      <div class="chart-hint">Pinch or Ctrl+scroll to zoom, drag to pan, double-click or use Reset zoom to reset</div>
     </section>
   );
 }

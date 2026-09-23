@@ -6,7 +6,10 @@ Astro.response.status = 404;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>404 - Not Found · wx.jamestannahill.com</title>
+    <title>wx.jamestannahill.com - Page Not Found</title>
+    <meta name="description" content="This page does not exist. Return to the live Midtown Manhattan weather dashboard." />
+    <link rel="preconnect" href="https://fonts.jamestannahill.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.jamestannahill.com/nhg-display.css" />
     <meta name="robots" content="noindex" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -27,7 +30,7 @@ Astro.response.status = 404;
       h1 { font-size: 48px; font-weight: 500; letter-spacing: -0.02em; }
       p { color: #8e8e8e; font-size: 14px; }
       a { color: #e8e0d0; text-decoration: none; border-bottom: 1px solid #222; padding-bottom: 2px; }
-      a:hover { border-color: #e8e0d0; }
+      @media (hover: hover) and (pointer: fine) { a:hover { border-color: #e8e0d0; } }
     </style>
   </head>
   <body>
@@ -35,7 +38,7 @@ Astro.response.status = 404;
       <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
       <h1>404 - Not Found</h1>
       <p>That page doesn't exist.</p>
-      <a href="/">← Back to the dashboard</a>
+      <a href="/"><span aria-hidden="true">←</span> Back to the dashboard</a>
     </main>
   </body>
 </html>

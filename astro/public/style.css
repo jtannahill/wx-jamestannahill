@@ -117,6 +117,9 @@ header {
 }
 /* The arrow spins, not the bordered box around it. */
 .refresh-btn.spinning svg { animation: spin 0.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .refresh-btn.spinning svg { animation: none; opacity: 0.5; }
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .stale-banner {
@@ -212,6 +215,7 @@ button.card-clickable {
   margin-bottom: 10px;
 }
 .hourly-strip {
+  position: relative;
   display: flex;
   border: 1px solid var(--border);
   overflow-x: auto;
@@ -220,6 +224,7 @@ button.card-clickable {
 }
 .hourly-strip::-webkit-scrollbar { display: none; }  /* WebKit */
 .hourly-cell {
+  position: relative;
   flex: 1 0 auto;
   min-width: 52px;
   background: var(--surface);
@@ -640,13 +645,13 @@ footer a { color: var(--muted); text-decoration: underline; }
 /* Empty chart canvas (island not yet hydrated / history loading) gets a
    quiet shimmer block instead of a collapsed frame */
 .wx-chart-wrap:empty {
-  min-height: 220px;
+  min-height: 246px;
   background: linear-gradient(90deg, #0e0e0e 25%, #141414 40%, #0e0e0e 60%);
   background-size: 300% 100%;
   animation: skel-shimmer 2s linear infinite;
 }
 @media (max-width: 480px) {
-  .wx-chart-wrap:empty { min-height: 180px; }
+  .wx-chart-wrap:empty { min-height: 206px; }
 }
 /* Loaded frame = plot height + 24px padding + 2px border; reserve it up front. */
 .wx-chart-wrap { min-height: 246px; }
