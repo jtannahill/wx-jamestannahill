@@ -97,6 +97,9 @@ async function fetchHistory(hours = 24) {
 }
 
 // ── Current conditions ────────────────────────────────────────────────────────
+// API strings join clauses with a middle dot or an em dash; the page reads them as sentences.
+function tidyText(s) { return String(s).replace(/\s[\u00b7\u2014]\s/g, ', '); }
+
 function renderCurrent(data) {
   document.getElementById('temp').textContent = fmtT(data.tempf, 0);
   document.getElementById('temp-unit').textContent = tempUnit();
@@ -113,13 +116,13 @@ function renderCurrent(data) {
 
   const topAnomaly = data.anomalies?.temp;
   const anomalyEl = document.getElementById('anomaly-headline');
-  anomalyEl.textContent = localizeTempAnomalyLabel(topAnomaly);
+  anomalyEl.textContent = tidyText(localizeTempAnomalyLabel(topAnomaly));
   if (topAnomaly && data.baseline_sample_count > 0) {
     const n = data.baseline_sample_count.toLocaleString();
     const src = data.baseline_source === 'era5'
       ? `ERA5 climate reanalysis + ${n} station readings`
       : `${n} station readings`;
-    anomalyEl.setAttribute('data-tooltip', `Based on ${src} · 5-min weighted running average`);
+    anomalyEl.setAttribute('data-tooltip', `Based on ${src}, 5-min weighted running average`);
   } else {
     anomalyEl.removeAttribute('data-tooltip');
   }
@@ -156,7 +159,7 @@ function renderCurrent(data) {
   // Spatial boost source annotation: combine label with boost source when present
   const rainProbLabelEl = document.getElementById('rain-prob-label');
   rainProbLabelEl.textContent = rp?.spatial_source
-    ? `${rp?.label ?? '—'} · ↑ ${rp.spatial_source}`
+    ? `${rp?.label ?? '—'}, from ${rp.spatial_source}`
     : (rp?.label ?? '—');
 
   // Urban Heat Island
@@ -276,7 +279,7 @@ function renderHourlyStrip(hours) {
     const raw = h.precip_prob ?? 0;
     const pp  = Math.round(raw <= 1 ? raw * 100 : raw);
     const fullCond = cond ? cond.replace(/([a-z])([A-Z])/g, '$1 $2') : '—';
-    const tip = pp >= 10 ? `${fullCond} · ${pp}% precip` : fullCond;
+    const tip = pp >= 10 ? `${fullCond}, ${pp}% precip` : fullCond;
     return `<div class="hourly-cell has-tooltip" data-tooltip="${tip}">
       <div class="hourly-hour">${label}</div>
       <div class="hourly-glyph" aria-hidden="true">${glyph}</div>
@@ -325,7 +328,7 @@ function renderForecast(forecast, nowTempF) {
     const n = forecast.accuracy.evaluation_count;
     metaParts.push(`±${fmtD(forecast.accuracy.mae_1h_tempf, 1)}${tempUnit()} avg error (+1h, n=${n})`);
   }
-  document.getElementById('forecast-meta').textContent = metaParts.filter(Boolean).join(' · ');
+  document.getElementById('forecast-meta').textContent = metaParts.filter(Boolean).join(', ');
 
   const grid = document.getElementById('forecast-grid');
   grid.innerHTML = forecast.hours.map(h => {
@@ -430,7 +433,7 @@ function renderClimatePanel(data) {
   // Update anomaly subline
   const subline = document.getElementById('anomaly-subline');
   if (cc.headline) {
-    subline.textContent = cc.headline;
+    subline.textContent = tidyText(cc.headline);
   } else {
     subline.textContent = '';
   }
@@ -484,7 +487,7 @@ function renderClimatePanel(data) {
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
             <span class="climate-metric-value" style="color:${color}">${dispVal}${tempUnit()}
-              <span class="climate-metric-pct">${pct}th pct · ${since}</span>
+              <span class="climate-metric-pct">${pct}th pct, ${since}</span>
             </span>
           </div>
           ${barHtml}
@@ -507,12 +510,12 @@ function renderClimatePanel(data) {
 
     const yrs = verdict.temp_high?.years_of_data ?? 156;
     document.getElementById('climate-footer').textContent =
-      `NOAA Central Park 1869–${new Date().getFullYear()} · ${yrs} yrs`;
+      `NOAA Central Park 1869 to ${new Date().getFullYear()}, ${yrs} yrs`;
     document.getElementById('climate-source-tag').setAttribute(
       'data-tooltip',
       'NOAA GHCN-Daily station USC00305801 (Central Park). Daily high/low temperature going back to 1869.'
     );
-    document.getElementById('climate-source-tag').textContent = 'NOAA · GHCN';
+    document.getElementById('climate-source-tag').textContent = 'NOAA GHCN';
 
   } else {
     // Live mode: current percentile for temp, dewpoint, wind from ERA5
@@ -553,7 +556,7 @@ function renderClimatePanel(data) {
 
     const yrs = metrics.temp?.years_of_data ?? 85;
     document.getElementById('climate-footer').textContent =
-      `ERA5 1940–${new Date().getFullYear() - 1} · ${yrs} yrs`;
+      `ERA5 1940 to ${new Date().getFullYear() - 1}, ${yrs} yrs`;
     document.getElementById('climate-source-tag').setAttribute(
       'data-tooltip',
       'ERA5 reanalysis via Open-Meteo Archive. Hourly temperature, dew point, and wind for this exact lat/lon going back to 1940.'
@@ -592,20 +595,26 @@ function renderComfortCalendar(summaries) {
     const color = `hsl(${hue}, 55%, 30%)`;
     const d     = new Date(s.date + 'T12:00:00');
     const label = `${d.getMonth() + 1}/${d.getDate()}`;
-    const rain  = s.total_rain > 0.01 ? ` · ${Number(s.total_rain).toFixed(2)}"` : '';
-    const tip   = `${s.date}: ${score}/100 comfort · ${fmtT(s.temp_high,0)}°–${fmtT(s.temp_low,0)}${tempUnit()}${rain}`;
+    const rain  = s.total_rain > 0.01 ? `, ${Number(s.total_rain).toFixed(2)}" rain` : '';
+    const tip   = `${s.date}: ${score}/100 comfort, ${fmtT(s.temp_high,0)}° to ${fmtT(s.temp_low,0)}${tempUnit()}${rain}`;
     return `<div class="comfort-cell has-tooltip" style="background:${color}" data-tooltip="${tip}">
       <span class="comfort-cell-label">${label}</span>
     </div>`;
   }).join('');
 
   grid.removeAttribute('aria-busy');
+  if (!document.getElementById('comfort-legend')) {
+    const lg = document.createElement('div');
+    lg.id = 'comfort-legend'; lg.className = 'comfort-legend';
+    lg.innerHTML = '<span>Less comfortable</span><span class="comfort-legend-bar" aria-hidden="true"></span><span>More comfortable</span>';
+    grid.insertAdjacentElement('afterend', lg);
+  }
 
   // Re-bind tooltip to dynamically created cells
   grid.querySelectorAll('.has-tooltip').forEach(bindTip);
 
   const avg = Math.round(summaries.reduce((s, d) => s + (d.avg_comfort ?? 0), 0) / summaries.length);
-  document.getElementById('comfort-meta').textContent = `${summaries.length}-day avg · ${avg}/100`;
+  document.getElementById('comfort-meta').textContent = `${summaries.length}-day avg ${avg}/100`;
 }
 
 // ── Station Records ───────────────────────────────────────────────────────────
@@ -822,6 +831,10 @@ document.body.appendChild(_tipEl);
 function _showTip(anchor) {
   const text = anchor.dataset.tooltip;
   if (!text) return;
+  // Moving from one tip straight to another skips the fade: the first tip
+  // already earned the delay, the rest should feel instant.
+  const wasOpen = _tipEl.style.display !== 'none';
+  if (wasOpen) _tipEl.setAttribute('data-instant', ''); else _tipEl.removeAttribute('data-instant');
   _tipEl.textContent = text;
   _tipEl._anchor = anchor;
   _tipEl.style.display = 'block';
@@ -855,8 +868,14 @@ function _hideTip() {
 }
 
 function bindTip(el) {
+  if (el.dataset.tipBound === '1') return;
+  el.dataset.tipBound = '1';
   el.addEventListener('mouseenter', () => _showTip(el));
   el.addEventListener('mouseleave', _hideTip);
+  // Keyboard: anything with an explanation can take focus and show it.
+  if (!el.matches('a, button, [tabindex]')) el.tabIndex = 0;
+  el.addEventListener('focus', () => _showTip(el));
+  el.addEventListener('blur', _hideTip);
   // Touch: tap to show/dismiss — do NOT preventDefault so card clicks still fire
   el.addEventListener('touchend', e => {
     if (!el.dataset.tooltip) return;
@@ -880,6 +899,7 @@ function bindTip(el) {
 
 document.getElementById('anomaly-headline') && bindTip(document.getElementById('anomaly-headline'));
 document.querySelectorAll('.has-tooltip').forEach(bindTip);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') _hideTip(); });
 
 // ── Chart pre-boot click capture ─────────────────────────────────────────────
 // The chart island (client:visible) may not have hydrated yet when a range or
@@ -955,12 +975,13 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 });
 
 // Chart toolbar — reset / copy / share
+const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>';
 function flashBtn(el, label, ms = 1100) {
   if (!el) return;
-  const orig = el.textContent;
-  el.textContent = label;
+  const orig = el.innerHTML;
+  el.innerHTML = label === '✓' ? CHECK_SVG : label;
   el.classList.add('flash');
-  setTimeout(() => { el.textContent = orig; el.classList.remove('flash'); }, ms);
+  setTimeout(() => { el.innerHTML = orig; el.classList.remove('flash'); }, ms);
 }
 document.getElementById('chart-zoom-reset')?.addEventListener('click', () => resetChartZoom());
 document.getElementById('chart-copy-btn')?.addEventListener('click', async (e) => {

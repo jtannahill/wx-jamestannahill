@@ -5,9 +5,14 @@
   --surface: #141414;
   --border: #222;
   --text: #f0f0f0;
-  --muted: #666;
+  /* Muted tiers. Both clear 4.5:1 on the ground: nothing on the page is set
+     fainter than --faint. */
+  --muted: #8e8e8e;
+  --faint: #7a7a7a;
   --accent: #e8e0d0;
   --anomaly: #c8b97a;
+  --blue: #5a9ad0;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --font: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
 }
 
@@ -20,8 +25,16 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 /* Visible keyboard focus for all interactive controls */
 button:focus-visible, a:focus-visible,
 .card-clickable:focus-visible, [tabindex]:focus-visible {
-  outline: 1px solid var(--anomaly);
+  outline: 2px solid var(--anomaly);
   outline-offset: 2px;
+}
+
+/* Every pressable thing answers the press. */
+button { transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s; }
+button:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  button { transition: border-color 0.15s, color 0.15s; }
+  button:active { transform: none; }
 }
 
 /* Anchor targets land clear of the viewport edge */
@@ -57,13 +70,13 @@ header {
 }
 .jump-row::-webkit-scrollbar { display: none; }
 .jump-row a {
-  font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
-  color: #555; text-decoration: none; white-space: nowrap;
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--faint); text-decoration: none; white-space: nowrap;
   padding: 2px 0; flex-shrink: 0;
   transition: color 0.15s;
 }
 .jump-row a:hover { color: var(--accent); }
-.station-label { margin: 0; font-size: 11px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
+.station-label { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 .updated-at { font-size: 11px; letter-spacing: 0.05em; color: var(--muted); }
 .unit-toggle {
   background: none; border: 1px solid var(--border); color: var(--muted);
@@ -73,9 +86,10 @@ header {
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0; font-family: inherit; font-weight: 500;
 }
-.unit-toggle:hover { border-color: var(--accent); color: var(--accent); }
-.unit-toggle:active { border-color: var(--accent); color: var(--accent); }
-.unit-toggle.celsius { border-color: #4ab8e8; color: #4ab8e8; }
+@media (hover: hover) and (pointer: fine) {
+  .unit-toggle:hover { border-color: var(--accent); color: var(--accent); }
+}
+.unit-toggle.celsius { border-color: var(--blue); color: var(--blue); }
 .share-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 14px; width: 44px; height: 44px; cursor: pointer;
@@ -84,8 +98,10 @@ header {
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0; font-family: inherit;
 }
-.share-btn:hover { border-color: #fff; color: #fff; }
-.share-btn:active { border-color: #fff; color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .share-btn:hover { border-color: #fff; color: #fff; }
+}
+.share-btn svg, .refresh-btn svg, .chart-action-btn svg { display: block; width: 15px; height: 15px; }
 .refresh-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   font-size: 16px; width: 44px; height: 44px; cursor: pointer;
@@ -94,20 +110,26 @@ header {
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
 }
-.refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
-.refresh-btn:active { border-color: var(--accent); color: var(--accent); }
-.refresh-btn.spinning { animation: spin 0.6s linear infinite; }
+@media (hover: hover) and (pointer: fine) {
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+}
+/* The arrow spins, not the bordered box around it. */
+.refresh-btn.spinning svg { animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .stale-banner {
   background: rgba(200,140,60,0.08); border: 1px solid rgba(200,140,60,0.25);
-  color: #c88c3c; font-size: 12px; letter-spacing: 0.06em;
+  color: #d1974a; font-size: 12px; letter-spacing: 0.04em;
   padding: 8px 14px; margin-bottom: 32px;
+  opacity: 1; transform: translateY(0);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  @starting-style { opacity: 0; transform: translateY(-4px); }
 }
+.stale-banner[hidden] { display: none; }
 
 .hero { margin-bottom: 36px; }
 .temp-block { display: flex; align-items: flex-start; line-height: 1; }
-.temp { font-size: clamp(80px, 15vw, 140px); font-weight: 400; letter-spacing: -0.02em; }
+.temp { font-size: clamp(80px, 15vw, 140px); font-weight: 400; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .temp-unit { font-size: 40px; margin-top: 20px; color: var(--muted); }
 .feels-like { font-size: 18px; color: var(--muted); margin-top: 6px; }
 .condition { font-size: 20px; font-weight: 500; margin-top: 10px; }
@@ -121,7 +143,7 @@ header {
   border-bottom: 1px dashed rgba(200,185,122,0.4);
 }
 .percentile-rank {
-  font-size: 13px; color: #777; margin-top: 6px;
+  font-size: 13px; color: var(--muted); margin-top: 6px;
   letter-spacing: 0.02em;
 }
 
@@ -133,7 +155,10 @@ header {
   position: fixed;
   background: #161616;
   border: 1px solid #2e2e2e;
-  color: #888;
+  color: #a8a8a8;
+  opacity: 1;
+  transition: opacity 120ms var(--ease-out);
+  @starting-style { opacity: 0; }
   font-size: 11.5px;
   font-style: normal;
   font-weight: 400;
@@ -147,6 +172,8 @@ header {
   line-height: 1.65;
   box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
+#wx-tip[data-instant] { transition-duration: 0ms; }
+@media (prefers-reduced-motion: reduce) { #wx-tip { transition: none; } }
 
 .conditions-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
@@ -156,17 +183,23 @@ header {
   background: var(--surface); padding: 24px 20px;
   border: 1px solid var(--border);
 }
-.card-label { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 12px; }
-.card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; }
+.card-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+.card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
-.card-clickable {
+/* Clickable cards are real buttons: reset the button chrome, keep the card look. */
+button.card-clickable {
+  display: block; width: 100%; text-align: left;
+  font: inherit; color: inherit; font-family: var(--font);
   cursor: pointer;
-  transition: border-top-color 0.15s, background 0.15s;
+  transition: border-top-color 0.15s, background 0.15s, transform 160ms var(--ease-out);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.card-clickable:hover, .card-clickable:active { border-top-color: var(--anomaly); background: #161616; }
+@media (hover: hover) and (pointer: fine) {
+  .card-clickable:hover { border-top-color: var(--anomaly); background: #161616; }
+}
+.card-clickable:active { border-top-color: var(--anomaly); background: #161616; transform: scale(0.99); }
 
 .forecast-section { margin-bottom: 48px; }
 
@@ -195,23 +228,23 @@ header {
 .hourly-cell:last-child { border-right: none; }
 .hourly-cell.skel-card { align-items: center; justify-content: center; gap: 7px; }
 .hourly-hour {
-  font-size: 9px; letter-spacing: 0.1em; color: var(--muted);
+  font-size: 10px; letter-spacing: 0.08em; color: var(--muted);
   text-transform: uppercase; margin-bottom: 7px;
 }
-.hourly-glyph { font-size: 13px; color: #999; line-height: 1; margin-bottom: 7px; }
-.hourly-temp  { font-size: 14px; color: var(--text); letter-spacing: -0.01em; }
-.hourly-precip { font-size: 9px; color: #4ab8e8; margin-top: 3px; min-height: 11px; }
+.hourly-glyph { font-size: 13px; color: #b0b0b0; line-height: 1; margin-bottom: 7px; }
+.hourly-temp  { font-size: 14px; color: var(--text); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.hourly-precip { font-size: 10px; color: var(--blue); margin-top: 3px; min-height: 11px; }
 .forecast-header {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 16px;
 }
-.forecast-title { margin: 0; font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
-.forecast-meta  { font-size: 11px; color: #444; }
+.forecast-title { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
+.forecast-meta  { font-size: 11px; color: var(--faint); }
 .forecast-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--border); }
 .forecast-card  { background: var(--surface); padding: 20px 18px; border: 1px solid var(--border); }
-.forecast-offset { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; }
-.forecast-temp   { font-size: 28px; font-weight: 400; letter-spacing: -0.01em; }
-.forecast-delta  { font-size: 11px; color: #777; letter-spacing: 0.04em; margin-top: 3px; }
+.forecast-offset { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+.forecast-temp   { font-size: 28px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.forecast-delta  { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; margin-top: 3px; }
 .forecast-fields { margin-top: 8px; }
 .forecast-field  { font-size: 12px; color: var(--muted); line-height: 1.7; }
 
@@ -225,24 +258,26 @@ header {
 }
 .chart-action-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
-  width: 28px; height: 28px; cursor: pointer; padding: 0;
+  width: 36px; height: 36px; cursor: pointer; padding: 0;
   font-family: inherit; font-size: 13px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
   transition: border-color 0.15s, color 0.15s;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-.chart-action-btn:hover, .chart-action-btn:active {
-  border-color: var(--accent); color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .chart-action-btn:hover { border-color: var(--accent); color: var(--accent); }
 }
+.chart-action-btn:active { border-color: var(--accent); color: var(--accent); }
+@media (pointer: coarse) { .chart-action-btn { width: 44px; height: 44px; } }
 .chart-action-btn.flash {
   border-color: var(--anomaly); color: var(--anomaly);
 }
 .chart-hint {
-  font-size: 9.5px; letter-spacing: 0.05em; color: #333;
+  font-size: 11px; letter-spacing: 0.03em; color: var(--faint);
   margin-top: 8px; text-align: right;
 }
 @media (max-width: 600px) {
-  .chart-hint { font-size: 9px; text-align: center; }
+  .chart-hint { text-align: center; }
 }
 .chart-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .chart-controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -254,9 +289,11 @@ header {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.chart-btn:hover, .chart-btn.active,
-.range-btn:hover, .range-btn.active {
+.chart-btn.active, .range-btn.active {
   border-color: var(--accent); color: var(--accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .chart-btn:hover, .range-btn:hover { border-color: var(--accent); color: var(--accent); }
 }
 .range-row { margin-top: 2px; }
 .range-btn { padding: 4px 10px; font-size: 11px; }
@@ -295,9 +332,9 @@ header {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
-  color: #666;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
   white-space: nowrap;
 }
 .chart-legend-swatch {
@@ -332,7 +369,7 @@ header {
   padding: 10px 14px;
   font-family: var(--font);
   font-size: 11px;
-  color: #666;
+  color: #9a9a9a;
   letter-spacing: 0.04em;
   line-height: 1.85;
   pointer-events: none;
@@ -355,8 +392,8 @@ header {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 16px;
 }
-.section-title { margin: 0; font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
-.section-meta  { font-size: 11px; color: #444; }
+.section-title { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
+.section-meta  { font-size: 11px; color: var(--faint); }
 
 /* ── Today / Yesterday summaries ─────────────────────────────────────────── */
 .summary-section {
@@ -364,13 +401,13 @@ header {
   padding: 12px 18px;
   margin-bottom: 48px;
 }
-.tomorrow-section { border-left-color: #5a8aad; margin-bottom: 20px; }
-.tomorrow-section .summary-date { color: #5a8aad; }
+.tomorrow-section { border-left-color: var(--blue); margin-bottom: 20px; }
+.tomorrow-section .summary-date { color: var(--blue); }
 .today-section { border-left-color: var(--anomaly); margin-bottom: 20px; }
 .summary-date {
-  font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; font-weight: 500;
+  font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-weight: 500;
 }
-.summary-text { font-size: 14px; color: #aaa; line-height: 1.7; }
+.summary-text { font-size: 14px; color: #b4b4b4; line-height: 1.7; }
 
 .live-dot {
   display: inline-block; width: 5px; height: 5px; border-radius: 50%;
@@ -378,6 +415,7 @@ header {
   animation: live-pulse 2.4s ease-in-out infinite;
 }
 @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
 /* ── Comfort Calendar ────────────────────────────────────────────────────── */
 .comfort-calendar-section { margin-bottom: 48px; }
@@ -391,7 +429,17 @@ header {
   flex-shrink: 0;
 }
 .comfort-cell-label {
-  font-size: 9px; color: rgba(255,255,255,0.55); letter-spacing: 0.03em; line-height: 1;
+  font-size: 10px; color: rgba(0,0,0,0.78); letter-spacing: 0.02em; line-height: 1; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* What the shade means. Same hue ramp the cells use. */
+.comfort-legend {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  font-size: 11px; color: var(--faint);
+}
+.comfort-legend-bar {
+  flex: 0 0 120px; height: 6px; border-radius: 2px;
+  background: linear-gradient(90deg, hsl(0,55%,30%), hsl(60,55%,30%), hsl(120,55%,30%));
 }
 
 /* ── Station Records ─────────────────────────────────────────────────────── */
@@ -403,9 +451,9 @@ header {
 .record-card {
   background: var(--surface); padding: 18px 16px; border: 1px solid var(--border);
 }
-.record-label { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; }
-.record-value { font-size: 24px; font-weight: 400; letter-spacing: -0.01em; }
-.record-date  { font-size: 11px; color: #555; margin-top: 4px; }
+.record-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.record-value { font-size: 24px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.record-date  { font-size: 11px; color: var(--faint); margin-top: 4px; }
 
 
 /* ── Nearby Stations ─────────────────────────────────────────────────────── */
@@ -417,8 +465,8 @@ header {
   background: var(--surface); border: 1px solid var(--border);
   padding: 12px 14px; min-width: 116px;
 }
-.nearby-chip-id { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 6px; }
-.nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; }
+.nearby-chip-id { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+.nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .nearby-chip-rain { font-size: 11px; color: #6aaa6a; margin-top: 3px; }
 .nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
@@ -430,7 +478,7 @@ header {
   cursor: help; display: flex; align-items: baseline; gap: 4px;
 }
 .nearby-chip-delta { color: var(--text, #ebebeb); }
-.nc-ref { font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
+.nc-ref { font-size: 10px; letter-spacing: 0.06em; color: var(--muted); }
 .nearby-chip-outlier { text-decoration: underline dotted currentColor; }
 
 /* Network-level readout above the strip. */
@@ -440,7 +488,7 @@ header {
   background: var(--surface); border: 1px solid var(--border);
 }
 .nv-item { display: inline-flex; align-items: baseline; gap: 8px; }
-.nv-label { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
+.nv-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); }
 .nv-value { font-size: 13px; font-variant-numeric: tabular-nums; }
 .nv-verdict { font-size: 11px; color: var(--muted); font-style: italic; }
 .nv-flag { color: #d98b5f; font-style: normal; }
@@ -452,32 +500,35 @@ header {
 
 /* ── Source tags ─────────────────────────────────────────────────────────── */
 .source-tag {
-  font-size: 9px; letter-spacing: 0.12em; color: #3a3a3a;
+  font-size: 10px; letter-spacing: 0.08em; color: var(--faint);
   font-weight: 500; text-transform: uppercase;
-  border: 1px solid #222; padding: 2px 7px;
+  border: 1px solid #2a2a2a; padding: 2px 7px;
   white-space: nowrap; flex-shrink: 0;
 }
-.source-tag.source-external { color: #4a5a6a; border-color: #2a3540; }
+.source-tag.source-external { color: #7f93a6; border-color: #2e3a46; }
 a.source-tag { text-decoration: none; transition: color 0.15s, border-color 0.15s; }
-a.source-tag:hover { color: #666; border-color: #333; }
+@media (hover: hover) and (pointer: fine) {
+  a.source-tag:hover { color: var(--text); border-color: #444; }
+}
 
 /* (ERA5) inline chip → docs link */
 .era5-chip {
-  font-size: 9px; color: #444; text-decoration: none;
-  border-bottom: 1px dotted #333;
+  font-size: 10px; color: var(--faint); text-decoration: none;
+  border-bottom: 1px dotted #444;
 }
-.era5-chip:hover { color: #666; border-bottom-color: #555; }
+.era5-chip:hover { color: var(--muted); border-bottom-color: #666; }
 
 /* section-header already has flex; source-tag goes on the right */
 .section-source-row {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 16px;
 }
-.section-source-row .section-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; }
+.section-source-row .section-title { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 
 footer { border-top: 1px solid var(--border); padding-top: 24px; }
 footer p { font-size: 12px; color: var(--muted); line-height: 1.8; }
 footer a { color: var(--muted); text-decoration: underline; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 
 @media (max-width: 600px) {
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }
@@ -492,7 +543,7 @@ footer a { color: var(--muted); text-decoration: underline; }
     gap: 14px;
     padding: 12px 14px;
   }
-  .forecast-offset { margin-bottom: 0; font-size: 9.5px; }
+  .forecast-offset { margin-bottom: 0; font-size: 11px; }
   .forecast-temp   { font-size: 22px; }
   .forecast-fields { margin-top: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: flex-end; }
   .forecast-field  { font-size: 11px; line-height: 1.2; }
@@ -507,13 +558,13 @@ footer a { color: var(--muted); text-decoration: underline; }
     flex-wrap: wrap; gap: 0 8px; row-gap: 10px; align-items: center;
     margin-bottom: 12px; padding-bottom: 12px;
   }
-  .station-label { font-size: 10px; letter-spacing: 0.1em; flex: 1 1 100%; white-space: nowrap; }
+  .station-label { font-size: 11px; letter-spacing: 0.08em; flex: 1 1 100%; white-space: nowrap; }
   .updated-at    { font-size: 10px; white-space: nowrap; margin-right: auto; }
   .unit-toggle   { width: 32px; height: 32px; font-size: 10px; }
   .share-btn     { width: 32px; height: 32px; font-size: 12px; }
   .refresh-btn   { width: 32px; height: 32px; font-size: 14px; }
   .jump-row      { gap: 14px; margin-bottom: 24px; }
-  .jump-row a    { letter-spacing: 0.12em; }
+  .jump-row a    { letter-spacing: 0.08em; }
   /* Chart controls wrap nicely */
   .chart-controls-row { gap: 6px; }
   .chart-btn  { padding: 6px 10px; font-size: 11px; }
@@ -526,7 +577,7 @@ footer a { color: var(--muted); text-decoration: underline; }
   .climate-metric-value { font-size: 13px; }
   .climate-metric-pct { font-size: 10px; }
   .dev-bar { margin: 4px 0 18px; }
-  .climate-footer { font-size: 9px; }
+  .climate-footer { font-size: 11px; }
 }
 
 /* ── Skeleton placeholders ───────────────────────────────────────────────────
@@ -574,7 +625,7 @@ footer a { color: var(--muted); text-decoration: underline; }
 }
 
 /* Scroll reveal */
-.sr { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.sr { opacity: 0; transform: translateY(12px); transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out); }
 .sr.visible { opacity: 1; transform: translateY(0); }
 /* View transitions */
 @view-transition { navigation: auto; }
@@ -590,7 +641,7 @@ footer a { color: var(--muted); text-decoration: underline; }
 /* ── Climate Panel ─────────────────────────────────────────────────────────── */
 .anomaly-subline {
   font-size: 12px;
-  color: #555;
+  color: var(--faint);
   margin-top: 4px;
   letter-spacing: 0.02em;
 }
@@ -623,18 +674,19 @@ footer a { color: var(--muted); text-decoration: underline; }
 .climate-metric-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #666;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 .climate-metric-value {
   font-size: 15px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .climate-metric-pct {
   font-size: 11px;
-  color: #555;
+  color: var(--faint);
   margin-left: 6px;
   font-weight: 400;
 }
@@ -675,10 +727,10 @@ footer a { color: var(--muted); text-decoration: underline; }
   margin-top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 9px;
-  color: #3a3a3a;
+  font-size: 10px;
+  color: var(--faint);
   white-space: nowrap;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .dev-bar-today-dot {
@@ -721,15 +773,15 @@ footer a { color: var(--muted); text-decoration: underline; }
 .climate-bar-ticks {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
-  color: #2e2e2e;
+  font-size: 10px;
+  color: var(--faint);
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
 
 .climate-footer {
-  font-size: 10px;
-  color: #2a2a2a;
+  font-size: 11px;
+  color: var(--faint);
   text-align: right;
   margin-top: 6px;
   letter-spacing: 0.05em;

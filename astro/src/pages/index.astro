@@ -35,7 +35,9 @@ const trendArrow = (t: string | undefined) =>
 const heroTemp     = fmt(boot?.tempf, 1);
 const heroFeels    = boot?.feelsLike != null ? `Feels like ${fmt(boot.feelsLike, 0)}°F` : 'Feels like —°F';
 const heroCond     = boot?.condition ?? '—';
-const anomHead     = boot?.climate_context?.headline ?? '—';
+// API strings join clauses with a middle dot; the page reads them as sentences.
+const tidy = (s: string) => s.replace(/\s[\u00b7\u2014]\s/g, ', ');
+const anomHead     = tidy(boot?.climate_context?.headline ?? '—');
 const monthName    = new Date().toLocaleString('en-US', { month: 'long', timeZone: 'America/New_York' });
 const percentile   = boot?.percentile_rank?.label
   ? `Temp vs typical ${monthName}: ${boot.percentile_rank.label}`
@@ -84,8 +86,8 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       <h1 class="station-label">MIDTOWN MANHATTAN, NEW YORK</h1>
       <span class="updated-at" id="updated-at">—</span>
       <button class="unit-toggle" id="unit-toggle" title="Toggle °F / °C" aria-label="Toggle °F / °C">°F</button>
-      <button class="share-btn" id="share-btn" title="Share current conditions on X" aria-label="Share current conditions on X">𝕏</button>
-      <button class="refresh-btn" id="refresh-btn" title="Refresh now (auto-updates every 5 minutes)" aria-label="Refresh now (auto-updates every 5 minutes)">↻</button>
+      <button class="share-btn" id="share-btn" title="Share current conditions on X" aria-label="Share current conditions on X"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></button>
+      <button class="refresh-btn" id="refresh-btn" title="Refresh now (auto-updates every 5 minutes)" aria-label="Refresh now (auto-updates every 5 minutes)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
     </header>
 
     <nav class="jump-row" aria-label="Page sections">
@@ -146,25 +148,25 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     </section>
 
     <div id="conditions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">CONDITIONS</h2>
+      <h2 class="section-title">CONDITIONS</h2>
       <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
     </div>
     <section class="conditions-grid">
-      <div class="card card-clickable" data-chart-field="windspeedmph">
+      <button type="button" class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND</div>
         <div class="card-value" id="wind-speed">{windSpeed}</div>
         <div class="card-sub" id="wind-detail">{windDetail}</div>
-      </div>
-      <div class="card card-clickable" data-chart-field="humidity">
+      </button>
+      <button type="button" class="card card-clickable" data-chart-field="humidity">
         <div class="card-label">HUMIDITY</div>
         <div class="card-value" id="humidity">{humidity}</div>
         <div class="card-sub" id="dewpoint">{dewpoint}</div>
-      </div>
-      <div class="card card-clickable" data-chart-field="baromrelin">
+      </button>
+      <button type="button" class="card card-clickable" data-chart-field="baromrelin">
         <div class="card-label">PRESSURE</div>
         <div class="card-value" id="pressure">{pressure}</div>
         <div class="card-sub" id="pressure-trend">{pressureT}</div>
-      </div>
+      </button>
       <div class="card">
         <div class="card-label">UV INDEX</div>
         <div class="card-value" id="uv">{uv}</div>
@@ -175,30 +177,30 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
         <div class="card-value" id="rain-hourly">{rainHourly}</div>
         <div class="card-sub" id="rain-daily">{rainDaily}</div>
       </div>
-      <div class="card card-clickable" data-chart-field="windspeedmph">
+      <button type="button" class="card card-clickable" data-chart-field="windspeedmph">
         <div class="card-label">WIND GUST</div>
         <div class="card-value" id="wind-gust">{windGust}</div>
         <div class="card-sub" id="wind-dir">{windDir}</div>
-      </div>
+      </button>
       <div class="card">
         <div class="card-label has-tooltip" data-tooltip="Microclimate Comfort Score (0–100). Composite of feels-like temperature deviation from 71°F ideal, humidity, wind speed, UV index, and rain rate. Season-weighted and adjusted for anomalies vs. this station's own baseline.">COMFORT</div>
         <div class="card-value" id="comfort-score">{comfortScore}</div>
         <div class="card-sub" id="comfort-label">{comfortLabel}</div>
       </div>
       <div class="card">
-        <div class="card-label has-tooltip" data-tooltip="Probability of rain in the next 60 minutes. Logistic regression on humidity, 1-hour pressure trend, dew-point depression, and hour-of-day. Heuristic coefficients calibrated for NYC (~120 rain days/yr). Boosts automatically if rain is currently falling.">RAIN NEXT HR</div>
+        <div class="card-label has-tooltip" data-tooltip="Probability of rain in the next 60 minutes. Logistic regression on humidity, 1-hour pressure trend, dew-point depression, and hour-of-day. Heuristic coefficients calibrated for NYC (~120 rain days/yr). Boosts automatically if rain is currently falling.">RAIN NEXT HOUR</div>
         <div class="card-value" id="rain-prob">{rainProb}</div>
         <div class="card-sub" id="rain-prob-label">{rainProbLbl}</div>
       </div>
-      <div class="card card-clickable" data-chart-field="uhi_delta">
+      <button type="button" class="card card-clickable" data-chart-field="uhi_delta">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
           <div class="card-label has-tooltip" style="margin-bottom:0" data-tooltip="Urban Heat Island delta: this Midtown station minus the average of JFK, LGA, and EWR ASOS readings via NOAA aviationweather.gov. Positive = Midtown warmer than airports. Updated on every page load.">URBAN HEAT</div>
-          <span class="source-tag source-external" style="font-size:8px;padding:1px 5px">NOAA</span>
+          <span class="source-tag source-external" style="padding:1px 5px">NOAA</span>
         </div>
         <div class="card-value" id="uhi-delta">{uhiVal}</div>
         <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
-        <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px;color:#555"></div>
-      </div>
+        <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px"></div>
+      </button>
     </section>
 
     <section class="comfort-calendar-section" id="comfort-calendar-section">
@@ -206,7 +208,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
         <h2 class="section-title">COMFORT CALENDAR</h2>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="section-meta" id="comfort-meta">30-day history</span>
-          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
+          <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ, computed: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ, COMPUTED</a>
         </div>
       </div>
       <div class="comfort-grid" id="comfort-grid" aria-busy="true">
@@ -235,7 +237,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
           <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="forecast-meta" id="forecast-meta"></span>
-            <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ · COMPUTED: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ · COMPUTED</a>
+            <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ, computed: derived in-house from this station's own history (callsign CatHouz, KNYNEWYO2140). Click for docs.">CATHOUZ, COMPUTED</a>
           </div>
         </div>
         <div class="forecast-grid" id="forecast-grid" aria-busy="true">
@@ -294,7 +296,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <footer>
       <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
-      <p>40.75°N 73.98°W &nbsp;·&nbsp; <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> &nbsp;·&nbsp; <a href="/docs.html" data-astro-prefetch>How It Works</a></p>
+      <p class="footer-links"><span>40.75°N 73.98°W</span> <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> <a href="/docs.html" data-astro-prefetch>How it works</a></p>
     </footer>
   </main>
 

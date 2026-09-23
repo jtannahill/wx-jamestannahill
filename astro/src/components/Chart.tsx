@@ -312,14 +312,14 @@ async function exportChartPng(uplot: any, field: string, hours: number) {
   ctx.textBaseline = 'top';
   const cfg = FIELD_LABELS[field] || { label: field };
   const rangeLabel = RANGE_LABELS[hours] || `${hours}h`;
-  ctx.fillText(`${cfg.label.toUpperCase()} · ${rangeLabel}`, padX, 14 * dpr);
+  ctx.fillText(`${cfg.label.toUpperCase()}, ${rangeLabel}`, padX, 14 * dpr);
   ctx.fillStyle = '#666';
   ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
   ctx.fillText('MIDTOWN MANHATTAN, NEW YORK', padX, 34 * dpr);
   ctx.drawImage(src, padX, padTop);
   ctx.fillStyle = '#444';
   ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
-  ctx.fillText(`wx.jamestannahill.com · ${new Date().toLocaleString()}`, padX, padTop + src.height + 10 * dpr);
+  ctx.fillText(`wx.jamestannahill.com, ${new Date().toLocaleString()}`, padX, padTop + src.height + 10 * dpr);
   return new Promise<Blob | null>(res => out.toBlob(b => res(b), 'image/png'));
 }
 
@@ -558,11 +558,11 @@ export default function Chart({ apiBase }: Props) {
   return (
     <section class="chart-section" id="history">
       <div class="chart-section-header">
-        <h2 style="margin:0;font-size:10px;letter-spacing:0.15em;color:#444;font-weight:500">HISTORY</h2>
+        <h2 class="section-title">HISTORY</h2>
         <div class="chart-actions">
-          {zoomed && <button class="chart-action-btn" title="Reset zoom" onClick={resetZoom}>↻</button>}
-          <button class="chart-action-btn" title="Copy chart" onClick={onCopy}>⧉</button>
-          <button class="chart-action-btn" title="Share chart" onClick={onShare}>↗</button>
+          {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>}
+          <button class="chart-action-btn" title="Copy chart" aria-label="Copy chart" onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
+          <button class="chart-action-btn" title="Share chart" aria-label="Share chart" onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
           <a class="source-tag has-tooltip" href="/docs.html#cathouz" data-tooltip="CATHOUZ: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHOUZ</a>
         </div>
       </div>
@@ -591,7 +591,7 @@ export default function Chart({ apiBase }: Props) {
         )}
         {hasRain && <span class="chart-legend-item"><span class="chart-legend-swatch swatch-rain"></span>Rainfall</span>}
       </div>
-      <div class="chart-hint">Scroll / pinch to zoom · Drag to pan · Double-click to reset</div>
+      <div class="chart-hint">Scroll or pinch to zoom, drag to pan, double-click to reset</div>
     </section>
   );
 }
