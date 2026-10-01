@@ -7,7 +7,7 @@ import { defineMiddleware } from 'astro:middleware';
 // reading serialized into localStorage, see index.astro). Its content
 // changes with every reading, so a static hash set can never cover it.
 // Hashing it per request would require buffering the streamed HTML in the
-// worker and would still leave docs.html (served by the assets binding via
+// worker and would still leave /docs (docs.html, served by the assets binding via
 // public/_headers, where only a static value is possible) out of sync.
 // Every other directive is strict.
 //
@@ -29,7 +29,7 @@ import { defineMiddleware } from 'astro:middleware';
 //   serves a first-party bootstrap (e.g. /vjoz/) that then loads gtm.js
 //   from googletagmanager.com on the main thread, also zone-level
 //
-// Keep this in sync with the copy for /docs.html in public/_headers
+// Keep this in sync with the copy for /docs in public/_headers
 // (prerendered, served by the assets binding, which bypasses middleware).
 export const CSP = [
   "default-src 'self'",

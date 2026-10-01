@@ -25,17 +25,17 @@ function localizeFTemps(text) {
   return text.replace(/(-?\d+(?:\.\d+)?)\s*°F/g, (_, n) => {
     const c = (parseFloat(n) - 32) * 5 / 9;
     const dec = n.includes('.') ? 1 : 0;
-    return `${c.toFixed(dec)}°C`;
+    return `${withMinus(c.toFixed(dec))}°C`;
   });
 }
 
-// Same idea but for differences ("8.2°F warmer than airports") — divide by 1.8.
+// Same idea but for differences ("8.2°F warmer than airports") - divide by 1.8.
 function localizeDeltaFTemps(text) {
   if (!text || !useCelsius) return text || '';
   return text.replace(/(-?\d+(?:\.\d+)?)\s*°F/g, (_, n) => {
     const c = parseFloat(n) / 1.8;
     const dec = n.includes('.') ? 1 : 0;
-    return `${c.toFixed(dec)}°C`;
+    return `${withMinus(c.toFixed(dec))}°C`;
   });
 }
 
@@ -51,7 +51,7 @@ function localizeTempAnomalyLabel(temp) {
   }
   // "near average ..." or unknown → fallback to a generic °F → °C swap
   return temp.label.replace(/(-?\d+(?:\.\d+)?)°F/g, (_, n) => {
-    const c = (parseFloat(n) / 1.8).toFixed(1);
+    const c = withMinus((parseFloat(n) / 1.8).toFixed(1));
     return `${c}°C`;
   });
 }
@@ -61,9 +61,45 @@ function degToCompass(deg) {
   return DIR_LABELS[Math.round(deg / 22.5) % 16];
 }
 
+// Empty-value placeholder, defined once. Visible as two hyphens; readings
+// that show it are announced as "No reading" (see setReading / readingHtml).
+const EMPTY = '--';
+const MINUS = '\u2212';
+
+// Negative values use a true minus sign (U+2212). A value that rounds to
+// zero drops its sign instead of showing "-0".
+function withMinus(s) {
+  return /^-0*(\.0+)?$/.test(s) ? s.slice(1) : s.replace(/^-/, MINUS);
+}
+
 function fmt(val, decimals = 1) {
-  if (val == null) return '—';
-  return Number(val).toFixed(decimals);
+  if (val == null || Number.isNaN(Number(val))) return EMPTY;
+  return withMinus(Number(val).toFixed(decimals));
+}
+
+// Explicitly signed value: "+1.2" / "\u22121.2". fmtFn formats the magnitude.
+function signed(val, fmtFn) {
+  if (val == null) return EMPTY;
+  const s = fmtFn(val);
+  // Already signed, empty, or rounds to zero: no plus sign.
+  return s === EMPTY || s.startsWith(MINUS) || /^[0.]+$/.test(s) ? s : `+${s}`;
+}
+
+const NO_READING_HTML = `<span aria-hidden="true">${EMPTY}</span><span class="sr-only">No reading</span>`;
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+// HTML for a reading: EMPTY renders visually but reads as "No reading".
+function readingHtml(text) {
+  return String(text).split(EMPTY).map(escHtml).join(NO_READING_HTML);
+}
+// Set an element's reading text. Plain textContent unless it holds EMPTY.
+function setReading(el, text) {
+  if (typeof el === 'string') el = document.getElementById(el);
+  if (!el) return;
+  const str = String(text);
+  if (str.includes(EMPTY)) el.innerHTML = readingHtml(str);
+  else el.textContent = str;
 }
 
 // ── Cache (stale-while-revalidate) ───────────────────────────────────────────
@@ -105,10 +141,10 @@ function ordinal(n) {
 function tidyText(s) { return String(s).replace(/\s[\u00b7\u2014]\s/g, ', '); }
 
 function renderCurrent(data) {
-  document.getElementById('temp').textContent = fmtT(data.tempf, 0);
+  setReading('temp', fmtT(data.tempf, 0));
   document.getElementById('temp-unit').textContent = tempUnit();
-  document.getElementById('feels-like').textContent = `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`;
-  document.getElementById('condition').textContent = data.condition || '—';
+  setReading('feels-like', `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`);
+  setReading('condition', data.condition || EMPTY);
 
   // Percentile rank = current temp vs this station's distribution for the
   // month. Prefix it so it can't be misread against the "Warmest June 9th"
@@ -131,46 +167,44 @@ function renderCurrent(data) {
     anomalyEl.removeAttribute('data-tooltip');
   }
 
-  document.getElementById('wind-speed').textContent = `${fmt(data.windspeedmph, 0)} mph`;
-  document.getElementById('wind-detail').textContent = data.winddir != null
+  setReading('wind-speed', `${fmt(data.windspeedmph, 0)} mph`);
+  setReading('wind-detail', data.winddir != null
     ? `From ${degToCompass(data.winddir)} (${fmt(data.winddir, 0)}°)`
-    : 'Direction unavailable';
+    : 'Direction unavailable');
 
-  document.getElementById('humidity').textContent = `${fmt(data.humidity, 0)}%`;
-  document.getElementById('dewpoint').textContent = `Dew point ${fmtT(data.dewPoint, 0)}${tempUnit()}`;
+  setReading('humidity', `${fmt(data.humidity, 0)}%`);
+  setReading('dewpoint', `Dew point ${fmtT(data.dewPoint, 0)}${tempUnit()}`);
 
-  document.getElementById('pressure').textContent = `${fmt(data.baromrelin, 2)}"`;
+  setReading('pressure', `${fmt(data.baromrelin, 2)}"`);
   const trend = data.pressure_trend || 'steady';
-  document.getElementById('pressure-trend').textContent =
-    trend === 'rising' ? '↑ Rising' : trend === 'falling' ? '↓ Falling' : '→ Steady';
+  setReading('pressure-trend', trend === 'rising' ? '↑ Rising' : trend === 'falling' ? '↓ Falling' : '→ Steady');
 
-  document.getElementById('uv').textContent = fmt(data.uv, 0);
-  document.getElementById('solar').textContent = `${fmt(data.solarradiation, 0)} W/m²`;
+  setReading('uv', fmt(data.uv, 0));
+  setReading('solar', `${fmt(data.solarradiation, 0)} W/m²`);
 
-  document.getElementById('rain-hourly').textContent = `${fmt(data.hourlyrainin, 2)}"`;
-  document.getElementById('rain-daily').textContent = `Daily: ${fmt(data.dailyrainin, 2)}"`;
+  setReading('rain-hourly', `${fmt(data.hourlyrainin, 2)}"`);
+  setReading('rain-daily', `Daily: ${fmt(data.dailyrainin, 2)}"`);
 
-  document.getElementById('wind-gust').textContent = `${fmt(data.windgustmph, 0)} mph`;
-  document.getElementById('wind-dir').textContent = data.winddir != null ? degToCompass(data.winddir) : '—';
+  setReading('wind-gust', `${fmt(data.windgustmph, 0)} mph`);
+  setReading('wind-dir', data.winddir != null ? degToCompass(data.winddir) : EMPTY);
 
   // Comfort Score
   const comfort = data.comfort;
-  document.getElementById('comfort-score').textContent = comfort?.score ?? '—';
-  document.getElementById('comfort-label').textContent = comfort?.label ?? '—';
+  setReading('comfort-score', comfort?.score ?? EMPTY);
+  setReading('comfort-label', comfort?.label ?? EMPTY);
 
   // Rain Probability
   const rp = data.rain_probability;
-  document.getElementById('rain-prob').textContent = rp ? `${rp.probability}%` : '—';
+  setReading('rain-prob', rp ? `${rp.probability}%` : EMPTY);
   // Spatial boost source annotation: combine label with boost source when present
   const rainProbLabelEl = document.getElementById('rain-prob-label');
-  rainProbLabelEl.textContent = rp?.spatial_source
-    ? `${rp?.label ?? '—'}, from ${rp.spatial_source}`
-    : (rp?.label ?? '—');
+  setReading(rainProbLabelEl, rp?.spatial_source
+    ? `${rp?.label ?? EMPTY}, from ${rp.spatial_source}`
+    : (rp?.label ?? EMPTY));
 
   // Urban Heat Island
   const uhi = data.uhi_delta;
-  document.getElementById('uhi-delta').textContent =
-    uhi != null ? `${uhi >= 0 ? '+' : ''}${fmtD(uhi, 1)}${tempUnit()}` : '—';
+  setReading('uhi-delta', uhi != null ? `${signed(uhi, v => fmtD(v, 1))}${tempUnit()}` : EMPTY);
   document.getElementById('uhi-label').textContent = localizeDeltaFTemps(data.uhi_label) || 'vs JFK / LGA / EWR';
 
   // Seasonal UHI average for current month
@@ -182,7 +216,7 @@ function renderCurrent(data) {
     if (entry && entry.avg_delta != null && entry.sample_count >= 10) {
       const avg = entry.avg_delta;
       uhiMonthlyEl.textContent =
-        `Typical ${entry.month_name}: ${avg >= 0 ? '+' : ''}${fmtD(avg, 1)}${tempUnit()}`;
+        `Typical ${entry.month_name}: ${signed(avg, v => fmtD(v, 1))}${tempUnit()}`;
     } else {
       uhiMonthlyEl.textContent = '';
     }
@@ -192,8 +226,8 @@ function renderCurrent(data) {
 
   const updated = data.updated_at
     ? `${new Date(data.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET`
-    : '—';
-  document.getElementById('updated-at').textContent = `Updated ${updated}`;
+    : EMPTY;
+  setReading('updated-at', `Updated ${updated}`);
 
   renderHourlyStrip(data.wk_hourly);
   renderForecast(data.forecast, data.tempf);
@@ -287,7 +321,7 @@ function renderHourlyStrip(hours) {
     // converted to percent.
     const raw = h.precip_prob ?? 0;
     const pp  = Math.round(raw <= 1 ? raw * 100 : raw);
-    const fullCond = cond ? cond.replace(/([a-z])([A-Z])/g, '$1 $2') : '—';
+    const fullCond = cond ? cond.replace(/([a-z])([A-Z])/g, '$1 $2') : 'Conditions unavailable';
     const tip = pp >= 10 ? `${fullCond}, ${pp}% precip` : fullCond;
     return `<div class="hourly-cell has-tooltip" data-tooltip="${tip}">
       <div class="hourly-hour">${label}</div>
@@ -407,8 +441,8 @@ function renderTodayContext(current, history) {
   // Temp range
   if (high != null && low != null) {
     sentences.push(high - low < 3
-      ? `Temperatures holding near ${Math.round((high + low) / 2)}${tempUnit()}.`
-      : `Temperatures ranging from ${low}${tempUnit()} to ${high}${tempUnit()} so far.`);
+      ? `Temperatures holding near ${fmt((high + low) / 2, 0)}${tempUnit()}.`
+      : `Temperatures ranging from ${fmt(low, 0)}${tempUnit()} to ${fmt(high, 0)}${tempUnit()} so far.`);
   }
 
   // Wind gusts
@@ -417,12 +451,8 @@ function renderTodayContext(current, history) {
   // Rain
   if (rain > 0.01) sentences.push(`${rain.toFixed(2)}" of rain since midnight.`);
 
-  // Anomaly — only if notable (≥5°F delta)
-  const anomaly = current.anomalies?.temp;
-  if (anomaly && Math.abs(anomaly.delta) >= 5) {
-    const localized = localizeTempAnomalyLabel(anomaly);
-    if (localized) sentences.push(localized[0].toUpperCase() + localized.slice(1) + '.');
-  }
+  // The temperature anomaly is not repeated here: the hero headline already
+  // states it directly above this card.
 
   if (!sentences.length) { section.hidden = true; return; }
   textEl.textContent = sentences.join(' ');
@@ -510,7 +540,7 @@ function renderClimatePanel(data) {
       container.innerHTML += `
         <div class="climate-metric">
           <div class="climate-metric-row">
-            <span class="climate-metric-label">Dew Point <a class="era5-chip has-tooltip" href="/docs.html#era5" data-tooltip="ERA5: ECMWF climate reanalysis baseline. Hourly climate history for this exact lat/lon back to 1940. Click for docs.">(ERA5)</a></span>
+            <span class="climate-metric-label">Dew Point <a class="era5-chip has-tooltip" href="/docs#era5" data-tooltip="ERA5: ECMWF climate reanalysis baseline. Hourly climate history for this exact lat/lon back to 1940. Click for docs.">(ERA5)</a></span>
             <span class="climate-metric-value" style="color:var(--muted)">${fmtT(dp.value, 0)}${tempUnit()}
               <span class="climate-metric-pct">${ordinal(dp.percentile)} pct</span>
             </span>
@@ -541,9 +571,9 @@ function renderClimatePanel(data) {
       const pct  = m.percentile;
       const unit = isTemp ? tempUnit() : ' mph';
       const dispVal = isTemp ? fmtT(m.value, 0) : m.value;
-      const dispP25 = isTemp ? fmtT(m.p25, 0) : (m.p25 ?? '—');
-      const dispP50 = isTemp ? fmtT(m.p50, 0) : (m.p50 ?? '—');
-      const dispP75 = isTemp ? fmtT(m.p75, 0) : (m.p75 ?? '—');
+      const dispP25 = readingHtml(isTemp ? fmtT(m.p25, 0) : (m.p25 ?? EMPTY));
+      const dispP50 = readingHtml(isTemp ? fmtT(m.p50, 0) : (m.p50 ?? EMPTY));
+      const dispP75 = readingHtml(isTemp ? fmtT(m.p75, 0) : (m.p75 ?? EMPTY));
       container.innerHTML += `
         <div class="climate-metric">
           <div class="climate-metric-row">
@@ -586,7 +616,7 @@ function renderSummary(summary) {
   section.hidden = false;
   const d = new Date(summary.date + 'T12:00:00');
   const opts = { weekday: 'long', month: 'long', day: 'numeric' };
-  document.getElementById('summary-date').textContent = d.toLocaleDateString('en-US', opts);
+  document.getElementById('summary-date').textContent = d.toLocaleDateString('en-US', opts).toUpperCase();
   document.getElementById('summary-text').textContent = localizeFTemps(summary.summary);
 }
 
@@ -680,13 +710,32 @@ function renderNearby(stations, snapshotAt, variance) {
     return;
   }
   document.getElementById('nearby-section').style.display = '';
-  const stamp = snapshotAt ? new Date(snapshotAt).toLocaleTimeString() : '';
+  const stamp = snapshotAt
+    ? `${new Date(snapshotAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET`
+    : '';
   meta.textContent = stamp;
 
   renderNearbyVariance(variance);
 
-  strip.innerHTML = stations.filter(s => s.station_id !== 'KNYNEWYO2140').map(s => {
-    const temp = s.temp_f != null ? `${fmtT(s.temp_f, 0)}${tempUnit()}` : '–';
+  // Stations with no reading sort last (stable, so the API's distance order
+  // holds within each group) and render dimmed with a reason line.
+  const shown = stations
+    .filter(s => s.station_id !== 'KNYNEWYO2140')
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => ((a.s.temp_f == null) - (b.s.temp_f == null)) || (a.i - b.i))
+    .map(x => x.s);
+
+  strip.innerHTML = shown.map(s => {
+    if (s.temp_f == null) {
+      const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
+      return `<div class="nearby-chip nearby-chip-empty">
+      <div class="nearby-chip-id">${s.station_id ?? ''}</div>
+      <div class="nearby-chip-temp" aria-hidden="true">${EMPTY}</div>
+      <div class="nearby-chip-reason">No report</div>
+      <div class="nearby-chip-dist">${dist}</div>
+    </div>`;
+    }
+    const temp = `${fmtT(s.temp_f, 0)}${tempUnit()}`;
     const rain = s.rain_rate_in_hr > 0 ? `${s.rain_rate_in_hr.toFixed(2)}"/hr` : '';
     const dist = s.distance_mi != null ? `${s.distance_mi.toFixed(1)} mi` : '';
 
@@ -771,13 +820,39 @@ function renderNwsAlerts(alerts) {
 }
 
 // ── Rain Events ───────────────────────────────────────────────────────────────
+// Events are grouped into one row per day (ET) so 14 days fit in a few rows:
+// date, day total, event count, and the day's peak rate. A day whose total
+// rounds below 0.01" reads "Trace".
+const _rainDayKeyFmt = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/New_York' });
+const _rainDayLabelFmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+
+function groupRainByDay(events) {
+  const days = new Map();
+  for (const ev of events) {
+    if (!ev.start) continue;
+    const start = new Date(ev.start);
+    if (Number.isNaN(start.getTime())) continue;
+    const key = _rainDayKeyFmt.format(start); // YYYY-MM-DD in ET
+    let day = days.get(key);
+    if (!day) {
+      day = { key, label: _rainDayLabelFmt.format(start), total: 0, hasTotal: false, count: 0, peak: null };
+      days.set(key, day);
+    }
+    day.count += 1;
+    if (ev.total_in != null) { day.total += Number(ev.total_in); day.hasTotal = true; }
+    if (ev.peak_rate != null) day.peak = Math.max(day.peak ?? 0, Number(ev.peak_rate));
+  }
+  return [...days.values()].sort((a, b) => b.key.localeCompare(a.key));
+}
+
 function renderRainEvents(events) {
   const list = document.getElementById('rain-events-list');
   if (!list) return;
 
   list.replaceChildren();
 
-  if (!events || !events.length) {
+  const days = groupRainByDay(events || []);
+  if (!days.length) {
     const empty = document.createElement('p');
     empty.className = 'rain-events-empty';
     empty.textContent = 'No measurable rain in this period.';
@@ -786,26 +861,27 @@ function renderRainEvents(events) {
     return;
   }
 
-  events.slice(0, 8).forEach(ev => {
+  days.forEach(day => {
     const row = document.createElement('div');
     row.className = 'rain-event-row';
 
     const when = document.createElement('span');
     when.className = 'rain-event-when';
-    when.textContent = ev.start
-      ? new Date(ev.start).toLocaleString(undefined, {
-          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-        })
-      : '—';
+    when.textContent = day.label.toUpperCase();
+
+    const total = document.createElement('span');
+    total.className = 'rain-event-total';
+    if (!day.hasTotal) setReading(total, EMPTY);
+    else total.textContent = day.total < 0.01 ? 'Trace' : `${day.total.toFixed(2)}"`;
 
     const detail = document.createElement('span');
     detail.className = 'rain-event-detail';
-    const dur = ev.duration_min != null ? `${ev.duration_min} min` : '—';
-    const total = ev.total_in == null ? '—' : Number(ev.total_in) < 0.005 ? 'Trace' : `${Number(ev.total_in).toFixed(2)}"`;
-    const peak = ev.peak_rate != null ? `, peak ${Number(ev.peak_rate).toFixed(2)}"/hr` : '';
-    detail.textContent = `${total}, ${dur}${peak}`;
+    const parts = [`${day.count} event${day.count === 1 ? '' : 's'}`];
+    if (day.peak != null && day.peak >= 0.01) parts.push(`peak ${day.peak.toFixed(2)}"/hr`);
+    detail.textContent = parts.join(', ');
 
     row.appendChild(when);
+    row.appendChild(total);
     row.appendChild(detail);
     list.appendChild(row);
   });
@@ -813,7 +889,38 @@ function renderRainEvents(events) {
 }
 
 // ── Secondary data (comfort calendar + rain events) ───────────────────────────
+// Each section fetches on its own: /daily-summaries is fast, /rain-events can
+// take ~3s, so neither waits on the other. Cached copies paint first.
 let secondaryLoaded = false;
+
+async function loadDailySummaries() {
+  try {
+    const resp = await fetch(`${API_BASE}/daily-summaries?days=30`);
+    if (!resp.ok) return false;
+    const d = await resp.json();
+    cacheSet('daily_summaries', d.summaries || []);
+    renderComfortCalendar(d.summaries || []);
+    return true;
+  } catch (e) {
+    console.error('Daily summaries load failed:', e);
+    return false;
+  }
+}
+
+async function loadRainEvents() {
+  try {
+    const resp = await fetch(`${API_BASE}/rain-events?days=14`);
+    if (!resp.ok) return false;
+    const d = await resp.json();
+    cacheSet('rain_events', d.events || []);
+    renderRainEvents(d.events || []);
+    return true;
+  } catch (e) {
+    console.error('Rain events load failed:', e);
+    return false;
+  }
+}
+
 async function loadSecondaryData() {
   const cachedSummaries = cacheGet('daily_summaries');
   if (cachedSummaries) renderComfortCalendar(cachedSummaries);
@@ -821,25 +928,8 @@ async function loadSecondaryData() {
   const cachedRain = cacheGet('rain_events');
   if (cachedRain) renderRainEvents(cachedRain);
 
-  try {
-    const [sumResp, rainResp] = await Promise.all([
-      fetch(`${API_BASE}/daily-summaries?days=30`),
-      fetch(`${API_BASE}/rain-events?days=14`),
-    ]);
-    if (sumResp.ok) {
-      const d = await sumResp.json();
-      cacheSet('daily_summaries', d.summaries || []);
-      renderComfortCalendar(d.summaries || []);
-    }
-    if (rainResp.ok) {
-      const d = await rainResp.json();
-      cacheSet('rain_events', d.events || []);
-      renderRainEvents(d.events || []);
-    }
-    secondaryLoaded = true;
-  } catch (e) {
-    console.error('Secondary data load failed:', e);
-  }
+  const results = await Promise.all([loadDailySummaries(), loadRainEvents()]);
+  if (results.every(Boolean)) secondaryLoaded = true;
 }
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
@@ -914,7 +1004,7 @@ refreshBtn.addEventListener('click', async () => {
 });
 
 // ── Viewport-aware tooltip manager ───────────────────────────────────────────
-// Single fixed div — no overflow possible. Replaces CSS ::after approach.
+// Single fixed div - no overflow possible. Replaces CSS ::after approach.
 const _tipEl = document.createElement('div');
 _tipEl.id = 'wx-tip';
 _tipEl.setAttribute('role', 'tooltip');
@@ -933,7 +1023,7 @@ function _showTip(anchor) {
   anchor.setAttribute('aria-describedby', 'wx-tip');
   _tipEl.style.display = 'block';
 
-  // getBoundingClientRect returns viewport coords — correct for position:fixed
+  // getBoundingClientRect returns viewport coords - correct for position:fixed
   const r   = anchor.getBoundingClientRect();
   const tw  = _tipEl.offsetWidth;
   const th  = _tipEl.offsetHeight;
@@ -973,7 +1063,7 @@ function bindTip(el) {
   if (!el.matches('a, button, [tabindex], .comfort-cell, .hourly-cell') && !el.closest('button, a')) el.tabIndex = 0;
   el.addEventListener('focus', () => _showTip(el));
   el.addEventListener('blur', _hideTip);
-  // Touch: tap to show/dismiss — do NOT preventDefault so card clicks still fire
+  // Touch: tap to show/dismiss - do NOT preventDefault so card clicks still fire
   el.addEventListener('touchend', e => {
     if (!el.dataset.tooltip) return;
     const wasThis = _tipEl._anchor === el && _tipEl.style.display !== 'none';
@@ -1080,7 +1170,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 let _bootCurrent = null;
 
 async function boot() {
-  // Phase 0 — paint from cache instantly (0ms on repeat visits)
+  // Phase 0 - paint from cache instantly (0ms on repeat visits)
   const cc = cacheGet('current');
   const ch = cacheGet('history_' + currentHours);
   if (cc) {
@@ -1097,7 +1187,7 @@ async function boot() {
     if (cc) renderTodayContext(cc, ch);
   }
 
-  // Phase 1 — fetch current + history in parallel (chart island handles its
+  // Phase 1 - fetch current + history in parallel (chart island handles its
   // own chart render; we still need history for renderTodayContext).
   const [rCur, rHist] = await Promise.allSettled([
     fetchCurrent(),
@@ -1128,7 +1218,7 @@ async function boot() {
     console.error('History fetch failed:', rHist.reason);
   }
 
-  // Phase 2 — secondary data (rain events + calendar), also cached
+  // Phase 2 - secondary data (rain events + calendar), also cached
   loadSecondaryData();
 }
 boot();

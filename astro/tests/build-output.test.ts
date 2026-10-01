@@ -49,8 +49,8 @@ describe('build output — docs (prerendered)', () => {
     expect(existsSync(resolve(distClient, 'docs.html'))).toBe(true);
   });
 
-  it('has canonical pointing to /docs.html', () => {
-    expect(html()).toMatch(/<link rel="canonical" href="https:\/\/wx\.jamestannahill\.com\/docs\.html"/);
+  it('has canonical pointing to /docs', () => {
+    expect(html()).toMatch(/<link rel="canonical" href="https:\/\/wx\.jamestannahill\.com\/docs"/);
   });
 
   it('emits the TechArticle JSON-LD', () => {

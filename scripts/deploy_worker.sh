@@ -21,7 +21,9 @@ cfg.compatibility_date = '2026-05-01';
 cfg.compatibility_flags = ['nodejs_compat'];
 cfg.vars = { API_BASE: 'https://api.wx.jamestannahill.com' };
 cfg.kv_namespaces = [];
-cfg.assets = { ...(cfg.assets || {}), html_handling: 'none', not_found_handling: 'none' };
+// html_handling auto-trailing-slash serves the prerendered docs.html at /docs
+// (and embed.html at /embed); public/_redirects 301s the old .html URLs.
+cfg.assets = { ...(cfg.assets || {}), html_handling: 'auto-trailing-slash', not_found_handling: 'none' };
 cfg.routes = [{ pattern: 'wx.jamestannahill.com', custom_domain: true }];
 delete cfg.previews;
 fs.writeFileSync(p, JSON.stringify(cfg, null, 2));

@@ -11,13 +11,13 @@ export const GET: APIRoute = () => {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://wx.jamestannahill.com/docs.html</loc>
+    <loc>https://wx.jamestannahill.com/docs</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://wx.jamestannahill.com/embed.html</loc>
+    <loc>https://wx.jamestannahill.com/embed</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

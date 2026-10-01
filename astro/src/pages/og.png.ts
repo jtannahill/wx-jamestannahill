@@ -1,4 +1,4 @@
-// Dynamic OG image — generated at the edge, no AWS dependency.
+// Dynamic OG image - generated at the edge, no AWS dependency.
 //
 // Pulls /current from the API, renders the same Pillow layout the legacy
 // wx_poller Lambda used to bake into S3, but as JSX → SVG → PNG via Satori
@@ -31,7 +31,7 @@ async function loadFonts(origin: string) {
   if (_fontCache) return _fontCache;
   const ASSETS = (env as any).ASSETS as Fetcher | undefined;
 
-  // Use the ASSETS binding directly — fetching the worker's own hostname
+  // Use the ASSETS binding directly - fetching the worker's own hostname
   // round-trips through Cloudflare and can return the Worker's HTML handler
   // instead of the static asset.
   const fetchAsset = async (url: string) => {
@@ -58,8 +58,12 @@ const DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W'
 const compass = (deg: number | null | undefined) =>
   deg == null ? '' : DIRS[Math.round(Number(deg) / 22.5) % 16];
 
+// Empty-value placeholder, same glyph as EMPTY in public/app.js. Negative
+// values use a true minus sign (U+2212); a rounded -0 drops its sign.
+const EMPTY = '--';
+const withMinus = (s: string) => (/^-0*(\.0+)?$/.test(s) ? s.slice(1) : s.replace(/^-/, '\u2212'));
 const fmt = (v: unknown, d = 0) =>
-  v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(d);
+  v == null || Number.isNaN(Number(v)) ? EMPTY : withMinus(Number(v).toFixed(d));
 
 function etLabel(ms: number): string {
   // -4h offset (ET, summer); for an OG image this is close enough year-round.
@@ -74,7 +78,7 @@ function etLabel(ms: number): string {
 const nowET = () => etLabel(Date.now());
 
 // A reading is usable for a snapshot only if the core hero value is present.
-// A degraded render (all "—") must never be edge-cached behind ?v=.
+// A degraded render (all "--") must never be edge-cached behind ?v=.
 const hasReading = (r: any) =>
   r != null && r.tempf != null && !Number.isNaN(Number(r.tempf));
 
@@ -92,8 +96,9 @@ function buildJsx(reading: any) {
   metrics.push({ label: 'UV INDEX', value: fmt(reading?.uv, 0), sub: '' });
 
   if (reading?.uhi_delta != null) {
-    const sign = reading.uhi_delta >= 0 ? '+' : '';
-    metrics.push({ label: 'URBAN HEAT', value: `${sign}${Number(reading.uhi_delta).toFixed(1)}°F`, sub: 'vs airports' });
+    const uhi = fmt(reading.uhi_delta, 1);
+    const sign = uhi.startsWith('\u2212') || /^[0.]+$/.test(uhi) ? '' : '+';
+    metrics.push({ label: 'URBAN HEAT', value: `${sign}${uhi}°F`, sub: 'vs airports' });
   } else {
     metrics.push({ label: 'RAIN TODAY', value: `${fmt(reading?.dailyrainin, 2)}"`, sub: '' });
   }
@@ -102,7 +107,7 @@ function buildJsx(reading: any) {
 
   // Whitespace between tags becomes phantom text nodes that break Satori's
   // "div with >1 child needs display:flex" rule. Build with no whitespace.
-  // Stamp the reading's own time, not wall-clock — the card must not claim to
+  // Stamp the reading's own time, not wall-clock - the card must not claim to
   // be fresher than the data it shows. Fall back to now only if absent.
   const ts = reading?.timestamp ? new Date(reading.timestamp).getTime() : NaN;
   const updatedLabel = Number.isNaN(ts) ? nowET() : etLabel(ts);
@@ -168,7 +173,7 @@ export async function GET({ request }: { request: Request }) {
   };
 
   // One retry on a transient blip: without this, a single failed scrape
-  // pins an all-"—" card at the edge for 5 min behind ?v=.
+  // pins an all-"--" card at the edge for 5 min behind ?v=.
   let reading: any = null;
   try { reading = await fetchCurrent(); } catch {}
   if (!hasReading(reading)) {

@@ -6,7 +6,7 @@ Station ID: KNYNEWYO2140 (Ambient Weather network)
 Location: 40.75°N 73.98°W (Midtown Manhattan)
 Hardware: Ambient Weather WS-2902 series
 Data resolution: 5-minute intervals
-Coverage: 2024–present
+Coverage: 2024-present
 
 ## Data Fields
 All fields available via API:
@@ -16,13 +16,13 @@ All fields available via API:
 - windgustmph: Wind gust (mph)
 - winddir: Wind direction (degrees)
 - baromrelin: Barometric pressure (inHg, relative)
-- uvi: UV index (0–11+)
+- uvi: UV index (0-11+)
 - solarradiation: Solar radiation (W/m²)
 - hourlyrainin: Hourly rainfall (inches)
 - dailyrainin: Daily rainfall (inches)
 - dewPoint: Dew point (°F)
 - feelsLike: Feels-like temperature (°F)
-- comfort_score: Microclimate Comfort Score (0–100, computed)
+- comfort_score: Microclimate Comfort Score (0-100, computed)
 - rain_prob: Rain probability next 60 min (%, computed)
 - uhi_delta: Urban Heat Island delta vs JFK/LGA/EWR airports (°F, computed)
 
@@ -41,7 +41,7 @@ All fields available via API:
 - GET https://api.wx.jamestannahill.com/openapi.json - OpenAPI 3 specification
 
 ## Computed Metrics
-### Comfort Score (0–100)
+### Comfort Score (0-100)
 Composite of: feels-like deviation from 71°F ideal, humidity, wind speed, UV index, rain rate. Season-weighted and compared to this station's own 90-day baseline.
 
 ### Rain Probability
@@ -55,8 +55,8 @@ Nearest-neighbor pattern matching on 90 days of 5-minute data. Finds 5 most simi
 
 ## Pages
 - / - Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations, NWS alerts)
-- /docs.html - Technical documentation (how it works, data sources, methodology, API reference)
-- /embed.html - Badge widget and iframe embed instructions
+- /docs - Technical documentation (how it works, data sources, methodology, API reference)
+- /embed - Badge widget and iframe embed instructions
 
 ## Data Sources
 - Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHaus aggregator

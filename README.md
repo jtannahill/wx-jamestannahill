@@ -127,7 +127,7 @@ Cloudflare Worker (Astro 6 SSR) → wx.jamestannahill.com  (dashboard)
      a degraded render (API miss) is served uncached so the next
      crawler scrape recovers the current snapshot; no AWS dependency
    • Chart shipped as Preact island, hydrates on client:visible
-   • Partytown moves GA off the main thread; /docs.html prefetched on hover
+   • Partytown moves GA off the main thread; /docs prefetched on hover
 
 API Gateway + CloudFront → api.wx.jamestannahill.com
 ```
@@ -236,7 +236,7 @@ scripts/
 cd cdk && npx cdk deploy --require-approval never
 
 # Deploy dashboard Worker to Cloudflare
-#   - Builds Astro (SSR for /, prerender for /docs.html)
+#   - Builds Astro (SSR for /, prerender for /docs, served from docs.html)
 #   - Patches the auto-generated wrangler.json (name, vars, custom domain)
 #   - wrangler deploy → wx.jamestannahill.com
 bash scripts/deploy_worker.sh

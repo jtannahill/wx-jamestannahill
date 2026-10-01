@@ -18,6 +18,11 @@ const RANGE_LABELS: Record<number, string> = {
   12: '12 hours', 24: '24 hours', 168: '7 days', 720: '30 days',
 };
 
+// Empty-value placeholder, same glyph as EMPTY in public/app.js.
+const EMPTY = '--';
+// Negative values use a true minus sign (U+2212); a rounded -0 drops its sign.
+const withMinus = (s: string) => (/^-0*(\.0+)?$/.test(s) ? s.slice(1) : s.replace(/^-/, '\u2212'));
+
 const toC  = (f: number) => (f - 32) * 5 / 9;
 const toDC = (df: number) => df * 5 / 9;
 const tempUnitFor = (cel: boolean) => cel ? '°C' : '°F';
@@ -25,8 +30,8 @@ const tempUnitFor = (cel: boolean) => cel ? '°C' : '°F';
 // ── Plugins ──────────────────────────────────────────────────────────────────
 function makeTooltipPlugin(readings: any[], hours: number, activeField: string, useCelsius: boolean) {
   let el: HTMLDivElement;
-  const fmtT = (v: any, d: number) => v == null ? '—' : (useCelsius ? toC(Number(v)) : Number(v)).toFixed(d);
-  const fmtD = (v: any, d: number) => v == null ? '—' : (useCelsius ? toDC(Number(v)) : Number(v)).toFixed(d);
+  const fmtT = (v: any, d: number) => v == null ? EMPTY : withMinus((useCelsius ? toC(Number(v)) : Number(v)).toFixed(d));
+  const fmtD = (v: any, d: number) => v == null ? EMPTY : withMinus((useCelsius ? toDC(Number(v)) : Number(v)).toFixed(d));
   const tu   = tempUnitFor(useCelsius);
   const fmtChartLabel = (ms: number) => {
     const d = new Date(ms);
@@ -56,7 +61,7 @@ function makeTooltipPlugin(readings: any[], hours: number, activeField: string, 
         if (r.humidity     != null) rows.push(`<div>RH&emsp;&ensp;${activeField==='humidity'    ? active(r.humidity.toFixed(0)+'%')       : r.humidity.toFixed(0)+'%'}</div>`);
         if (r.windspeedmph != null) rows.push(`<div>Wind&ensp;${activeField==='windspeedmph'  ? active(r.windspeedmph.toFixed(1)+' mph') : r.windspeedmph.toFixed(1)+' mph'}</div>`);
         if (r.baromrelin   != null) rows.push(`<div>Pres&ensp;${activeField==='baromrelin'    ? active(r.baromrelin.toFixed(2)+'"')      : r.baromrelin.toFixed(2)+'"'}</div>`);
-        if (r.uhi_delta    != null) { const v = (r.uhi_delta>=0?'+':'')+fmtD(r.uhi_delta,1)+tu; rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active(v) : v}</div>`); }
+        if (r.uhi_delta    != null) { const m = fmtD(r.uhi_delta,1); const v = (m.startsWith('\u2212') || /^[0.]+$/.test(m) ? '' : '+')+m+tu; rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active(v) : v}</div>`); }
         if ((r.hourlyrainin??0) > 0.005) rows.push(`<div>Rain&ensp;${r.hourlyrainin.toFixed(2)}"/hr</div>`);
         el.innerHTML = rows.join('');
         el.hidden = false;
@@ -85,8 +90,13 @@ function makeDrawPlugin(tsArr: number[], baseArr: any[], upperArr: any[], lowerA
       }],
       draw: [(u: any) => {
         try {
-          const { ctx } = u;
+          const { ctx, bbox } = u;
           ctx.save();
+          // Keep the band and baseline inside the plot area; without the clip a
+          // baseline step outside the y range paints over the axes.
+          ctx.beginPath();
+          ctx.rect(bbox.left, bbox.top, bbox.width, bbox.height);
+          ctx.clip();
           const hasUpper = upperArr && upperArr.some(v => v != null);
           const hasLower = lowerArr && lowerArr.some(v => v != null);
           if (hasUpper && hasLower) {
@@ -437,12 +447,32 @@ export default function Chart({ apiBase }: Props) {
     {
       const nums = vals.filter((v: any) => v != null && isFinite(v)) as number[];
       if (nums.length) {
-        const f = (v: number) => `${v.toFixed(cfg.decimals)}${cfg.unit}`;
+        const f = (v: number) => `${withMinus(v.toFixed(cfg.decimals))}${cfg.unit}`;
         const lo = Math.min(...nums), hi = Math.max(...nums), last = nums[nums.length - 1];
         setSummary(`${cfg.label}, last ${RANGE_LABELS[hours] || `${hours} hours`}: low ${f(lo)}, high ${f(hi)}, latest ${f(last)}`);
       }
     }
     setHasRain(rain.some((v: any) => v != null && v > 0));
+
+    // y range spans the observed series AND the baseline band within the
+    // visible x window, so the sigma band and dashed baseline never fall
+    // outside the plot. 5% padding each side.
+    const yRange = (u: any, dMin: number | null, dMax: number | null): [number, number] => {
+      let lo = dMin != null && isFinite(dMin) ? dMin : Infinity;
+      let hi = dMax != null && isFinite(dMax) ? dMax : -Infinity;
+      const xMin = u.scales?.x?.min, xMax = u.scales?.x?.max;
+      for (let i = 0; i < ts.length; i++) {
+        if (xMin != null && ts[i] < xMin) continue;
+        if (xMax != null && ts[i] > xMax) continue;
+        for (const v of [upper[i], lower[i], base[i]]) {
+          if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+        }
+      }
+      if (!isFinite(lo) || !isFinite(hi)) return [0, 1];
+      if (hi === lo) { lo -= 1; hi += 1; }
+      const pad = (hi - lo) * 0.05;
+      return [lo - pad, hi + pad];
+    };
 
     if (uplotRef.current) { uplotRef.current._wxCleanup?.(); uplotRef.current.destroy(); uplotRef.current = null; }
     wrap.innerHTML = '';
@@ -474,13 +504,13 @@ export default function Chart({ apiBase }: Props) {
             stroke: '#999',
             ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
             grid:   { stroke: '#1e1e1e', width: 1 },
-            values: (_u: any, ticks: number[]) => ticks.map(v => v != null ? `${Number(v).toFixed(cfg.decimals)}${cfg.unit}` : null),
+            values: (_u: any, ticks: number[]) => ticks.map(v => v != null ? `${withMinus(Number(v).toFixed(cfg.decimals))}${cfg.unit}` : null),
             font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
             size: window.innerWidth < 480 ? 48 : 56, gap: 6,
           },
           { show: false, scale: 'rain' },
         ],
-        scales: { x: {}, y: { auto: true } as any, rain: { range: [0, maxRain * 14] } as any },
+        scales: { x: {}, y: { auto: true, range: yRange } as any, rain: { range: [0, maxRain * 14] } as any },
         series: [
           {} as any,
           { stroke: '#c8b97a', width: 2, fill: 'rgba(200,185,122,0.08)' } as any,
@@ -586,7 +616,7 @@ export default function Chart({ apiBase }: Props) {
           {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>}
           <button class={`chart-action-btn${flashed === 'copy' ? ' flash' : ''}`} title="Copy chart" aria-label={flashed === 'copy' ? 'Chart copied' : 'Copy chart'} onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
           <button class={`chart-action-btn${flashed === 'share' ? ' flash' : ''}`} title="Share chart" aria-label={flashed === 'share' ? 'Chart shared' : 'Share chart'} onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
-          <a class="source-tag has-tooltip" href="/docs.html#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
+          <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
         </div>
       </div>
       <div class="chart-controls">

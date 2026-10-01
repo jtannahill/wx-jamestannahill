@@ -1,0 +1,5 @@
+# Clean URLs are canonical. The assets binding serves docs.html at /docs and
+# embed.html at /embed (html_handling auto-trailing-slash in
+# scripts/deploy_worker.sh); old .html links move permanently.
+/docs.html /docs 301
+/embed.html /embed 301

@@ -1,10 +1,12 @@
 /*
   X-Content-Type-Options: nosniff
 
-# docs.html is prerendered and served by the assets binding, which bypasses
-# the Astro middleware, so it gets its security headers (including the CSP)
-# here. Keep the CSP in sync with src/middleware.ts.
-/docs.html
+# The docs page is prerendered to docs.html and served at /docs by the assets
+# binding (html_handling auto-trailing-slash), which bypasses the Astro
+# middleware, so it gets its security headers (including the CSP) here.
+# Header rules match the request path, so the rule is keyed on /docs.
+# Keep the CSP in sync with src/middleware.ts.
+/docs
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.jamestannahill.com; font-src https://fonts.jamestannahill.com; img-src 'self' data:; connect-src 'self' https://api.wx.jamestannahill.com https://www.googletagmanager.com https://www.google-analytics.com https://cloudflareinsights.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Frame-Options: DENY
