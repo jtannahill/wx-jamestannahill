@@ -176,8 +176,10 @@ function renderCurrent(data) {
   setReading('dewpoint', `Dew point ${fmtT(data.dewPoint, 0)}${tempUnit()}`);
 
   setReading('pressure', `${fmt(data.baromrelin, 2)}"`);
-  const trend = data.pressure_trend || 'steady';
-  setReading('pressure-trend', trend === 'rising' ? '↑ Rising' : trend === 'falling' ? '↓ Falling' : '→ Steady');
+  // No pressure reading means no trend either; do not claim "Steady".
+  const trend = data.baromrelin == null ? null : (data.pressure_trend || 'steady');
+  setReading('pressure-trend', trend == null ? EMPTY
+    : trend === 'rising' ? '↑ Rising' : trend === 'falling' ? '↓ Falling' : '→ Steady');
 
   setReading('uv', fmt(data.uv, 0));
   setReading('solar', `${fmt(data.solarradiation, 0)} W/m²`);
@@ -888,6 +890,21 @@ function renderRainEvents(events) {
   list.removeAttribute('aria-busy');
 }
 
+// ── Unavailable state ────────────────────────────────────────────────────────
+// A section still showing its server-rendered skeleton when its data failed
+// to load settles into a quiet message instead of shimmering forever. The
+// next successful render replaces it (renderers rebuild their containers).
+function settleUnavailable(id) {
+  const el = document.getElementById(id);
+  if (!el || el.getAttribute('aria-busy') !== 'true') return;
+  const msg = document.createElement('p');
+  msg.className = 'section-unavailable';
+  msg.textContent = 'Not available right now. Retrying with the next refresh.';
+  el.replaceChildren(msg);
+  el.removeAttribute('aria-busy');
+}
+const CURRENT_SECTIONS = ['hourly-strip', 'forecast-grid', 'records-grid', 'nearby-strip'];
+
 // ── Secondary data (comfort calendar + rain events) ───────────────────────────
 // Each section fetches on its own: /daily-summaries is fast, /rain-events can
 // take ~3s, so neither waits on the other. Cached copies paint first.
@@ -896,13 +913,14 @@ let secondaryLoaded = false;
 async function loadDailySummaries() {
   try {
     const resp = await fetch(`${API_BASE}/daily-summaries?days=30`);
-    if (!resp.ok) return false;
+    if (!resp.ok) { settleUnavailable('comfort-grid'); return false; }
     const d = await resp.json();
     cacheSet('daily_summaries', d.summaries || []);
     renderComfortCalendar(d.summaries || []);
     return true;
   } catch (e) {
     console.error('Daily summaries load failed:', e);
+    settleUnavailable('comfort-grid');
     return false;
   }
 }
@@ -910,13 +928,14 @@ async function loadDailySummaries() {
 async function loadRainEvents() {
   try {
     const resp = await fetch(`${API_BASE}/rain-events?days=14`);
-    if (!resp.ok) return false;
+    if (!resp.ok) { settleUnavailable('rain-events-list'); return false; }
     const d = await resp.json();
     cacheSet('rain_events', d.events || []);
     renderRainEvents(d.events || []);
     return true;
   } catch (e) {
     console.error('Rain events load failed:', e);
+    settleUnavailable('rain-events-list');
     return false;
   }
 }
@@ -956,6 +975,8 @@ async function refresh(forceHistory = false) {
     console.error('Refresh failed:', e);
     showFetchFailure();
   }
+  // Sections that failed at boot get another chance on every refresh.
+  if (!secondaryLoaded) loadSecondaryData();
 }
 
 function showFetchFailure() {
@@ -987,6 +1008,8 @@ unitToggleBtn.addEventListener('click', () => {
   document.getElementById('temp-unit').textContent = tempUnit();
   if (_bootCurrent) {
     renderCurrent(_bootCurrent);
+    renderTomorrow(_bootCurrent.nws_tomorrow, _bootCurrent.wk_attribution);
+    renderSummary(_bootCurrent.daily_summary);
     renderClimatePanel(_bootCurrent);
     renderStationRecords(_bootCurrent.station_records);
     renderNearby(_bootCurrent.nearby_stations, null, _bootCurrent.nearby_variance);
@@ -998,9 +1021,12 @@ unitToggleBtn.addEventListener('click', () => {
 
 const refreshBtn = document.getElementById('refresh-btn');
 refreshBtn.addEventListener('click', async () => {
+  if (refreshBtn.classList.contains('spinning')) return; // one refresh at a time
   refreshBtn.classList.add('spinning');
+  refreshBtn.setAttribute('aria-busy', 'true');
   await refresh(true);
   refreshBtn.classList.remove('spinning');
+  refreshBtn.removeAttribute('aria-busy');
 });
 
 // ── Viewport-aware tooltip manager ───────────────────────────────────────────
@@ -1207,6 +1233,7 @@ async function boot() {
   } else {
     console.error('Current fetch failed:', rCur.reason);
     showFetchFailure();
+    CURRENT_SECTIONS.forEach(settleUnavailable);
   }
 
   if (rHist.status === 'fulfilled') {

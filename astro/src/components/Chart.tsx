@@ -379,6 +379,7 @@ export default function Chart({ apiBase }: Props) {
   const [hasRain, setHasRain] = useState<boolean>(false);
   const [summary, setSummary] = useState<string>('');
   const [loadError, setLoadError] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [flashed, setFlashed] = useState<'copy' | 'share' | null>(null);
 
@@ -403,15 +404,19 @@ export default function Chart({ apiBase }: Props) {
   // Fetch history when hours changes
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadError(false);
     (async () => {
       try {
         const r = await fetch(`${apiBase}/history?hours=${hours}`);
         if (!r.ok) throw new Error(`history ${r.status}`);
         const j = await r.json();
-        if (!cancelled) { setLoadError(false); setHistory(j); }
+        // Tag the payload with the range it answers, so the chart never draws
+        // one range's data under another range's axis labels and summary.
+        if (!cancelled) { setHistory({ ...j, _hours: hours }); setLoading(false); }
       } catch (e) {
         console.error('[chart] history fetch failed:', e);
-        if (!cancelled) setLoadError(true);
+        if (!cancelled) { setLoadError(true); setLoading(false); }
       }
     })();
     return () => { cancelled = true; };
@@ -421,6 +426,7 @@ export default function Chart({ apiBase }: Props) {
   useEffect(() => {
     if (!history?.readings?.length || !wrapRef.current) return;
     const wrap = wrapRef.current;
+    const hours: number = history._hours ?? 24;
     const cfg = { ...(FIELD_LABELS[field] || { label: field, unit: '', decimals: 1 }) };
     if (useCelsius && (field === 'tempf' || field === 'uhi_delta')) cfg.unit = '°C';
     const readings = history.readings;
@@ -450,9 +456,14 @@ export default function Chart({ apiBase }: Props) {
         const f = (v: number) => `${withMinus(v.toFixed(cfg.decimals))}${cfg.unit}`;
         const lo = Math.min(...nums), hi = Math.max(...nums), last = nums[nums.length - 1];
         setSummary(`${cfg.label}, last ${RANGE_LABELS[hours] || `${hours} hours`}: low ${f(lo)}, high ${f(hi)}, latest ${f(last)}`);
+      } else {
+        setSummary(`${cfg.label}, last ${RANGE_LABELS[hours] || `${hours} hours`}: no readings`);
       }
     }
-    setHasRain(rain.some((v: any) => v != null && v > 0));
+    // Rain is drawn only when there is some, matching the legend; an all-zero
+    // series would otherwise trace a blue line along the plot floor.
+    const anyRain = rain.some((v: any) => v != null && v > 0);
+    setHasRain(anyRain);
 
     // y range spans the observed series AND the baseline band within the
     // visible x window, so the sigma band and dashed baseline never fall
@@ -493,8 +504,10 @@ export default function Chart({ apiBase }: Props) {
             values: (_u: any, ticks: number[]) => ticks.map(v => {
               if (v == null) return null;
               const d = new Date(v * 1000);
-              if (hours > 24) return `${d.getMonth()+1}/${d.getDate()}`;
               const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
+              // 30d: dates only. 7d: ticks fall every few hours, so a date-only
+              // label repeats; show the date at midnight and the hour otherwise.
+              if (hours > 168 || (hours > 24 && h === 0)) return `${d.getMonth()+1}/${d.getDate()}`;
               return `${h===0?12:h>12?h-12:h}${ap}`;
             }),
             font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
@@ -514,7 +527,7 @@ export default function Chart({ apiBase }: Props) {
         series: [
           {} as any,
           { stroke: '#c8b97a', width: 2, fill: 'rgba(200,185,122,0.08)' } as any,
-          { scale: 'rain', stroke: 'rgba(90,140,210,0.7)', fill: 'rgba(90,140,210,0.20)', width: 1 } as any,
+          { scale: 'rain', show: anyRain, stroke: 'rgba(90,140,210,0.7)', fill: 'rgba(90,140,210,0.20)', width: 1 } as any,
         ],
         plugins: [
           makeDrawPlugin(ts, base, upper, lower),
@@ -534,7 +547,7 @@ export default function Chart({ apiBase }: Props) {
       console.error('[wx chart]', e);
       wrap.innerHTML = '<div class="wx-chart-msg">The chart could not be drawn. Refresh the page to try again.</div>';
     }
-  }, [history, field, useCelsius, hours]);
+  }, [history, field, useCelsius]);
 
   // ResizeObserver
   useEffect(() => {
@@ -633,14 +646,14 @@ export default function Chart({ apiBase }: Props) {
           ))}
         </div>
       </div>
-      {loadError && !history && (
+      {loadError && (
         <div class="wx-chart-msg" role="status">
           Chart history did not load.
           <button type="button" onClick={() => setReloadKey((k) => k + 1)}>Try again</button>
         </div>
       )}
-      <div ref={wrapRef} class="wx-chart-wrap" role="img" aria-label={summary || 'History chart, loading'} hidden={loadError && !history} />
-      <div class="chart-legend">
+      <div ref={wrapRef} class="wx-chart-wrap" role="img" aria-busy={loading} aria-label={loading ? 'History chart, loading' : (summary || 'History chart, loading')} hidden={loadError} />
+      <div class="chart-legend" hidden={loadError}>
         <span class="chart-legend-item"><span class="chart-legend-swatch swatch-observed"></span>Observed</span>
         {hasBaseline && (
           <>
@@ -650,7 +663,7 @@ export default function Chart({ apiBase }: Props) {
         )}
         {hasRain && <span class="chart-legend-item"><span class="chart-legend-swatch swatch-rain"></span>Rainfall</span>}
       </div>
-      <div class="chart-hint">Pinch or Ctrl+scroll to zoom, drag to pan, double-click or use Reset zoom to reset</div>
+      <div class="chart-hint" hidden={loadError}>Pinch or Ctrl+scroll to zoom, drag to pan, double-click or use Reset zoom to reset</div>
     </section>
   );
 }

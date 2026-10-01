@@ -57,7 +57,8 @@ const windDetail   = boot?.winddir != null ? `From ${compass(boot.winddir)} (${f
 const humidity     = `${fmt(boot?.humidity, 0)}%`;
 const dewpoint     = `Dew point ${fmt(boot?.dewPoint, 0)}°F`;
 const pressure     = `${fmt(boot?.baromrelin, 2)}"`;
-const pressureT    = trendArrow(boot?.pressure_trend);
+// No pressure reading means no trend either; do not claim "Steady".
+const pressureT    = boot?.baromrelin == null ? EMPTY : trendArrow(boot?.pressure_trend);
 const uv           = fmt(boot?.uv, 0);
 const solar        = `${fmt(boot?.solarradiation, 0)} W/m²`;
 const rainHourly   = `${fmt(boot?.hourlyrainin, 2)}"`;

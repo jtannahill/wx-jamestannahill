@@ -18,6 +18,9 @@
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
 
+/* Browser surfaces carry the palette too. */
+::selection { background: rgba(200,185,122,0.32); color: var(--text); }
+
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
@@ -339,6 +342,7 @@ button.card-clickable {
   border-bottom: 1px solid var(--border);
   background: #0e0e0e;
 }
+.chart-legend[hidden] { display: none; }
 .chart-legend-item {
   display: flex;
   align-items: center;
@@ -504,6 +508,7 @@ button.card-clickable {
   padding: 10px 14px; margin-bottom: 10px;
   background: var(--surface); border: 1px solid var(--border);
 }
+.nearby-variance[hidden] { display: none; }
 .nv-item { display: inline-flex; align-items: baseline; gap: 8px; }
 .nv-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); }
 .nv-value { font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -541,6 +546,15 @@ button.card-clickable {
 .rain-event-total { font-size: 15px; color: var(--blue); font-variant-numeric: tabular-nums; }
 .rain-event-detail { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 .rain-events-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+
+/* A lazily filled section whose data failed: replaces the skeleton, spans the
+   whole grid or strip, and reads in the same voice as the rain empty state. */
+.section-unavailable {
+  grid-column: 1 / -1; flex: 1 1 100%;
+  font-size: 13px; color: var(--muted); padding: 14px;
+}
+.comfort-grid > .section-unavailable,
+.nearby-strip > .section-unavailable { padding: 8px 0; }
 
 /* ── Source tags ─────────────────────────────────────────────────────────── */
 .source-tag {
@@ -691,7 +705,12 @@ footer a { color: var(--muted); text-decoration: underline; }
 /* Loaded frame = plot height + 24px padding + 2px border; reserve it up front. */
 .wx-chart-wrap { min-height: 246px; }
 @media (max-width: 480px) { .wx-chart-wrap { min-height: 206px; } }
+/* A new range or metric is loading: the previous chart dims until it lands. */
+.wx-chart-wrap { transition: opacity 150ms var(--ease-out); }
+.wx-chart-wrap[aria-busy="true"]:not(:empty) { opacity: 0.4; }
 .wx-chart-msg { color: var(--muted); font-size: 12px; padding: 20px 16px; }
+/* Outside the chart frame the message aligns with the section edge. */
+.chart-section > .wx-chart-msg { padding-left: 0; padding-right: 0; }
 .wx-chart-msg button {
   margin-left: 10px; background: none; border: 1px solid var(--border); color: var(--text);
   font-family: inherit; font-size: 12px; padding: 6px 12px; min-height: 36px; cursor: pointer;
@@ -829,7 +848,8 @@ footer a { color: var(--muted); text-decoration: underline; }
   background: #1c1c1c;
   border-radius: 1px;
   margin: 5px 0 4px;
-  overflow: hidden;
+  /* visible: the 9px marker straddles the 3px track and must not be clipped */
+  overflow: visible;
 }
 
 .climate-bar-fill {
