@@ -46,8 +46,11 @@ def _ordinal(n: int) -> str:
     return f"{n}{['th','st','nd','rd','th'][min(n%10,4)]}"
 
 
-def compute_anomalies(current: dict, baseline: dict, month: int, hour: int) -> dict:
-    month_name = datetime(2026, month, 1).strftime('%B')
+def compute_anomalies(current: dict, baseline: dict, month: int, hour: int,
+                      period: str | None = None) -> dict:
+    # period ("early October") names a blended baseline; the bare month name
+    # is kept for callers that pass a single-month baseline.
+    month_name = period or datetime(2026, month, 1).strftime('%B')
     hour_label = datetime(2026, 1, 1, hour).strftime('%-I%p').lower()  # e.g. "9am"
 
     def delta_label(field: str, unit: str) -> dict | None:

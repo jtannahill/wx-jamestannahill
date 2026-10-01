@@ -8,6 +8,7 @@ STATION_TZ = ZoneInfo('America/New_York')
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
 from wx_api.anomaly import compute_anomalies, pressure_trend, condition_label, percentile_rank
+from wx_api.baseline import blend_plan, blend, period_label
 from wx_api.climate_context import live_context, daily_verdict, anomaly_headline
 from shared.uhi import fetch_uhi
 from wx_api.ml import comfort_score, rain_probability
@@ -143,14 +144,24 @@ def _current():
         data_stale   = False
 
     local_now = now.astimezone(STATION_TZ)
-    month_hour = local_now.strftime('%m-%H')
     doy      = local_now.strftime("%m%d")        # e.g. "0413"
     doy_hour = f"{doy}-{local_now.hour:02d}"     # e.g. "0413-14"
+    # Month baselines blend toward the adjacent month by day of month, so the
+    # anomaly does not jump at midnight on the 1st (see wx_api/baseline.py).
+    own_key, other_key, weight = blend_plan(local_now)
     stats_table = get_table(STATS_TABLE)
-    stats_resp = stats_table.get_item(Key={'station_id': mac, 'month_hour': month_hour})
+    stats_resp = stats_table.get_item(Key={'station_id': mac, 'month_hour': own_key})
     baseline = _floatify(stats_resp.get('Item', {}))
+    if baseline and weight > 0:
+        try:
+            other_resp = stats_table.get_item(Key={'station_id': mac, 'month_hour': other_key})
+            baseline = blend(baseline, _floatify(other_resp.get('Item', {})), weight)
+        except Exception as e:
+            print(f"Adjacent baseline fetch (non-fatal): {e}")
 
-    anomalies = compute_anomalies(reading, baseline, local_now.month, local_now.hour) if baseline else {}
+    anomalies = (compute_anomalies(reading, baseline, local_now.month, local_now.hour,
+                                   period=period_label(local_now))
+                 if baseline else {})
     trend     = pressure_trend(recent)
     label     = condition_label(reading)
     baseline_source = baseline.get('source', 'none') if baseline else 'none'
@@ -433,25 +444,25 @@ def _attach_baselines(readings: list, mac: str) -> list:
     import boto3 as _boto3
     BASELINE_FIELDS = ['tempf', 'humidity', 'windspeedmph', 'baromrelin']
 
-    # Collect unique month-hour keys (NY local time)
-    mh_to_indices: dict = {}
+    # Each reading blends its own month-hour baseline with the adjacent
+    # month's (NY local time), matching the headline anomaly.
+    plans: dict = {}
     for i, r in enumerate(readings):
         try:
             dt = datetime.fromisoformat(r.get('timestamp', ''))
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-            local = dt.astimezone(STATION_TZ)
-            mh = local.strftime('%m-%H')
-            mh_to_indices.setdefault(mh, []).append(i)
+            plans[i] = blend_plan(dt.astimezone(STATION_TZ))
         except Exception:
             pass
 
-    if not mh_to_indices:
+    if not plans:
         return readings
 
     # Batch-fetch baselines (DynamoDB batch_get_item, max 100 per request)
     dynamo = _boto3.resource('dynamodb', region_name='us-east-1')
-    all_keys = [{'station_id': mac, 'month_hour': mh} for mh in mh_to_indices]
+    needed = sorted({k for own, other, _w in plans.values() for k in (own, other)})
+    all_keys = [{'station_id': mac, 'month_hour': mh} for mh in needed]
     baseline_cache: dict = {}
 
     for i in range(0, len(all_keys), 100):
@@ -462,13 +473,12 @@ def _attach_baselines(readings: list, mac: str) -> list:
             f = _floatify(item)
             baseline_cache[f['month_hour']] = f
 
-    # Attach baseline mean and std to each reading
-    for mh, indices in mh_to_indices.items():
-        b = baseline_cache.get(mh, {})
-        for idx in indices:
-            for field in BASELINE_FIELDS:
-                readings[idx][f'baseline_{field}']     = b.get(f'avg_{field}')
-                readings[idx][f'baseline_std_{field}'] = b.get(f'std_{field}')
+    # Attach blended baseline mean and std to each reading
+    for idx, (own, other, weight) in plans.items():
+        b = blend(baseline_cache.get(own, {}), baseline_cache.get(other), weight)
+        for field in BASELINE_FIELDS:
+            readings[idx][f'baseline_{field}']     = b.get(f'avg_{field}')
+            readings[idx][f'baseline_std_{field}'] = b.get(f'std_{field}')
 
     return readings
 
