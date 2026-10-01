@@ -2,7 +2,9 @@
 
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white)
+![Astro](https://img.shields.io/badge/Astro-BC52EE?logo=astro&logoColor=white)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
+![AWS CDK](https://img.shields.io/badge/AWS_CDK-232F3E?logo=amazonwebservices&logoColor=white)
 ![Ambient Weather](https://img.shields.io/badge/sensor-Ambient_WS--2902-orange)
 [![Live](https://img.shields.io/badge/live-wx.jamestannahill.com-blue)](https://wx.jamestannahill.com)
 ![Last Commit](https://img.shields.io/github/last-commit/jtannahill/wx-jamestannahill)
@@ -24,7 +26,7 @@ Live hyperlocal weather dashboard for Midtown Manhattan, New York. Data from a p
 - **WeatherKit forecast**: Apple WeatherKit 7-day outlook with daily high/low, condition, precipitation probability, and UV index
 - **NWS alerts**: active National Weather Service warnings for the station coordinates (via api.weather.gov)
 - **Nearby stations**: Weather Underground personal weather stations in the area (the home station excluded) with current conditions for local comparison
-- **Comfort calendar**: 30-day heatmap grid, color-coded by daily comfort score (0–100)
+- **Comfort calendar**: 30-day heatmap grid, color-coded by daily comfort score (0 to 100)
 - **Station records**: current-month extremes: temp high/low, max gust, peak rain rate, pressure range, each with the date it was set
 - **Analog forecast**: +1h/+2h/+3h predictions via nearest-neighbor pattern matching on 90 days of station data, with running MAE accuracy
 - **Urban Heat Island delta**: this station vs. the average of JFK, LGA, and EWR METAR readings, updated every 5 minutes
@@ -180,7 +182,7 @@ API Gateway + CloudFront → api.wx.jamestannahill.com
 Logistic regression: `p = σ(w·x + b)`. Features: humidity (normalized), 1-hour pressure trend, dew-point depression, sin/cos of hour-of-day. Weekly refit via gradient descent (300 epochs, L2 regularization, class weighting `n_neg/n_pos`). Current model: F1=0.396, recall=82%, n=24,348.
 
 ### Analog Forecast
-1-hour buckets of the last 90 days → normalize to [0,1] → 6-hour fingerprint → nearest 5 Euclidean neighbors → average their next 3-hour trajectories. Confidence = inverse of mean neighbor distance, normalized to 0–100%.
+1-hour buckets of the last 90 days → normalize to [0,1] → 6-hour fingerprint → nearest 5 Euclidean neighbors → average their next 3-hour trajectories. Confidence = inverse of mean neighbor distance, normalized to 0 to 100%.
 
 ### Baseline Variance (±1σ bands)
 Welford's online algorithm accumulates per-slot variance alongside the rolling mean. Transition to EMA variance at 8,640 samples (30 days). Standard deviation is stored as `std_{field}` per MM-HH slot and served via `/history`.
@@ -245,4 +247,4 @@ bash scripts/deploy_worker.sh
 First-time setup needs `npx wrangler login` (one-shot OAuth) and a DNS record
 for `wx.jamestannahill.com` that doesn't conflict with the Custom Domain.
 
-Estimated cost: **~$4–6/month** AWS, Worker on the free tier.
+Estimated cost: **about $4 to $6 per month** AWS, Worker on the free tier.
