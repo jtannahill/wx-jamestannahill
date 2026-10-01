@@ -663,7 +663,7 @@ export default function Chart({ apiBase }: Props) {
         )}
         {hasRain && <span class="chart-legend-item"><span class="chart-legend-swatch swatch-rain"></span>Rainfall</span>}
       </div>
-      <div class="chart-hint" hidden={loadError}>Pinch or Ctrl+scroll to zoom, drag to pan, double-click or use Reset zoom to reset</div>
+      <div class="chart-hint" hidden={loadError}>Pinch or Ctrl+scroll to zoom, drag to pan</div>
     </section>
   );
 }

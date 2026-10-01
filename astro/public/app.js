@@ -368,7 +368,9 @@ function renderForecast(forecast, nowTempF) {
                    : 'Low confidence';
   const metaParts = [
     `${confLabel} (${confidence}%)`,
-    forecast.best_match_label ? `best analog: ${forecast.best_match_label}` : '',
+    forecast.best_match_label
+      ? `best analog: ${String(forecast.best_match_label).replace(/^[a-z]{3}(?= \d)/, (m) => m[0].toUpperCase() + m.slice(1))}`
+      : '',
   ];
   if (forecast.accuracy && forecast.accuracy.mae_1h_tempf != null) {
     const n = forecast.accuracy.evaluation_count;
@@ -899,7 +901,7 @@ function settleUnavailable(id) {
   if (!el || el.getAttribute('aria-busy') !== 'true') return;
   const msg = document.createElement('p');
   msg.className = 'section-unavailable';
-  msg.textContent = 'Not available right now. Retrying with the next refresh.';
+  msg.textContent = 'Not available right now. Trying again on the next refresh.';
   el.replaceChildren(msg);
   el.removeAttribute('aria-busy');
 }
@@ -986,8 +988,8 @@ function showFetchFailure() {
     ? new Date(_bootCurrent.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET'
     : null;
   staleMsg.textContent = at
-    ? `Could not reach the station. Showing the reading from ${at}. Select Refresh to try again.`
-    : 'Could not reach the station. Select Refresh to try again.';
+    ? `Could not reach the station. Showing the reading from ${at}. Use the refresh button to try again.`
+    : 'Could not reach the station. Use the refresh button to try again.';
   banner.hidden = false;
 }
 
