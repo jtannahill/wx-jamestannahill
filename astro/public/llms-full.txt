@@ -6,7 +6,7 @@ Station ID: KNYNEWYO2140 (Ambient Weather network)
 Location: 40.75°N 73.98°W (Midtown Manhattan)
 Hardware: Ambient Weather WS-2902 series
 Data resolution: 5-minute intervals
-Coverage: 2024-present
+Coverage: January 2026 to present
 
 ## Data Fields
 All fields available via API:
@@ -16,14 +16,14 @@ All fields available via API:
 - windgustmph: Wind gust (mph)
 - winddir: Wind direction (degrees)
 - baromrelin: Barometric pressure (inHg, relative)
-- uvi: UV index (0-11+)
+- uv: UV index (0-11+)
 - solarradiation: Solar radiation (W/m²)
 - hourlyrainin: Hourly rainfall (inches)
 - dailyrainin: Daily rainfall (inches)
 - dewPoint: Dew point (°F)
 - feelsLike: Feels-like temperature (°F)
-- comfort_score: Microclimate Comfort Score (0-100, computed)
-- rain_prob: Rain probability next 60 min (%, computed)
+- comfort: Microclimate Comfort Score, {score (0-100), label} (computed)
+- rain_probability: Rain probability next 60 min, {probability (%), label} (computed)
 - uhi_delta: Urban Heat Island delta vs JFK/LGA/EWR airports (°F, computed)
 
 ## API Endpoints
@@ -31,7 +31,7 @@ All fields available via API:
 - GET https://api.wx.jamestannahill.com/history?hours=24: History for past N hours (24, 168, or 720 max)
 - GET https://api.wx.jamestannahill.com/daily-summaries?days=30: Daily summaries: {summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}
 - GET https://api.wx.jamestannahill.com/rain-events?days=30: Recent rain events: {events: [{start, peak_rate, duration_min, total_in}], days}
-- GET https://api.wx.jamestannahill.com/nearby: Nearby Ambient Weather stations: {stations, count, snapshot_at}
+- GET https://api.wx.jamestannahill.com/nearby: Nearby personal weather stations from the Weather Underground API: {stations, count, snapshot_at}
 - GET https://api.wx.jamestannahill.com/health: Health check: {ok, last_reading_at, data_age_minutes, poller_healthy}
 - GET https://api.wx.jamestannahill.com/forecast: Standalone analog forecast
 - GET https://api.wx.jamestannahill.com/records: Standalone station records
@@ -56,15 +56,16 @@ Nearest-neighbor pattern matching on 90 days of 5-minute data. Finds 5 most simi
 ## Pages
 - /: Live dashboard (conditions grid, comfort calendar, analog forecast, station records, history charts, rain events, nearby stations, NWS alerts)
 - /docs: Technical documentation (how it works, data sources, methodology, API reference)
-- /embed: Badge widget and iframe embed instructions
+- /embed: Badge widget embed instructions
 
 ## Data Sources
-- Primary: Ambient Weather Network (station KNYNEWYO2140) via CatHaus aggregator
+- Primary: Ambient Weather WS-2902, callsign CatHaus, polled from the Ambient Weather REST API every 5 minutes
 - Redistribution: Weather Underground (KNYNEWYO2140), Windy.com (CatHaus, station ID 0Gpj0rbF), NOAA CWOP (GW7880)
 - Airport ASOS: NOAA aviationweather.gov (JFK, LGA, EWR) for UHI delta
-- Daily forecast: Apple WeatherKit (tomorrow's conditions)
+- Forecast: Apple WeatherKit (next-12-hours strip and tomorrow's conditions)
+- Nearby stations: up to 20 nearby personal weather stations from the Weather Underground API
 - NWS alerts: api.weather.gov active alerts for station coordinates
 
 ## License
-Station data: CC BY 4.0
+Station data: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Credit wx.jamestannahill.com when you reuse it.
 Owner: James Tannahill (https://jamestannahill.com)

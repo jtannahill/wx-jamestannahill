@@ -1,5 +1,8 @@
 import type { APIRoute } from 'astro';
 
+// Only the dashboard carries a lastmod: its readings change every 5 minutes.
+// /docs and /embed are static, and stamping them with today's date on every
+// request teaches crawlers to ignore lastmod for the whole sitemap.
 export const GET: APIRoute = () => {
   const today = new Date().toISOString().slice(0, 10);
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -12,13 +15,11 @@ export const GET: APIRoute = () => {
   </url>
   <url>
     <loc>https://wx.jamestannahill.com/docs</loc>
-    <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://wx.jamestannahill.com/embed</loc>
-    <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

@@ -13,7 +13,8 @@ The dashboard includes derived metrics not available from commercial weather ser
 - **Primary station**: Ambient Weather KNYNEWYO2140 (CatHaus): private PWS, Midtown Manhattan
 - **Redistribution**: the same station also feeds Weather Underground (KNYNEWYO2140), Windy.com (CatHaus, station ID 0Gpj0rbF), and NOAA CWOP (GW7880)
 - **Urban Heat Island**: NOAA ASOS readings from JFK, LGA, and EWR via aviationweather.gov
-- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W: condition, high/low, wind
+- **Forecast**: Apple WeatherKit at 40.75°N 73.98°W: the next-12-hours strip and tomorrow's condition, high/low, and wind
+- **Nearby stations**: up to 20 nearby personal weather stations from the Weather Underground API
 
 ## API
 
@@ -23,7 +24,7 @@ The dashboard includes derived metrics not available from commercial weather ser
 - `GET /history?hours=24`: Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
 - `GET /daily-summaries?days=30`: Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
 - `GET /rain-events?days=30`: Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
-- `GET /nearby`: Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
+- `GET /nearby`: Nearby personal weather stations snapshot (from the Weather Underground API). Returns `{stations, count, snapshot_at}`.
 - `GET /health`: Health and data freshness. Returns `{ok, last_reading_at, data_age_minutes, poller_healthy}`.
 - `GET /forecast`: Standalone analog forecast (same shape as `forecast` in `/current`).
 - `GET /records`: Standalone station records (monthly + all-time).
@@ -39,6 +40,10 @@ The `/current` response also embeds `forecast`, `station_records`, `daily_summar
 - [Dashboard](https://wx.jamestannahill.com/): Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events, NWS alerts
 - [How It Works](https://wx.jamestannahill.com/docs): Technical documentation on data collection, processing pipeline, ML models, and the public API
 - [Embed](https://wx.jamestannahill.com/embed): Badge widget embed instructions
+
+## License
+
+Station data is licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Credit wx.jamestannahill.com when you reuse it.
 
 ## About the operator
 
