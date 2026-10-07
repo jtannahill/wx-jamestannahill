@@ -141,39 +141,6 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       <div class="percentile-rank" id="percentile-rank">{percentile}</div>
     </section>
 
-    <section class="climate-panel" id="climate-panel" hidden={!(boot?.climate_context?.headline || boot?.climate_context?.verdict)}>
-      <div class="climate-panel-header">
-        <h2 class="section-title">TODAY IN HISTORY</h2>
-        <span class="source-tag has-tooltip" id="climate-source-tag" data-tooltip="">NOAA / ERA5</span>
-      </div>
-      <div id="climate-metrics"></div>
-      <div class="climate-footer" id="climate-footer"></div>
-    </section>
-
-    <section class="summary-section tomorrow-section" id="tomorrow-section" hidden>
-      <div class="summary-header">
-        <p class="summary-date" id="tomorrow-date"></p>
-        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" data-tooltip="Apple WeatherKit - daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="">WEATHERKIT</span>
-      </div>
-      <p class="summary-text" id="tomorrow-text"></p>
-    </section>
-
-    <section class="summary-section today-section" id="today-section" hidden>
-      <div class="summary-header">
-        <p class="summary-date">TODAY <span class="live-dot"></span></p>
-        <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
-      </div>
-      <p class="summary-text" id="today-text"></p>
-    </section>
-
-    <section class="summary-section" id="summary-section" hidden>
-      <div class="summary-header">
-        <p class="summary-date" id="summary-date"></p>
-        <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
-      </div>
-      <p class="summary-text" id="summary-text"></p>
-    </section>
-
     <div id="conditions" class="section-header section-header-tag">
       <h2 class="section-title">CONDITIONS</h2>
       <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
@@ -228,6 +195,39 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
         <div class="card-sub" id="uhi-label">vs JFK / LGA / EWR</div>
         <div class="card-sub" id="uhi-monthly-avg" style="margin-top:4px;font-size:11px"></div>
       </button>
+    </section>
+
+    <section class="climate-panel" id="climate-panel" hidden={!(boot?.climate_context?.headline || boot?.climate_context?.verdict)}>
+      <div class="climate-panel-header">
+        <h2 class="section-title">TODAY IN HISTORY</h2>
+        <span class="source-tag has-tooltip" id="climate-source-tag" data-tooltip="">NOAA / ERA5</span>
+      </div>
+      <div id="climate-metrics"></div>
+      <div class="climate-footer" id="climate-footer"></div>
+    </section>
+
+    <section class="summary-section tomorrow-section" id="tomorrow-section" hidden>
+      <div class="summary-header">
+        <p class="summary-date" id="tomorrow-date"></p>
+        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" data-tooltip="Apple WeatherKit - daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="">WEATHERKIT</span>
+      </div>
+      <p class="summary-text" id="tomorrow-text"></p>
+    </section>
+
+    <section class="summary-section today-section" id="today-section" hidden>
+      <div class="summary-header">
+        <p class="summary-date">TODAY <span class="live-dot"></span></p>
+        <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
+      </div>
+      <p class="summary-text" id="today-text"></p>
+    </section>
+
+    <section class="summary-section" id="summary-section" hidden>
+      <div class="summary-header">
+        <p class="summary-date" id="summary-date"></p>
+        <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
+      </div>
+      <p class="summary-text" id="summary-text"></p>
     </section>
 
     <section class="comfort-calendar-section" id="comfort-calendar-section">

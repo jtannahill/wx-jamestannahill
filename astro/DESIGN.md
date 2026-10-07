@@ -70,6 +70,7 @@ wx.jamestannahill.com publishes readings from one private weather station (calls
 
 ## Layout
 
+- Page order: header, jump nav, hero, then the Conditions grid, so live readings sit above the fold; the climate panel and daily summaries follow.
 - Single centered column capped at 900px, with horizontal padding that respects safe-area insets. Sections stack with a consistent large bottom margin.
 - Metric groups (conditions, analog forecast, records) are 3-column grids with a 1px gap; each cell draws a 1px `--hairline` box-shadow ring, so neighbouring rings overlap in the gap and every divider and outer edge is a single pixel (rain rows use the same rule). At 600px and below they collapse: conditions and records to 2 columns (an odd last card spans both), forecast to a single-row-per-offset layout.
 - Every section header is a flex row with the uppercase title on the left and meta text plus a source tag on the right, separated from its content by one `--head-gap` (12px).
