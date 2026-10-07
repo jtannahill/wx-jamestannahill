@@ -21,6 +21,8 @@
      so every divider and the outer edge are a single pixel. */
   --hairline: 0 0 0 1px var(--border);
   --font: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
+  /* Code only (docs, embed snippet). */
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
 }
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }

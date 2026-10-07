@@ -3,3 +3,4 @@
 # scripts/deploy_worker.sh); old .html links move permanently.
 /docs.html /docs 301
 /embed.html /embed 301
+/index.html / 301

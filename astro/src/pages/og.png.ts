@@ -16,13 +16,14 @@ const W = 1200;
 const H = 630;
 const PAD = 72;
 
+// Site tokens (public/style.css). Labels sit on --muted, never dimmer: the
+// card is usually seen at ~500px wide, where anything fainter disappears.
 const COLORS = {
   bg:      '#0a0a0a',
-  text:    '#ebebeb',
-  muted:   '#5a5a5a',
-  dim:     '#8c8c8c',
+  text:    '#f0f0f0',
+  muted:   '#8e8e8e',
   accent:  '#c8b97a',
-  divider: '#262626',
+  divider: '#222222',
 };
 
 let _fontCache: { bold: ArrayBuffer; regular: ArrayBuffer } | null = null;
@@ -65,97 +66,111 @@ const withMinus = (s: string) => (/^-0*(\.0+)?$/.test(s) ? s.slice(1) : s.replac
 const fmt = (v: unknown, d = 0) =>
   v == null || Number.isNaN(Number(v)) ? EMPTY : withMinus(Number(v).toFixed(d));
 
-function etLabel(ms: number): string {
-  // -4h offset (ET, summer); for an OG image this is close enough year-round.
-  const d = new Date(ms - 4 * 60 * 60 * 1000);
-  let h = d.getUTCHours();
-  const m = String(d.getUTCMinutes()).padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h}:${m} ${ampm} ET`;
-}
-
-const nowET = () => etLabel(Date.now());
+// Station time, DST-aware, same "10:52 AM ET" style as the dashboard header.
+const _etClock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+const etLabel = (ms: number) => `${_etClock.format(ms)} ET`;
 
 // A reading is usable for a snapshot only if the core hero value is present.
 // A degraded render (all "--") must never be edge-cached behind ?v=.
 const hasReading = (r: any) =>
   r != null && r.tempf != null && !Number.isNaN(Number(r.tempf));
 
+const LABEL = `font-size:20px;letter-spacing:0.1em;color:${COLORS.muted};`;
+
+// Whitespace between tags becomes phantom text nodes that break Satori's
+// "div with >1 child needs display:flex" rule. Build with no whitespace.
+const frame = (inner: string) =>
+  `<div style="width:${W}px;height:${H}px;background:${COLORS.bg};color:${COLORS.text};font-family:'NHG Display';display:flex;flex-direction:column;position:relative;">` +
+    inner +
+    `<span style="position:absolute;left:${PAD}px;bottom:44px;${LABEL}">wx.jamestannahill.com</span>` +
+  `</div>`;
+
+// Static card: /docs and /embed, and whenever there is no reading to show.
+// It carries no numbers and no timestamp, so it can never be stale.
+function buildBrandJsx() {
+  return frame(
+    `<div style="display:flex;padding:56px ${PAD}px 0;${LABEL}">MIDTOWN MANHATTAN, NEW YORK</div>` +
+    `<div style="display:flex;flex-direction:column;padding:120px ${PAD}px 0;">` +
+      `<span style="font-size:112px;font-weight:400;line-height:1;letter-spacing:-0.03em;">Live weather</span>` +
+      `<span style="font-size:32px;color:${COLORS.muted};margin-top:28px;line-height:1.35;max-width:900px;">One private station in Midtown Manhattan, read every 5 minutes, with history, records and forecasts.</span>` +
+    `</div>`
+  );
+}
+
 function buildJsx(reading: any) {
   const tempStr  = `${fmt(reading?.tempf, 0)}°`;
   const condStr  = reading?.condition ?? '';
-  const feelsStr = reading?.feelsLike != null ? `Feels like ${fmt(reading.feelsLike, 0)}°F` : '';
+  // Feels-like only earns a line when it differs from the reading.
+  const feelsStr = reading?.feelsLike != null && fmt(reading.feelsLike, 0) !== fmt(reading?.tempf, 0)
+    ? `Feels like ${fmt(reading.feelsLike, 0)}°F` : '';
 
   const metrics: Array<{ label: string; value: string; sub: string }> = [];
   metrics.push({ label: 'HUMIDITY', value: `${fmt(reading?.humidity, 0)}%`,
-                 sub: reading?.dewPoint != null ? `Dew ${fmt(reading.dewPoint, 0)}°F` : '' });
+                 sub: reading?.dewPoint != null ? `Dew point ${fmt(reading.dewPoint, 0)}°F` : '' });
+  const dir = compass(reading?.winddir);
+  const gust = reading?.windgustmph != null ? `gusts ${fmt(reading.windgustmph, 0)}` : '';
   metrics.push({ label: 'WIND', value: `${fmt(reading?.windspeedmph, 0)} mph`,
-                 sub: `${reading?.windgustmph != null ? `Gust ${fmt(reading.windgustmph, 0)}` : ''}  ${compass(reading?.winddir)}`.trim() });
-  metrics.push({ label: 'PRESSURE', value: `${fmt(reading?.baromrelin, 2)}"`, sub: '' });
+                 sub: [dir, gust].filter(Boolean).join(', ') });
+  metrics.push({ label: 'PRESSURE', value: fmt(reading?.baromrelin, 2), sub: 'inHg' });
   metrics.push({ label: 'UV INDEX', value: fmt(reading?.uv, 0), sub: '' });
 
+  let uhiPositive = false;
   if (reading?.uhi_delta != null) {
     const uhi = fmt(reading.uhi_delta, 1);
-    const sign = uhi.startsWith('\u2212') || /^[0.]+$/.test(uhi) ? '' : '+';
+    const sign = uhi.startsWith('−') || /^[0.]+$/.test(uhi) ? '' : '+';
+    uhiPositive = sign === '+';
     metrics.push({ label: 'URBAN HEAT', value: `${sign}${uhi}°F`, sub: 'vs airports' });
   } else {
-    metrics.push({ label: 'RAIN TODAY', value: `${fmt(reading?.dailyrainin, 2)}"`, sub: '' });
+    metrics.push({ label: 'RAIN TODAY', value: `${fmt(reading?.dailyrainin, 2)} in`, sub: '' });
   }
 
   const slotW = (W - 2 * PAD) / metrics.length;
 
-  // Whitespace between tags becomes phantom text nodes that break Satori's
-  // "div with >1 child needs display:flex" rule. Build with no whitespace.
-  // Stamp the reading's own time, not wall-clock - the card must not claim to
-  // be fresher than the data it shows. Fall back to now only if absent.
+  // Stamp the reading's own time, never wall-clock: the card must not claim
+  // to be fresher than the data it shows. Callers only get here with a reading.
   const ts = reading?.timestamp ? new Date(reading.timestamp).getTime() : NaN;
-  const updatedLabel = Number.isNaN(ts) ? nowET() : etLabel(ts);
+  const updated = Number.isNaN(ts) ? '' : `Updated ${etLabel(ts)}`;
 
   const headerHtml =
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:52px ${PAD}px 0;font-size:15px;letter-spacing:0.12em;color:${COLORS.muted};font-weight:400;">` +
-      `<span>MIDTOWN MANHATTAN, NEW YORK</span>` +
-      `<span>Updated ${updatedLabel}</span>` +
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:56px ${PAD}px 0;">` +
+      `<span style="${LABEL}">MIDTOWN MANHATTAN, NEW YORK</span>` +
+      (updated
+        ? `<div style="display:flex;align-items:center;font-size:20px;color:${COLORS.muted};">` +
+            `<div style="width:8px;height:8px;border-radius:4px;background:${COLORS.accent};margin-right:10px;display:flex;"></div>` +
+            `<span>${updated}</span>` +
+          `</div>`
+        : '') +
     `</div>`;
 
   const heroHtml =
-    `<div style="display:flex;align-items:flex-end;padding:36px ${PAD}px 0;">` +
-      `<span style="font-size:148px;font-weight:700;line-height:0.95;letter-spacing:-0.04em;">${tempStr}</span>` +
-      `<div style="display:flex;flex-direction:column;margin-left:36px;padding-bottom:24px;">` +
-        `<span style="font-size:38px;font-weight:700;line-height:1.1;">${condStr}</span>` +
-        `<span style="font-size:26px;font-weight:400;color:${COLORS.dim};margin-top:6px;">${feelsStr}</span>` +
+    `<div style="display:flex;align-items:flex-end;padding:28px ${PAD}px 0;">` +
+      `<span style="font-size:184px;font-weight:400;line-height:0.95;letter-spacing:-0.04em;">${tempStr}</span>` +
+      `<div style="display:flex;flex-direction:column;margin-left:40px;padding-bottom:26px;">` +
+        `<span style="font-size:44px;font-weight:700;line-height:1.1;">${condStr}</span>` +
+        (feelsStr ? `<span style="font-size:28px;color:${COLORS.muted};margin-top:8px;">${feelsStr}</span>` : '') +
       `</div>` +
     `</div>`;
 
-  const dividerHtml = `<div style="height:1px;background:${COLORS.divider};margin:60px ${PAD}px 0;display:flex;"></div>`;
+  const dividerHtml = `<div style="height:1px;background:${COLORS.divider};margin:44px ${PAD}px 0;display:flex;"></div>`;
 
   const metricsHtml =
-    `<div style="display:flex;padding:28px ${PAD}px 0;">` +
+    `<div style="display:flex;padding:30px ${PAD}px 0;">` +
       metrics.map(m =>
-        `<div style="width:${slotW}px;display:flex;flex-direction:column;align-items:center;">` +
-          `<span style="font-size:15px;letter-spacing:0.12em;color:${COLORS.muted};font-weight:400;">${m.label}</span>` +
-          `<span style="font-size:44px;font-weight:700;margin-top:12px;line-height:1;">${m.value}</span>` +
-          (m.sub ? `<span style="font-size:15px;color:${COLORS.dim};margin-top:14px;">${m.sub}</span>` : '') +
+        `<div style="width:${slotW}px;display:flex;flex-direction:column;align-items:flex-start;">` +
+          `<span style="${LABEL}">${m.label}</span>` +
+          `<span style="font-size:56px;font-weight:400;margin-top:12px;line-height:1;letter-spacing:-0.01em;color:${m.label === 'URBAN HEAT' && uhiPositive ? COLORS.accent : COLORS.text};">${m.value}</span>` +
+          (m.sub ? `<span style="font-size:20px;color:${COLORS.muted};margin-top:12px;">${m.sub}</span>` : '') +
         `</div>`
       ).join('') +
     `</div>`;
 
-  const footerHtml =
-    `<div style="position:absolute;bottom:0;left:0;width:${W}px;display:flex;flex-direction:column;">` +
-      `<span style="padding:0 ${PAD}px 24px;font-size:15px;letter-spacing:0.12em;color:${COLORS.muted};">wx.jamestannahill.com</span>` +
-      `<div style="height:3px;background:${COLORS.accent};display:flex;"></div>` +
-    `</div>`;
-
-  return (
-    `<div style="width:${W}px;height:${H}px;background:${COLORS.bg};color:${COLORS.text};font-family:'NHG Display';display:flex;flex-direction:column;position:relative;">` +
-      headerHtml + heroHtml + dividerHtml + metricsHtml + footerHtml +
-    `</div>`
-  );
+  return frame(headerHtml + heroHtml + dividerHtml + metricsHtml);
 }
 
 export async function GET({ request }: { request: Request }) {
   const apiBase = (env as any)?.API_BASE ?? 'https://api.wx.jamestannahill.com';
   const url = new URL(request.url);
+  const brand = url.searchParams.get('card') === 'brand';
 
   // The page uses a cache-busting ?v=<5-min bucket> param so each new reading
   // produces a unique OG URL. Crawlers re-fetch on URL change; the CF edge
@@ -175,14 +190,24 @@ export async function GET({ request }: { request: Request }) {
   // One retry on a transient blip: without this, a single failed scrape
   // pins an all-"--" card at the edge for 5 min behind ?v=.
   let reading: any = null;
-  try { reading = await fetchCurrent(); } catch {}
-  if (!hasReading(reading)) {
+  if (!brand) {
     try { reading = await fetchCurrent(); } catch {}
+    if (!hasReading(reading)) {
+      try { reading = await fetchCurrent(); } catch {}
+    }
   }
 
-  const { bold, regular } = await loadFonts(new URL(request.url).origin);
+  // Without fonts Satori cannot render; hand scrapers the committed static
+  // card instead of a 500.
+  let fonts: { bold: ArrayBuffer; regular: ArrayBuffer };
+  try { fonts = await loadFonts(url.origin); }
+  catch { return Response.redirect(new URL('/og-fallback.png', url.origin).toString(), 302); }
+  const { bold, regular } = fonts;
 
-  const r = new ImageResponse(buildJsx(reading), {
+  // No reading means the brand card, never a dated card full of "--".
+  const html = brand || !hasReading(reading) ? buildBrandJsx() : buildJsx(reading);
+
+  const r = new ImageResponse(html, {
     width: W,
     height: H,
     fonts: [
@@ -198,7 +223,10 @@ export async function GET({ request }: { request: Request }) {
   // - Without ?v= → no edge cache; render fresh every request (matches the
   //   "actual snapshot" guarantee for crawlers that strip query params).
   const headers = new Headers(r.headers);
-  if (url.searchParams.has('v') && hasReading(reading)) {
+  if (brand) {
+    // The brand card has no data in it, so it can be cached like a file.
+    headers.set('cache-control', 'public, max-age=86400, s-maxage=86400');
+  } else if (url.searchParams.has('v') && hasReading(reading)) {
     // Snapshot is real and keyed by the bucket → cache hard at the edge.
     headers.set('cache-control', 'public, max-age=300, s-maxage=300, immutable');
   } else {

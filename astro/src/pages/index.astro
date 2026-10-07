@@ -44,7 +44,10 @@ const heroTemp     = fmt(boot?.tempf, 0);
 const heroFeels    = fmt(boot?.feelsLike, 0) === fmt(boot?.tempf, 0) ? '' : `Feels like ${fmt(boot?.feelsLike, 0)}°F`;
 const heroCond     = boot?.condition ?? EMPTY;
 // API strings join clauses with a middle dot; the page reads them as sentences.
-const tidy = (s: string) => s.replace(/\s[\u00b7\u2014]\s/g, ', ');
+// API strings: clause separators become commas and "10am" reads "10 AM".
+const tidy = (s: string) => s
+  .replace(/\s[\u00b7\u2014]\s/g, ', ')
+  .replace(/\b(\d{1,2})(?::(\d{2}))?\s?(am|pm)\b/gi, (_m, h, mm, a) => `${h}${mm ? ':' + mm : ''} ${a.toUpperCase()}`);
 const anomHead     = tidy(boot?.anomalies?.temp?.label ?? '');
 // "Warmest <day> since <year>" names the last year that was warmer, so it is
 // true but empty for a below-median day; say where the day actually sits.
@@ -93,12 +96,18 @@ const ogBucket = boot?.timestamp
   ? Math.floor(new Date(boot.timestamp).getTime() / 1000 / 300) * 300
   : Math.floor(Date.now() / 1000 / 300) * 300;
 const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
+// Describe what the live card actually shows; without a reading it falls
+// back to the brand card, so the alt does too.
+const ogImageAlt = boot?.tempf != null
+  ? `${Math.round(boot.tempf)}°F${boot.condition ? ` and ${boot.condition}` : ''} in Midtown Manhattan, ${new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(boot.timestamp ?? Date.now()))} ET`
+  : undefined;
 ---
 <Base
-  title="wx.jamestannahill.com - Midtown Manhattan Weather"
+  title="Midtown Manhattan Weather, wx.jamestannahill.com"
   description="Live hyperlocal weather data from a private station in Midtown Manhattan, New York. Updated every 5 minutes."
   canonical="https://wx.jamestannahill.com/"
   ogImage={ogImageUrl}
+  ogImageAlt={ogImageAlt}
 >
   <SchemaOrgIndex slot="schema" />
 

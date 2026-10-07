@@ -6,40 +6,40 @@
 
 wx.jamestannahill.com is a personal weather station dashboard operated by James Tannahill at 40.75°N 73.98°W (Midtown Manhattan, New York). The station (Ambient Weather KNYNEWYO2140, callsign CatHaus) reports temperature, humidity, wind speed and direction, barometric pressure, UV index, solar radiation, and rainfall every 5 minutes.
 
-The dashboard includes derived metrics not available from commercial weather services: a Microclimate Comfort Score, next-hour rain probability via logistic regression on station data, Urban Heat Island delta vs. JFK/LGA/EWR airports, a nearest-neighbor Analog Forecast engine, and 30-day station records.
+The dashboard includes derived metrics not available from commercial weather services: a Microclimate Comfort Score, next-hour rain probability via logistic regression on station data, Urban Heat Island delta vs. JFK/LGA/EWR airports, a nearest-neighbor Analog Forecast engine, and monthly and all-time station records.
 
 ## Data sources
 
-- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHaus) - private PWS, Midtown Manhattan
+- **Primary station**: Ambient Weather KNYNEWYO2140 (CatHaus): private PWS, Midtown Manhattan
 - **Redistribution**: the same station also feeds Weather Underground (KNYNEWYO2140), Windy.com (CatHaus, station ID 0Gpj0rbF), and NOAA CWOP (GW7880)
 - **Urban Heat Island**: NOAA ASOS readings from JFK, LGA, and EWR via aviationweather.gov
-- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W - condition, high/low, wind
+- **Daily forecast**: Apple WeatherKit at 40.75°N 73.98°W: condition, high/low, wind
 
 ## API
 
 **Base URL**: https://api.wx.jamestannahill.com
 
-- `GET /current` - Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, condition, pressure_trend, anomalies, comfort, rain_probability, percentile_rank, climate_context, uhi_delta, forecast (analog forecast), station_records, daily_summary, nearby_stations, timestamp.
-- `GET /history?hours=24` - Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
-- `GET /daily-summaries?days=30` - Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
-- `GET /rain-events?days=30` - Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
-- `GET /nearby` - Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
-- `GET /health` - Health and data freshness. Returns `{ok, last_reading_at, data_age_minutes, poller_healthy}`.
-- `GET /forecast` - Standalone analog forecast (same shape as `forecast` in `/current`).
-- `GET /records` - Standalone station records (monthly + all-time).
-- `GET /climate-context` - NOAA/ERA5 climate context for current conditions.
-- `GET /alerts` - Active NWS alerts for the station coordinates.
-- `GET /export?days=30&format=json|csv` - Bulk export of readings.
-- `GET /openapi.json` - OpenAPI 3 specification for the public API.
+- `GET /current`: Latest station observation (JSON). Fields: tempf, humidity, windspeedmph, winddir, windgustmph, baromrelin, uv, solarradiation, hourlyrainin, dailyrainin, dewPoint, feelsLike, condition, pressure_trend, anomalies, comfort, rain_probability, percentile_rank, climate_context, uhi_delta, forecast (analog forecast), station_records, daily_summary, nearby_stations, timestamp.
+- `GET /history?hours=24`: Historical readings. hours param: 24, 168 (7d), 720 (30d, max). Returns `{readings, hours, count}`.
+- `GET /daily-summaries?days=30`: Daily summaries (days param, max 365). Returns `{summaries: [{date, summary, temp_high, temp_low, temp_avg, total_rain, max_gust, avg_comfort, reading_count}], count}`.
+- `GET /rain-events?days=30`: Recent rain events (days param, max 90). Returns `{events: [{start, peak_rate, duration_min, total_in}], days}`.
+- `GET /nearby`: Nearby Ambient Weather stations snapshot. Returns `{stations, count, snapshot_at}`.
+- `GET /health`: Health and data freshness. Returns `{ok, last_reading_at, data_age_minutes, poller_healthy}`.
+- `GET /forecast`: Standalone analog forecast (same shape as `forecast` in `/current`).
+- `GET /records`: Standalone station records (monthly + all-time).
+- `GET /climate-context`: NOAA/ERA5 climate context for current conditions.
+- `GET /alerts`: Active NWS alerts for the station coordinates.
+- `GET /export?days=30&format=json|csv`: Bulk export of readings.
+- `GET /openapi.json`: OpenAPI 3 specification for the public API.
 
 The `/current` response also embeds `forecast`, `station_records`, `daily_summary`, `nws_alerts`, and `nearby_stations` for one-shot dashboard loads.
 
 ## Pages
 
-- [Dashboard](https://wx.jamestannahill.com/) - Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events, NWS alerts
-- [How It Works](https://wx.jamestannahill.com/docs) - Technical documentation on data collection, processing pipeline, ML models, and the public API
-- [Embed](https://wx.jamestannahill.com/embed) - Badge widget embed instructions
+- [Dashboard](https://wx.jamestannahill.com/): Live conditions, comfort calendar, analog forecast, station records, historical charts, nearby stations, rain events, NWS alerts
+- [How It Works](https://wx.jamestannahill.com/docs): Technical documentation on data collection, processing pipeline, ML models, and the public API
+- [Embed](https://wx.jamestannahill.com/embed): Badge widget embed instructions
 
 ## About the operator
 
-James Tannahill - jamestannahill.com
+James Tannahill: jamestannahill.com

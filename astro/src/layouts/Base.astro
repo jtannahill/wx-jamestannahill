@@ -6,13 +6,17 @@ interface Props {
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
+  ogImageAlt?: string;
 }
 
-const { title, description, canonical, ogTitle, ogDescription, ogImage } = Astro.props;
+const { title, description, canonical, ogTitle, ogDescription, ogImage, ogImageAlt } = Astro.props;
 const og = {
   title: ogTitle ?? title,
   description: ogDescription ?? description,
-  image: ogImage ?? 'https://wx.jamestannahill.com/og.png',
+  // Default is the static brand card: a page without its own live card must
+  // not hand scrapers a reading they will cache and show for weeks.
+  image: ogImage ?? 'https://wx.jamestannahill.com/og.png?card=brand',
+  imageAlt: ogImageAlt ?? 'wx.jamestannahill.com, live weather from a private station in Midtown Manhattan',
 };
 ---
 <!DOCTYPE html>
@@ -39,7 +43,7 @@ const og = {
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="wx.jamestannahill.com - Live Midtown Manhattan Weather" />
+    <meta property="og:image:alt" content={og.imageAlt} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
     <meta property="og:locale" content="en_US" />
@@ -55,7 +59,7 @@ const og = {
     <meta name="twitter:title" content={og.title} />
     <meta name="twitter:description" content={og.description} />
     <meta name="twitter:image" content={og.image} />
-    <meta name="twitter:image:alt" content="wx.jamestannahill.com - Live Midtown Manhattan Weather" />
+    <meta name="twitter:image:alt" content={og.imageAlt} />
     <meta name="twitter:site" content="@jamestannahill" />
     <meta name="twitter:creator" content="@jamestannahill" />
 

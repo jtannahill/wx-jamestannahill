@@ -17,6 +17,8 @@ colors:
 typography:
   base:
     fontFamily: NHG Display
+  code:
+    fontFamily: ui-monospace, SF Mono, SFMono-Regular, Menlo, monospace
 components:
   page:
     backgroundColor: "{colors.bg}"
@@ -64,7 +66,7 @@ wx.jamestannahill.com publishes readings from one private weather station (calls
 - Type sizes come from a short scale: 11px labels and metadata (the floor for any functional text, source tags included), 12 to 13px secondary prose, 15px small readings, 22px secondary readings (forecast, records, nearby), 30px condition readings (22px on phones), and the fluid hero. Uppercase labels are weight 500 with 0.1em tracking; mixed-case text is never letter-spaced.
 - Prose blocks (summaries, footer) are capped at about 70 characters per line.
 - The hero unit is sized in em against the numeral (0.3em), so it scales with the clamp on `.temp-block`.
-- The docs page sets code in the system monospace stack (SF Mono, Fira Code, monospace); it is the only second family and appears only in code.
+- Code (docs, the embed snippet) uses `--font-mono`, the system monospace stack (ui-monospace, SF Mono, Menlo); it is the only second family and appears only in code.
 - Every time and date reads in station time (America/New_York): clock times as "10:35 AM", axis hours as "10 AM", chart dates as "10/6", record dates as "Jul 2, 2026".
 - API strings that join clauses with a middle dot or dash are rewritten to comma-separated sentences before display.
 

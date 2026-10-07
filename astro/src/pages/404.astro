@@ -6,7 +6,7 @@ Astro.response.status = 404;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>wx.jamestannahill.com - Page Not Found</title>
+    <title>Page Not Found, wx.jamestannahill.com</title>
     <meta name="description" content="This page does not exist. Return to the live Midtown Manhattan weather dashboard." />
     <link rel="preconnect" href="https://fonts.jamestannahill.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.jamestannahill.com/nhg-display.css" />
@@ -15,30 +15,35 @@ Astro.response.status = 404;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
     <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body {
-        background: #0a0a0a; color: #f0f0f0; min-height: 100vh;
-        font-family: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
-      }
-      main {
+      /* Tokens, reset, focus ring and selection come from /style.css. */
+      .nf {
+        max-width: 900px; margin: 0 auto; padding: 40px 24px;
         min-height: 100vh; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; gap: 16px; padding: 24px;
-        text-align: center;
       }
-      .station-label { font-size: 11px; letter-spacing: 0.15em; color: #8e8e8e; font-weight: 500; }
-      h1 { font-size: 48px; font-weight: 500; letter-spacing: -0.02em; }
-      p { color: #8e8e8e; font-size: 14px; }
-      a { color: #e8e0d0; text-decoration: none; border-bottom: 1px solid #222; padding-bottom: 2px; }
-      @media (hover: hover) and (pointer: fine) { a:hover { border-color: #e8e0d0; } }
+      .nf-head { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+      .nf-body {
+        flex: 1; display: flex; flex-direction: column; justify-content: center;
+        gap: 12px; padding: 48px 0;
+      }
+      .nf h1 { font-size: 48px; font-weight: 400; letter-spacing: -0.02em; }
+      .nf p { color: var(--text-2); font-size: 14px; line-height: 1.7; }
+      .nf a {
+        color: var(--accent); text-decoration: underline; text-decoration-color: #555;
+        text-underline-offset: 3px; font-size: 14px; align-self: flex-start;
+      }
+      @media (hover: hover) and (pointer: fine) { .nf a:hover { text-decoration-color: var(--accent); } }
     </style>
   </head>
   <body>
-    <main>
-      <span class="station-label">MIDTOWN MANHATTAN, NEW YORK</span>
-      <h1>404 - Not Found</h1>
-      <p>That page doesn't exist.</p>
-      <a href="/"><span aria-hidden="true">←</span> Back to the dashboard</a>
+    <main class="nf">
+      <header class="nf-head"><p class="station-label">MIDTOWN MANHATTAN, NEW YORK</p></header>
+      <div class="nf-body">
+        <h1>Page not found</h1>
+        <p>Nothing lives at this address. The live readings are on the dashboard.</p>
+        <a href="/"><span aria-hidden="true">←</span> Back to the dashboard</a>
+      </div>
     </main>
   </body>
 </html>

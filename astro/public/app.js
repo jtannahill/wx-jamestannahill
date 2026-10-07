@@ -138,7 +138,13 @@ function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
-function tidyText(s) { return String(s).replace(/\s[\u00b7\u2014]\s/g, ', '); }
+// API strings: clause separators become commas and "10am" reads "10 AM".
+// Same rule in tidy() (src/pages/index.astro) and public/widget.js.
+function tidyText(s) {
+  return String(s)
+    .replace(/\s[\u00b7\u2014]\s/g, ', ')
+    .replace(/\b(\d{1,2})(?::(\d{2}))?\s?(am|pm)\b/gi, (m, h, mm, a) => `${h}${mm ? ':' + mm : ''} ${a.toUpperCase()}`);
+}
 
 // "Warmest <day> since <year>" names the last year that was warmer, so it is
 // true but empty for a below-median day; say where the day actually sits.
@@ -1205,7 +1211,9 @@ function buildShareText(data) {
   let line1 = `Midtown Manhattan: ${temp}${tempUnit()}`;
   if (cond) line1 += `, ${cond}`;
   if (feels !== temp) line1 += `, feels ${feels}${tempUnit()}`;
-  if (anomaly) line1 += `. ${tidyText(anomaly)}`;
+  // The anomaly label is a sentence fragment ("near average for 10am ..."), so
+  // it starts its own sentence with a capital.
+  if (anomaly) { const t = tidyText(anomaly); line1 += `. ${t.charAt(0).toUpperCase()}${t.slice(1)}.`; }
 
   let line2 = `${hum}% humidity, wind ${wind}`;
   if (comfort?.score) line2 += `, comfort ${comfort.score} (${comfort.label})`;
