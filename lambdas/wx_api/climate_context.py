@@ -1,5 +1,5 @@
 """
-climate_context.py — Historical climate context for the /current API response.
+climate_context.py: Historical climate context for the /current API response.
 
 live_context(reading, doy_hour_stats, doy)
   → percentile rank for current temp/dewpoint/wind vs. ERA5 hourly distribution
@@ -47,15 +47,15 @@ def _metric_context(value: float, stats: dict, prefix: str, years: int) -> dict 
     percentile = max(1, min(99, percentile))
 
     if percentile >= 90:
-        label = f"{_ordinal(percentile)} percentile — exceptionally high"
+        label = f"{_ordinal(percentile)} percentile, exceptionally high"
     elif percentile >= 75:
-        label = f"{_ordinal(percentile)} percentile — above normal"
+        label = f"{_ordinal(percentile)} percentile, above normal"
     elif percentile >= 25:
-        label = f"{_ordinal(percentile)} percentile — near normal"
+        label = f"{_ordinal(percentile)} percentile, near normal"
     elif percentile >= 10:
-        label = f"{_ordinal(percentile)} percentile — below normal"
+        label = f"{_ordinal(percentile)} percentile, below normal"
     else:
-        label = f"{_ordinal(percentile)} percentile — exceptionally low"
+        label = f"{_ordinal(percentile)} percentile, exceptionally low"
 
     return {
         "value":        round(value, 1),
@@ -193,7 +193,7 @@ def daily_verdict(
                 "years_of_data":      years_of_data,
             }
 
-    # ── Wind (placeholder — actual avg_wind wired in handler.py) ─────────────
+    # ── Wind (placeholder, actual avg_wind wired in handler.py) ─────────────
     # awnd_vals available but wind_today not passed to this function
     # The handler.py will call this after adding wind from daily_summary
 
