@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "astro/public/embed.html"
+        ],
+        "createdAt": "2026-10-07T15:06:19.959Z",
+        "reason": "DESIGN.md Motion sanctions the .live-dot pulse (shared style.css); it marks genuinely live 5-minute station data and has a reduced-motion fallback; embed.html only inherits the rule"
+      }
+    ]
+  }
+}
