@@ -4,12 +4,13 @@ import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 
 // ── Field config & helpers ───────────────────────────────────────────────────
-type FieldKey = 'tempf' | 'humidity' | 'windspeedmph' | 'baromrelin' | 'uhi_delta';
+type FieldKey = 'tempf' | 'humidity' | 'windspeedmph' | 'windgustmph' | 'baromrelin' | 'uhi_delta';
 
 const FIELD_LABELS: Record<string, { label: string; unit: string; decimals: number }> = {
   tempf:        { label: 'Temperature', unit: '°F',  decimals: 1 },
   humidity:     { label: 'Humidity',    unit: '%',   decimals: 0 },
   windspeedmph: { label: 'Wind',        unit: ' mph', decimals: 1 },
+  windgustmph:  { label: 'Wind Gust',   unit: ' mph', decimals: 1 },
   baromrelin:   { label: 'Pressure',    unit: '"',   decimals: 2 },
   uhi_delta:    { label: 'Urban Heat',  unit: '°F',  decimals: 1 },
 };
@@ -23,6 +24,15 @@ const EMPTY = '--';
 // Negative values use a true minus sign (U+2212); a rounded -0 drops its sign.
 const withMinus = (s: string) => (/^-0*(\.0+)?$/.test(s) ? s.slice(1) : s.replace(/^-/, '\u2212'));
 
+// Every time on the page reads in station time (America/New_York), whatever
+// the viewer's own zone, in the same "10:35 AM" / "10 AM" / "10/6" styles.
+const TZ = 'America/New_York';
+const fmtClock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
+const fmtHour  = new Intl.DateTimeFormat('en-US', { hour: 'numeric', timeZone: TZ });
+const fmtDay   = new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric', timeZone: TZ });
+const fmtStamp = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: TZ, timeZoneName: 'short' });
+const etHour = (d: Date) => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: TZ }).format(d)) % 24;
+
 const toC  = (f: number) => (f - 32) * 5 / 9;
 const toDC = (df: number) => df * 5 / 9;
 const tempUnitFor = (cel: boolean) => cel ? '°C' : '°F';
@@ -35,10 +45,9 @@ function makeTooltipPlugin(readings: any[], hours: number, activeField: string, 
   const tu   = tempUnitFor(useCelsius);
   const fmtChartLabel = (ms: number) => {
     const d = new Date(ms);
-    if (hours > 168) return `${d.getMonth()+1}/${d.getDate()}`;
-    if (hours > 24)  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`;
-    const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
-    return `${h===0?12:h>12?h-12:h}${ap}`;
+    if (hours > 168) return fmtDay.format(d);
+    if (hours > 24)  return `${fmtDay.format(d)}, ${fmtHour.format(d)}`;
+    return fmtClock.format(d);
   };
   return {
     hooks: {
@@ -55,14 +64,16 @@ function makeTooltipPlugin(readings: any[], hours: number, activeField: string, 
         const r = readings[idx];
         if (!r) { el.hidden = true; return; }
         const active = (v: string) => `<span class="wxt-active">${v}</span>`;
+        const row = (k: string, v: string, on = false) => `<span class="k">${k}</span><span class="v">${on ? active(v) : v}</span>`;
         const rows: string[] = [];
         rows.push(`<div class="wxt-time">${fmtChartLabel(new Date(r.timestamp).getTime())}</div>`);
-        if (r.tempf        != null) { const v = fmtT(r.tempf,1)+tu; rows.push(`<div>Temp&ensp;${activeField==='tempf' ? active(v) : v}</div>`); }
-        if (r.humidity     != null) rows.push(`<div>RH&emsp;&ensp;${activeField==='humidity'    ? active(r.humidity.toFixed(0)+'%')       : r.humidity.toFixed(0)+'%'}</div>`);
-        if (r.windspeedmph != null) rows.push(`<div>Wind&ensp;${activeField==='windspeedmph'  ? active(r.windspeedmph.toFixed(1)+' mph') : r.windspeedmph.toFixed(1)+' mph'}</div>`);
-        if (r.baromrelin   != null) rows.push(`<div>Pres&ensp;${activeField==='baromrelin'    ? active(r.baromrelin.toFixed(2)+'"')      : r.baromrelin.toFixed(2)+'"'}</div>`);
-        if (r.uhi_delta    != null) { const m = fmtD(r.uhi_delta,1); const v = (m.startsWith('\u2212') || /^[0.]+$/.test(m) ? '' : '+')+m+tu; rows.push(`<div>UHI&emsp;&ensp;${activeField==='uhi_delta' ? active(v) : v}</div>`); }
-        if ((r.hourlyrainin??0) > 0.005) rows.push(`<div>Rain&ensp;${r.hourlyrainin.toFixed(2)}"/hr</div>`);
+        if (r.tempf        != null) rows.push(row('Temp', fmtT(r.tempf,1)+tu, activeField==='tempf'));
+        if (r.humidity     != null) rows.push(row('RH', r.humidity.toFixed(0)+'%', activeField==='humidity'));
+        if (r.windspeedmph != null) rows.push(row('Wind', r.windspeedmph.toFixed(1)+' mph', activeField==='windspeedmph'));
+        if (r.windgustmph  != null) rows.push(row('Gust', r.windgustmph.toFixed(1)+' mph', activeField==='windgustmph'));
+        if (r.baromrelin   != null) rows.push(row('Pres', r.baromrelin.toFixed(2)+'"', activeField==='baromrelin'));
+        if (r.uhi_delta    != null) { const m = fmtD(r.uhi_delta,1); rows.push(row('UHI', (m.startsWith('\u2212') || /^[0.]+$/.test(m) ? '' : '+')+m+tu, activeField==='uhi_delta')); }
+        if ((r.hourlyrainin??0) > 0.005) rows.push(row('Rain', r.hourlyrainin.toFixed(2)+'"/hr'));
         el.innerHTML = rows.join('');
         el.hidden = false;
         const overW = u.over.offsetWidth;
@@ -329,21 +340,21 @@ async function exportChartPng(uplot: any, field: string, hours: number) {
   const cfg = FIELD_LABELS[field] || { label: field };
   const rangeLabel = RANGE_LABELS[hours] || `${hours}h`;
   ctx.fillText(`${cfg.label.toUpperCase()}, ${rangeLabel}`, padX, 14 * dpr);
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = '#808080';
   ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
   ctx.fillText('MIDTOWN MANHATTAN, NEW YORK', padX, 34 * dpr);
   ctx.drawImage(src, padX, padTop);
-  ctx.fillStyle = '#444';
+  ctx.fillStyle = '#808080';
   ctx.font = `${10 * dpr}px "NHG Display", -apple-system, sans-serif`;
-  ctx.fillText(`wx.jamestannahill.com, ${new Date().toLocaleString()}`, padX, padTop + src.height + 10 * dpr);
+  ctx.fillText(`wx.jamestannahill.com, ${fmtStamp.format(new Date())}`, padX, padTop + src.height + 10 * dpr);
   return new Promise<Blob | null>(res => out.toBlob(b => res(b), 'image/png'));
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 const HOURS_OPTIONS = [12, 24, 168, 720];
-const FIELD_OPTIONS: FieldKey[] = ['tempf', 'humidity', 'windspeedmph', 'baromrelin', 'uhi_delta'];
+const FIELD_OPTIONS: FieldKey[] = ['tempf', 'humidity', 'windspeedmph', 'windgustmph', 'baromrelin', 'uhi_delta'];
 const FIELD_BTN_LABELS: Record<FieldKey, string> = {
-  tempf: 'Temperature', humidity: 'Humidity', windspeedmph: 'Wind',
+  tempf: 'Temperature', humidity: 'Humidity', windspeedmph: 'Wind', windgustmph: 'Gust',
   baromrelin: 'Pressure', uhi_delta: 'Urban Heat',
 };
 
@@ -494,6 +505,8 @@ export default function Chart({ apiBase }: Props) {
       uplotRef.current = new uPlot({
         width:  W,
         height: H,
+        // Place ticks on station-time hour and day boundaries.
+        tzDate: (ts: number) => uPlot.tzDate(new Date(ts * 1e3), TZ),
         cursor: { y: false, drag: { x: false, y: false }, points: { size: 0 } } as any,
         legend: { show: false } as any,
         axes: [
@@ -504,11 +517,10 @@ export default function Chart({ apiBase }: Props) {
             values: (_u: any, ticks: number[]) => ticks.map(v => {
               if (v == null) return null;
               const d = new Date(v * 1000);
-              const h = d.getHours(), ap = h >= 12 ? 'pm' : 'am';
               // 30d: dates only. 7d: ticks fall every few hours, so a date-only
               // label repeats; show the date at midnight and the hour otherwise.
-              if (hours > 168 || (hours > 24 && h === 0)) return `${d.getMonth()+1}/${d.getDate()}`;
-              return `${h===0?12:h>12?h-12:h}${ap}`;
+              if (hours > 168 || (hours > 24 && etHour(d) === 0)) return fmtDay.format(d);
+              return fmtHour.format(d);
             }),
             font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
             size: 28, gap: 6,
@@ -517,7 +529,12 @@ export default function Chart({ apiBase }: Props) {
             stroke: '#999',
             ticks:  { stroke: '#2a2a2a', width: 1, size: 4 },
             grid:   { stroke: '#1e1e1e', width: 1 },
-            values: (_u: any, ticks: number[]) => ticks.map(v => v != null ? `${withMinus(Number(v).toFixed(cfg.decimals))}${cfg.unit}` : null),
+            values: (_u: any, ticks: number[]) => {
+              // Whole-number steps label as whole numbers ("70°F", not "70.0°F").
+              const whole = ticks.every(t => t == null || Number.isInteger(Math.round(t * 1e6) / 1e6));
+              const dec = whole && field !== 'baromrelin' ? 0 : cfg.decimals;
+              return ticks.map(v => v != null ? `${withMinus(Number(v).toFixed(dec))}${cfg.unit}` : null);
+            },
             font: '11px "NHG Display", "Neue Haas Grotesk Display Pro", -apple-system, sans-serif',
             size: window.innerWidth < 480 ? 48 : 56, gap: 6,
           },
@@ -594,8 +611,8 @@ export default function Chart({ apiBase }: Props) {
     const cfg = FIELD_LABELS[field] || { label: field };
     const rangeLabel = RANGE_LABELS[hours] || `${hours}h`;
     const shareData = {
-      title: `${cfg.label} · ${rangeLabel} - Midtown Manhattan`,
-      text:  `${cfg.label} · ${rangeLabel} - wx.jamestannahill.com`,
+      title: `${cfg.label}, ${rangeLabel}, Midtown Manhattan`,
+      text:  `${cfg.label}, ${rangeLabel}, wx.jamestannahill.com`,
       // Trailing slash matches the canonical URL, so X's card scraper resolves
       // the link it was handed rather than following a redirect to find it.
       url:   'https://wx.jamestannahill.com/',
@@ -626,7 +643,7 @@ export default function Chart({ apiBase }: Props) {
       <div class="chart-section-header">
         <h2 class="section-title">HISTORY</h2>
         <div class="chart-actions">
-          {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>}
+          {zoomed && <button class="chart-action-btn" title="Reset zoom" aria-label="Reset zoom" onClick={resetZoom}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M8 11h6M20 20l-4.5-4.5"/></svg></button>}
           <button class={`chart-action-btn${flashed === 'copy' ? ' flash' : ''}`} title="Copy chart" aria-label={flashed === 'copy' ? 'Chart copied' : 'Copy chart'} onClick={onCopy}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
           <button class={`chart-action-btn${flashed === 'share' ? ' flash' : ''}`} title="Share chart" aria-label={flashed === 'share' ? 'Chart shared' : 'Share chart'} onClick={onShare}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></button>
           <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>

@@ -7,16 +7,24 @@
   --text: #f0f0f0;
   /* Muted tiers. Both clear 4.5:1 on the ground: nothing on the page is set
      fainter than --faint. */
+  --text-2: #b4b4b4;
+  --surface-hover: #161616;
   --muted: #8e8e8e;
   --faint: #808080;
   --accent: #e8e0d0;
   --anomaly: #c8b97a;
   --blue: #5a9ad0;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* One gap between every section heading and its content. */
+  --head-gap: 12px;
+  /* Hairline drawn around each cell: neighbours overlap in the 1px grid gap,
+     so every divider and the outer edge are a single pixel. */
+  --hairline: 0 0 0 1px var(--border);
   --font: 'NHG Display', 'Neue Haas Grotesk Display Pro', -apple-system, sans-serif;
 }
 
 html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Browser surfaces carry the palette too. */
 ::selection { background: rgba(200,185,122,0.32); color: var(--text); }
@@ -83,7 +91,7 @@ header {
 }
 .station-label { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 .updated-at {
-  font-size: 11px; letter-spacing: 0.05em; color: var(--muted); font-variant-numeric: tabular-nums;
+  font-size: 11px; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums;
   /* Sits next to the station name; the buttons cluster at the right edge. */
   margin-left: 24px; margin-right: auto;
 }
@@ -131,7 +139,7 @@ header {
 
 .stale-banner {
   background: rgba(200,140,60,0.08); border: 1px solid rgba(200,140,60,0.25);
-  color: #d1974a; font-size: 12px; letter-spacing: 0.04em;
+  color: #d1974a; font-size: 12px; letter-spacing: 0;
   padding: 8px 14px; margin-bottom: 32px;
   opacity: 1; transform: translateY(0);
   transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
@@ -140,14 +148,15 @@ header {
 .stale-banner[hidden] { display: none; }
 
 .hero { margin-bottom: 36px; }
-.temp-block { display: flex; align-items: flex-start; line-height: 1; }
-.temp { font-size: clamp(80px, 15vw, 140px); font-weight: 400; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.temp-unit { font-size: 40px; margin-top: 20px; color: var(--muted); }
+.temp-block { display: flex; align-items: flex-start; line-height: 1; font-size: clamp(80px, 15vw, 140px); }
+/* The unit scales with the numeral it belongs to. */
+.temp { font-size: 1em; font-weight: 400; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.temp-unit { font-size: 0.3em; margin-top: 0.16em; color: var(--muted); }
 .feels-like { font-size: 18px; color: var(--muted); margin-top: 6px; }
 .condition { font-size: 20px; font-weight: 500; margin-top: 10px; }
 .anomaly-headline {
   font-size: 16px; color: var(--anomaly); margin-top: 8px;
-  font-style: italic; letter-spacing: 0.01em;
+  font-style: italic; letter-spacing: 0;
   position: relative; display: inline-block;
 }
 .anomaly-headline[data-tooltip] {
@@ -156,7 +165,6 @@ header {
 }
 .percentile-rank {
   font-size: 13px; color: var(--muted); margin-top: 6px;
-  letter-spacing: 0.02em;
 }
 
 /* Generic tooltip - apply class="has-tooltip" + data-tooltip="..." to any element */
@@ -167,15 +175,15 @@ header {
   position: fixed;
   background: #161616;
   border: 1px solid #2e2e2e;
-  color: #a8a8a8;
+  color: var(--text-2);
   opacity: 1;
   transition: opacity 120ms var(--ease-out);
   @starting-style { opacity: 0; }
-  font-size: 11.5px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 400;
   font-family: var(--font);
-  letter-spacing: 0.025em;
+  letter-spacing: 0;
   white-space: normal;
   max-width: min(300px, calc(100vw - 16px));
   padding: 10px 14px;
@@ -189,14 +197,14 @@ header {
 
 .conditions-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-  border: 1px solid var(--border); margin-bottom: 48px;
+  margin-bottom: 48px;
 }
 .card {
   background: var(--surface); padding: 24px 20px;
-  border: 1px solid var(--border);
+  border: 0; box-shadow: var(--hairline);
 }
-.card-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
-.card-value { font-size: 32px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.card-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+.card-value { font-size: 30px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
 /* Clickable cards are real buttons: reset the button chrome, keep the card look. */
@@ -204,14 +212,14 @@ button.card-clickable {
   display: block; width: 100%; text-align: left;
   font: inherit; color: inherit; font-family: var(--font);
   cursor: pointer;
-  transition: border-top-color 0.15s, background 0.15s, transform 160ms var(--ease-out);
+  transition: box-shadow 0.15s, background 0.15s, transform 160ms var(--ease-out);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 @media (hover: hover) and (pointer: fine) {
-  .card-clickable:hover { border-top-color: var(--anomaly); background: #161616; }
+  .card-clickable:hover { box-shadow: var(--hairline), inset 0 1px 0 var(--anomaly); background: var(--surface-hover); }
 }
-.card-clickable:active { border-top-color: var(--anomaly); background: #161616; transform: scale(0.99); }
+.card-clickable:active { box-shadow: var(--hairline), inset 0 1px 0 var(--anomaly); background: var(--surface-hover); transform: scale(0.99); }
 
 .forecast-section { margin-bottom: 48px; }
 
@@ -219,7 +227,7 @@ button.card-clickable {
 .hourly-block { margin-bottom: 28px; }
 .hourly-header {
   display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 10px;
+  margin-bottom: var(--head-gap);
 }
 .hourly-strip {
   position: relative;
@@ -250,22 +258,22 @@ button.card-clickable {
 .hourly-precip { font-size: 11px; color: var(--blue); margin-top: 3px; min-height: 12px; font-variant-numeric: tabular-nums; }
 .forecast-header {
   display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 16px;
+  margin-bottom: var(--head-gap);
 }
 .forecast-title { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 .forecast-meta  { font-size: 11px; color: var(--faint); }
-.forecast-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--border); }
-.forecast-card  { background: var(--surface); padding: 20px 18px; border: 1px solid var(--border); }
-.forecast-offset { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
-.forecast-temp   { font-size: 28px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.forecast-delta  { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; margin-top: 3px; }
+.forecast-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+.forecast-card  { background: var(--surface); padding: 20px 18px; border: 0; box-shadow: var(--hairline); }
+.forecast-offset { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; font-weight: 500; }
+.forecast-temp   { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.forecast-delta  { font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .forecast-fields { margin-top: 8px; }
 .forecast-field  { font-size: 12px; color: var(--muted); line-height: 1.7; }
 
 .chart-section { margin-bottom: 48px; }
 .chart-section-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: var(--head-gap);
 }
 .chart-actions {
   display: flex; align-items: center; gap: 6px;
@@ -287,7 +295,7 @@ button.card-clickable {
   border-color: var(--anomaly); color: var(--anomaly);
 }
 .chart-hint {
-  font-size: 11px; letter-spacing: 0.03em; color: var(--faint);
+  font-size: 11px; color: var(--faint);
   margin-top: 8px; text-align: right;
 }
 @media (max-width: 600px) {
@@ -298,16 +306,17 @@ button.card-clickable {
 .chart-btn, .range-btn {
   background: none; border: 1px solid var(--border); color: var(--muted);
   padding: 6px 14px; font-family: var(--font); font-size: 12px;
-  letter-spacing: 0.08em; cursor: pointer; transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s;
+  letter-spacing: 0; cursor: pointer; transition: transform 160ms var(--ease-out), border-color 0.15s, color 0.15s;
   min-height: 44px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.chart-btn.active, .range-btn.active {
-  border-color: var(--accent); color: var(--accent);
-}
 @media (hover: hover) and (pointer: fine) {
   .chart-btn:hover, .range-btn:hover { border-color: var(--accent); color: var(--accent); }
+}
+/* Selected reads as filled, so a hovered neighbour never looks selected too. */
+.chart-btn.active, .range-btn.active {
+  background: var(--surface); border-color: var(--accent); color: var(--text);
 }
 .range-row { margin-top: 2px; }
 .range-btn { padding: 4px 10px; font-size: 11px; }
@@ -348,7 +357,6 @@ button.card-clickable {
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  letter-spacing: 0.04em;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -384,18 +392,22 @@ button.card-clickable {
   padding: 10px 14px;
   font-family: var(--font);
   font-size: 11px;
-  color: #9a9a9a;
-  letter-spacing: 0.04em;
+  color: var(--text-2);
   line-height: 1.85;
   pointer-events: none;
   z-index: 100;
   white-space: nowrap;
   box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  /* Label and value columns, values right-aligned on tabular figures. */
+  display: grid; grid-template-columns: auto auto; column-gap: 12px;
+  font-variant-numeric: tabular-nums;
 }
+.wx-tooltip[hidden] { display: none; }
+.wx-tooltip .v { text-align: right; }
 .wx-tooltip .wxt-time {
-  font-size: 10px;
+  grid-column: 1 / -1;
+  font-size: 11px;
   color: var(--anomaly);
-  letter-spacing: 0.1em;
   margin-bottom: 3px;
 }
 .wx-tooltip .wxt-active {
@@ -405,8 +417,12 @@ button.card-clickable {
 /* ── Section header (shared) ─────────────────────────────────────────────── */
 .section-header {
   display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 16px;
+  margin-bottom: var(--head-gap);
 }
+/* Header row whose right side holds a source tag rather than meta text. */
+.section-header-tag { align-items: center; }
+.section-header-tag > * { margin: 0; }
+.head-tags { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 .section-meta  { font-size: 11px; color: var(--faint); }
 
@@ -419,10 +435,15 @@ button.card-clickable {
 .tomorrow-section { border-left-color: var(--blue); margin-bottom: 20px; }
 .tomorrow-section .summary-date { color: var(--blue); }
 .today-section { border-left-color: var(--anomaly); margin-bottom: 20px; }
+.summary-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.summary-header .summary-date { margin: 0; }
 .summary-date {
   font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-weight: 500;
 }
-.summary-text { font-size: 14px; color: #b4b4b4; line-height: 1.7; }
+.summary-text { font-size: 14px; color: var(--text-2); line-height: 1.7; max-width: 68ch; text-wrap: pretty; }
 
 .live-dot {
   display: inline-block; width: 5px; height: 5px; border-radius: 50%;
@@ -444,7 +465,7 @@ button.card-clickable {
   flex-shrink: 0;
 }
 .comfort-cell-label {
-  font-size: 10px; color: #fff; letter-spacing: 0.02em; line-height: 1; font-weight: 500;
+  font-size: 11px; color: #fff; line-height: 1; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 /* What the shade means. Same hue ramp the cells use. */
@@ -461,13 +482,12 @@ button.card-clickable {
 .records-section { margin-bottom: 48px; }
 .records-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-  border: 1px solid var(--border);
 }
 .record-card {
-  background: var(--surface); padding: 18px 16px; border: 1px solid var(--border);
+  background: var(--surface); padding: 18px 16px; border: 0; box-shadow: var(--hairline);
 }
-.record-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
-.record-value { font-size: 24px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.record-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+.record-value { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .record-date  { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
 
@@ -485,8 +505,8 @@ button.card-clickable {
 .nearby-chip-empty .nearby-chip-id,
 .nearby-chip-empty .nearby-chip-dist { color: var(--faint); }
 .nearby-chip-empty .nearby-chip-temp { color: var(--faint); }
-.nearby-chip-reason { font-size: 11px; color: var(--faint); margin-top: 3px; }
-.nearby-chip-id { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+.nearby-chip-reason { font-size: 12px; color: var(--faint); margin-top: 3px; }
+.nearby-chip-id { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
 .nearby-chip-temp { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .nearby-chip-rain { font-size: 11px; color: var(--blue); margin-top: 3px; }
 .nearby-chip-dist { font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -510,9 +530,9 @@ button.card-clickable {
 }
 .nearby-variance[hidden] { display: none; }
 .nv-item { display: inline-flex; align-items: baseline; gap: 8px; }
-.nv-label { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); }
+.nv-label { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 .nv-value { font-size: 13px; font-variant-numeric: tabular-nums; }
-.nv-verdict { font-size: 11px; color: var(--muted); font-style: italic; }
+.nv-verdict { font-size: 12px; color: var(--muted); font-style: italic; }
 .nv-flag { color: #d98b5f; font-style: normal; }
 
 /* Shared sigma banding: under 1 sigma is agreement, 2+ is a real split. */
@@ -522,25 +542,25 @@ button.card-clickable {
 
 /* ── NWS alerts banner ───────────────────────────────────────────────────── */
 .alerts-banner {
-  background: #1a1200;
-  border: 1px solid #3d2e0a;
-  color: #f59e0b;
+  /* Same warning amber as the stale banner, one step stronger. */
+  background: rgba(200,140,60,0.12);
+  border: 1px solid rgba(200,140,60,0.4);
+  color: #d1974a;
   padding: 10px 14px;
   margin-bottom: 20px;
   font-size: 12px;
   line-height: 1.5;
-  border-radius: 3px;
 }
 
 /* ── Rain events ─────────────────────────────────────────────────────────── */
 .rain-events-section { margin-bottom: 48px; }
 .rain-events-list {
-  display: grid; gap: 1px; border: 1px solid var(--border);
+  display: grid; gap: 1px;
 }
 /* One row per day: date | day total | event count and peak rate. */
 .rain-event-row {
   display: grid; grid-template-columns: 112px 72px 1fr; align-items: baseline; gap: 12px;
-  background: var(--surface); border: 1px solid var(--border); padding: 10px 14px;
+  background: var(--surface); border: 0; box-shadow: var(--hairline); padding: 10px 14px;
 }
 .rain-event-when { font-size: 11px; letter-spacing: 0.06em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rain-event-total { font-size: 15px; color: var(--blue); font-variant-numeric: tabular-nums; }
@@ -553,17 +573,21 @@ button.card-clickable {
   grid-column: 1 / -1; flex: 1 1 100%;
   font-size: 13px; color: var(--muted); padding: 14px;
 }
+.conditions-grid > .section-unavailable, .forecast-grid > .section-unavailable,
+.records-grid > .section-unavailable, .rain-events-list > .section-unavailable { box-shadow: var(--hairline); }
 .comfort-grid > .section-unavailable,
 .nearby-strip > .section-unavailable { padding: 8px 0; }
 
 /* ── Source tags ─────────────────────────────────────────────────────────── */
 .source-tag {
-  font-size: 10px; letter-spacing: 0.08em; color: var(--faint);
+  font-size: 11px; letter-spacing: 0.08em; color: var(--faint);
   font-weight: 500; text-transform: uppercase;
   border: 1px solid #2a2a2a; padding: 2px 7px;
   white-space: nowrap; flex-shrink: 0;
 }
 .source-tag.source-external { color: #7f93a6; border-color: #2e3a46; }
+.source-tag:has(img) { display: inline-flex; align-items: center; gap: 5px; }
+.source-tag img { width: 14px; height: 14px; border-radius: 3px; }
 a.source-tag { text-decoration: none; transition: color 0.15s, border-color 0.15s; }
 @media (hover: hover) and (pointer: fine) {
   a.source-tag:hover { color: var(--text); border-color: #444; }
@@ -581,12 +605,12 @@ a.source-tag { text-decoration: none; transition: color 0.15s, border-color 0.15
 /* section-header already has flex; source-tag goes on the right */
 .section-source-row {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--head-gap);
 }
 .section-source-row .section-title { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 
 footer { border-top: 1px solid var(--border); padding-top: 24px; }
-footer p { font-size: 12px; color: var(--muted); line-height: 1.8; }
+footer p { font-size: 12px; color: var(--muted); line-height: 1.8; max-width: 75ch; }
 footer a { color: var(--muted); text-decoration: underline; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 
@@ -598,19 +622,19 @@ footer a { color: var(--muted); text-decoration: underline; }
   .forecast-grid   { grid-template-columns: 1fr; }
   .forecast-card   {
     display: grid;
-    grid-template-columns: 56px auto 1fr;
+    grid-template-columns: 76px auto 1fr;
     align-items: center;
     gap: 14px;
     padding: 12px 14px;
   }
-  .forecast-offset { margin-bottom: 0; font-size: 11px; }
+  .forecast-offset { margin-bottom: 0; font-size: 11px; white-space: nowrap; }
   .forecast-temp   { font-size: 22px; }
   .forecast-fields { margin-top: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: flex-end; }
-  .forecast-field  { font-size: 11px; line-height: 1.2; }
+  .forecast-field  { font-size: 12px; line-height: 1.2; }
   .records-grid    { grid-template-columns: repeat(2, 1fr); }
   .comfort-cell    { width: 30px; height: 30px; }
-  .temp            { font-size: clamp(72px, 20vw, 96px); }
-  .card-value      { font-size: 26px; }
+  .temp-block      { font-size: clamp(72px, 20vw, 96px); }
+  .card-value      { font-size: 22px; }
   .card            { padding: 18px 14px; }
   /* Header: two tidy rows - station name on its own line, then
      updated-time left + compact buttons right */
@@ -620,7 +644,7 @@ footer a { color: var(--muted); text-decoration: underline; }
   }
   .station-label { font-size: 11px; letter-spacing: 0.08em; flex: 1 1 100%; white-space: nowrap; }
   .updated-at    { font-size: 11px; white-space: nowrap; margin-left: 0; margin-right: auto; }
-  .unit-toggle   { width: 32px; height: 32px; font-size: 10px; }
+  .unit-toggle   { width: 32px; height: 32px; font-size: 11px; }
   .share-btn     { width: 32px; height: 32px; font-size: 12px; }
   .refresh-btn   { width: 32px; height: 32px; font-size: 14px; }
   .jump-row      { gap: 14px; margin-bottom: 24px; }
@@ -651,7 +675,6 @@ footer a { color: var(--muted); text-decoration: underline; }
   /* Climate panel */
   .climate-metric-row { flex-wrap: wrap; gap: 2px; }
   .climate-metric-value { font-size: 13px; }
-  .climate-metric-pct { font-size: 10px; }
   .dev-bar { margin: 4px 0 18px; }
   .climate-footer { font-size: 11px; }
 }
@@ -660,6 +683,10 @@ footer a { color: var(--muted); text-decoration: underline; }
    overriding the compact 32px phone size above. */
 @media (pointer: coarse) {
   .unit-toggle, .share-btn, .refresh-btn { width: 44px; height: 44px; }
+  /* Jump links and retry get full-height touch targets without moving the rhythm. */
+  .jump-row a { padding: 14px 0; }
+  .jump-row { margin-top: -12px; margin-bottom: 16px; }
+  .wx-chart-msg button { min-height: 44px; }
 }
 
 /* ── Skeleton placeholders ───────────────────────────────────────────────────
@@ -723,9 +750,6 @@ footer a { color: var(--muted); text-decoration: underline; }
   .wx-chart-wrap:empty { animation: none; background: #0e0e0e; }
 }
 
-/* Scroll reveal */
-.sr { opacity: 0; transform: translateY(12px); transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out); }
-.sr.visible { opacity: 1; transform: translateY(0); }
 /* View transitions */
 @view-transition { navigation: auto; }
 ::view-transition-old(root) { animation: 200ms ease both wx-fade-out; }
@@ -734,15 +758,13 @@ footer a { color: var(--muted); text-decoration: underline; }
 @keyframes wx-fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
-  .sr { opacity: 1; transform: none; }
 }
 
 /* ── Climate Panel ─────────────────────────────────────────────────────────── */
 .anomaly-subline {
-  font-size: 12px;
-  color: var(--faint);
-  margin-top: 4px;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
 }
 
 .climate-panel {
@@ -756,7 +778,7 @@ footer a { color: var(--muted); text-decoration: underline; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: var(--head-gap);
 }
 
 .climate-metric {
@@ -779,7 +801,7 @@ footer a { color: var(--muted); text-decoration: underline; }
 
 .climate-metric-value {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -829,7 +851,6 @@ footer a { color: var(--muted); text-decoration: underline; }
   font-size: 11px;
   color: var(--faint);
   white-space: nowrap;
-  letter-spacing: 0.04em;
 }
 
 .dev-bar-today-dot {
@@ -873,10 +894,10 @@ footer a { color: var(--muted); text-decoration: underline; }
 .climate-bar-ticks {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--faint);
-  letter-spacing: 0.04em;
   margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .climate-footer {
@@ -884,5 +905,4 @@ footer a { color: var(--muted); text-decoration: underline; }
   color: var(--faint);
   text-align: right;
   margin-top: 6px;
-  letter-spacing: 0.05em;
 }

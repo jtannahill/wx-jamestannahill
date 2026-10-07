@@ -140,10 +140,28 @@ function ordinal(n) {
 }
 function tidyText(s) { return String(s).replace(/\s[\u00b7\u2014]\s/g, ', '); }
 
+// "Warmest <day> since <year>" names the last year that was warmer, so it is
+// true but empty for a below-median day; say where the day actually sits.
+// Mirrors climateHeadline() in src/pages/index.astro.
+function climateHeadline(cc) {
+  const t = cc?.verdict?.temp_high;
+  if (t && t.percentile < 50) {
+    const m = /^Warmest (.+?) (?:since|on record)/.exec(t.label || '');
+    return `Below the median high for ${m ? m[1] : 'today'}, ${ordinal(t.percentile)} percentile`;
+  }
+  return cc?.headline ? tidyText(cc.headline) : '';
+}
+
+// Station-time date formats shared by every renderer.
+const _fmtDate  = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
+const _fmtShort = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+
 function renderCurrent(data) {
   setReading('temp', fmtT(data.tempf, 0));
   document.getElementById('temp-unit').textContent = tempUnit();
-  setReading('feels-like', `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`);
+  // Feels-like only earns a line when it differs from the reading itself.
+  const feelsSame = fmtT(data.feelsLike, 0) === fmtT(data.tempf, 0);
+  setReading('feels-like', feelsSame ? '' : `Feels like ${fmtT(data.feelsLike, 0)}${tempUnit()}`);
   setReading('condition', data.condition || EMPTY);
 
   // Percentile rank = current temp vs this station's distribution for the
@@ -238,10 +256,14 @@ function renderCurrent(data) {
   const banner  = document.getElementById('stale-banner');
   const staleMsg = document.getElementById('stale-msg');
   if (data.quality_flag === 'stuck') {
-    staleMsg.textContent = `Sensor may be frozen. Last valid reading ${data.data_age_minutes ?? '?'} min ago`;
+    staleMsg.textContent = data.data_age_minutes != null
+      ? `Sensor may be frozen. Last valid reading ${data.data_age_minutes} min ago`
+      : 'Sensor may be frozen.';
     banner.hidden = false;
   } else if (data.data_stale) {
-    staleMsg.textContent = `Station data is ${data.data_age_minutes ?? '?'} minutes old. Sensor may be offline`;
+    staleMsg.textContent = data.data_age_minutes != null
+      ? `Station data is ${data.data_age_minutes} minutes old. Sensor may be offline`
+      : 'Station data is delayed. Sensor may be offline';
     banner.hidden = false;
   } else if (data.quality_flag === 'range_error') {
     staleMsg.textContent = 'One or more sensor fields returned implausible values and were excluded';
@@ -316,7 +338,7 @@ function renderHourlyStrip(hours) {
   _syncForecastSection();
 
   strip.innerHTML = hours.slice(0, 12).map(h => {
-    const label = _hourlyHourFmt.format(new Date(h.time)).replace(/\s+/g, ''); // "6 PM" -> "6PM"
+    const label = _hourlyHourFmt.format(new Date(h.time)); // "6 PM", same style as the chart axis
     const cond  = h.condition || '';
     const glyph = WK_GLYPHS[cond] || (cond ? cond.slice(0, 3).toUpperCase() : '·');
     // WeatherKit precipitationChance is 0-1; tolerate a backend that already
@@ -380,8 +402,8 @@ function renderForecast(forecast, nowTempF) {
 
   const grid = document.getElementById('forecast-grid');
   grid.innerHTML = forecast.hours.map(h => {
-    const label = h.offset_hours === 1 ? '+1 hour'
-                : h.offset_hours === 2 ? '+2 hours' : '+3 hours';
+    const label = h.offset_hours === 1 ? '+1 HOUR'
+                : h.offset_hours === 2 ? '+2 HOURS' : '+3 HOURS';
     return `
       <div class="forecast-card">
         <div class="forecast-offset">${label}</div>
@@ -472,35 +494,31 @@ function renderClimatePanel(data) {
     return;
   }
   section.hidden = false;
-  section.classList.add('visible');
 
   // Update anomaly subline
   const subline = document.getElementById('anomaly-subline');
-  if (cc.headline) {
-    subline.textContent = tidyText(cc.headline);
-  } else {
-    subline.textContent = '';
-  }
+  subline.textContent = climateHeadline(cc);
 
   const isDaily = cc.mode === 'daily' && cc.verdict;
   const container = document.getElementById('climate-metrics');
   container.innerHTML = '';
 
   // Color map per metric
-  const COLORS = { temp: '#e8c84a', dewpoint: '#4ab8e8', wind: '#888888' };
+  const COLORS = { temp: '#e8c84a', dewpoint: '#5a9ad0', wind: '#888888' };  // dewpoint = --blue
 
   if (isDaily) {
     // Daily verdict: high temp, low temp from NOAA
     const verdict = cc.verdict;
     const rows = [
       { key: 'temp_high', label: 'High Temp', color: COLORS.temp },
-      { key: 'temp_low',  label: 'Low Temp',  color: '#4ab8e8' },
+      { key: 'temp_low',  label: 'Low Temp',  color: COLORS.dewpoint },
     ];
     rows.forEach(({ key, label, color }) => {
       const m = verdict[key];
       if (!m) return;
       const pct   = m.percentile;
-      const since = m.last_exceeded_year ? `since ${m.last_exceeded_year}` : 'on record';
+      // "Warmest since <year>" only says something for an above-median day.
+      const since = pct < 50 ? '' : m.last_exceeded_year ? `, warmest since ${m.last_exceeded_year}` : ', warmest on record';
       const dispVal = fmtT(m.value, 0);
       const dispP50 = fmtT(m.p50, 0);
 
@@ -531,7 +549,7 @@ function renderClimatePanel(data) {
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
             <span class="climate-metric-value" style="color:${color}">${dispVal}${tempUnit()}
-              <span class="climate-metric-pct">${ordinal(pct)} pct, ${since}</span>
+              <span class="climate-metric-pct">${ordinal(pct)} pct${since}</span>
             </span>
           </div>
           ${barHtml}
@@ -583,7 +601,7 @@ function renderClimatePanel(data) {
           <div class="climate-metric-row">
             <span class="climate-metric-label">${label}</span>
             <span class="climate-metric-value" style="color:${color}">${dispVal}${unit}
-              <span class="climate-metric-pct">${pct}th pct</span>
+              <span class="climate-metric-pct">${ordinal(pct)} pct</span>
             </span>
           </div>
           <div class="climate-bar-track">
@@ -640,7 +658,7 @@ function renderComfortCalendar(summaries) {
     const d     = new Date(s.date + 'T12:00:00');
     const label = `${d.getMonth() + 1}/${d.getDate()}`;
     const rain  = s.total_rain > 0.01 ? `, ${Number(s.total_rain).toFixed(2)}" rain` : '';
-    const tip   = `${s.date}: ${score}/100 comfort, ${fmtT(s.temp_high,0)}° to ${fmtT(s.temp_low,0)}${tempUnit()}${rain}`;
+    const tip   = `${_fmtShort.format(d)}: ${score}/100 comfort, ${fmtT(s.temp_low,0)}° to ${fmtT(s.temp_high,0)}${tempUnit()}${rain}`;
     return `<div class="comfort-cell has-tooltip" role="listitem" style="background:${color}" data-tooltip="${tip}">
       <span class="comfort-cell-label" aria-hidden="true">${label}</span><span class="sr-only">${tip}</span>
     </div>`;
@@ -662,12 +680,18 @@ function renderComfortCalendar(summaries) {
 }
 
 // ── Station Records ───────────────────────────────────────────────────────────
+// "2026-07-02" (or a full ISO timestamp) reads as "Jul 2, 2026".
+function fmtRecordDate(v) {
+  if (!v) return '';
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T12:00:00` : v);
+  return isNaN(d) ? String(v) : _fmtDate.format(d);
+}
 function renderStationRecords(records) {
   const section = document.getElementById('records-section');
   if (!records) { section.hidden = true; return; }
   section.hidden = false;
 
-  document.getElementById('records-month').textContent = records.scope === 'all-time' ? 'all time' : (records.month_name || '');
+  document.getElementById('records-month').textContent = records.scope === 'all-time' ? 'All time' : (records.month_name || '');
 
   const items = [];
   if (records.temp_high    != null) items.push({ label: 'HIGH TEMP',     value: `${fmtT(records.temp_high, 0)}${tempUnit()}`,     date: records.temp_high_at });
@@ -682,7 +706,7 @@ function renderStationRecords(records) {
     <div class="record-card">
       <div class="record-label">${it.label}</div>
       <div class="record-value">${it.value}</div>
-      <div class="record-date">${it.date || ''}</div>
+      <div class="record-date">${fmtRecordDate(it.date)}</div>
     </div>`).join('');
   recordsGrid.removeAttribute('aria-busy');
 }
@@ -751,7 +775,7 @@ function renderNearby(stations, snapshotAt, variance) {
     // station can sit below us and above the network at the same time.
     let deltaHtml = '';
     if (s.temp_delta_f != null) {
-      deltaHtml += `<div class="nearby-chip-delta" title="${fmtDelta(s.temp_delta_f)}${tempUnit()} against our station">`
+      deltaHtml += `<div class="nearby-chip-delta has-tooltip" data-tooltip="${fmtDelta(s.temp_delta_f)}${tempUnit()} against our station">`
         + `${fmtDelta(s.temp_delta_f)}${tempUnit()}<span class="nc-ref">vs us</span></div>`;
     }
     if (s.temp_ratio != null) {
@@ -761,7 +785,7 @@ function renderNearby(stations, snapshotAt, variance) {
       const title = s.is_outlier
         ? `${Math.abs(r).toFixed(2)} sigma from the network center: likely a miscited or sun-exposed sensor, not weather`
         : `${Math.abs(r).toFixed(2)} sigma from the network center`;
-      deltaHtml += `<div class="nearby-chip-ratio ${ratioClass(r)}${flag}" title="${title}">`
+      deltaHtml += `<div class="nearby-chip-ratio has-tooltip ${ratioClass(r)}${flag}" data-tooltip="${title}">`
         + `${sign}${Math.abs(r).toFixed(1)}σ<span class="nc-ref">vs net</span></div>`;
     }
 
@@ -774,6 +798,7 @@ function renderNearby(stations, snapshotAt, variance) {
     </div>`;
   }).join('');
   strip.removeAttribute('aria-busy');
+  strip.querySelectorAll('.has-tooltip').forEach(bindTip);
 }
 
 // Network-level readout: how tightly the neighbours agree, and where our
@@ -791,9 +816,9 @@ function renderNearbyVariance(v) {
   const sign = r > 0 ? '+' : r < 0 ? '−' : '±';
   const parts = [
     `<span class="nv-item"><span class="nv-label">NETWORK SPREAD</span>`
-      + `<span class="nv-value" title="Scaled median absolute deviation across ${v.count} nearby stations. Robust, so one bad sensor cannot inflate it.">σ ${sigma}${tempUnit()}</span></span>`,
+      + `<span class="nv-value has-tooltip" data-tooltip="Scaled median absolute deviation across ${v.count} nearby stations. Robust, so one bad sensor cannot inflate it.">σ ${sigma}${tempUnit()}</span></span>`,
     `<span class="nv-item"><span class="nv-label">OUR DEPARTURE</span>`
-      + `<span class="nv-value ${ratioClass(r)}" title="Our reading against the network median, expressed in units of that spread.">`
+      + `<span class="nv-value has-tooltip ${ratioClass(r)}" data-tooltip="Our reading against the network median, expressed in units of that spread.">`
       + `${fmtDelta(v.home_delta_f)}${tempUnit()}, ${sign}${Math.abs(r).toFixed(2)}σ</span></span>`,
   ];
   if (v.verdict) {
@@ -805,6 +830,7 @@ function renderNearbyVariance(v) {
   }
   el.innerHTML = parts.join('');
   el.hidden = false;
+  el.querySelectorAll('.has-tooltip').forEach(bindTip);
 }
 
 // ── NWS alerts banner ─────────────────────────────────────────────────────────
@@ -1083,8 +1109,15 @@ function _hideTip() {
 function bindTip(el) {
   if (el.dataset.tipBound === '1') return;
   el.dataset.tipBound = '1';
-  el.addEventListener('mouseenter', () => _showTip(el));
-  el.addEventListener('mouseleave', _hideTip);
+  // Hover waits a beat before the first tip, so sweeping across the strip or
+  // calendar does not flash one per cell; once a tip is open, the next is instant.
+  let hoverTimer = 0;
+  el.addEventListener('mouseenter', () => {
+    const open = _tipEl._anchor && _tipEl.style.display !== 'none';
+    if (open) { _showTip(el); return; }
+    hoverTimer = setTimeout(() => _showTip(el), 300);
+  });
+  el.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); _hideTip(); });
   // Keyboard: anything with an explanation can take focus and show it.
   // Skipped inside buttons/links (no nested focus) and on grid cells, which
   // carry the same text as sr-only content instead of one tab stop per cell.
@@ -1170,13 +1203,13 @@ function buildShareText(data) {
   const rp     = data.rain_probability;
 
   let line1 = `Midtown Manhattan: ${temp}${tempUnit()}`;
-  if (cond) line1 += ` · ${cond}`;
-  if (feels !== temp) line1 += ` · Feels ${feels}${tempUnit()}`;
-  if (anomaly) line1 += ` · ${anomaly}`;
+  if (cond) line1 += `, ${cond}`;
+  if (feels !== temp) line1 += `, feels ${feels}${tempUnit()}`;
+  if (anomaly) line1 += `. ${tidyText(anomaly)}`;
 
-  let line2 = `${hum}% humidity · Wind ${wind}`;
-  if (comfort?.score) line2 += ` · Comfort ${comfort.score} (${comfort.label})`;
-  if (rp?.probability >= 30) line2 += ` · ${rp.probability}% rain next hr`;
+  let line2 = `${hum}% humidity, wind ${wind}`;
+  if (comfort?.score) line2 += `, comfort ${comfort.score} (${comfort.label})`;
+  if (rp?.probability >= 30) line2 += `, ${rp.probability}% rain next hr`;
 
   // Cache-buster on the URL forces Twitter to do a fresh og.png scrape per tweet
   const v = Math.floor(Date.now() / 1000);
@@ -1264,11 +1297,3 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Scroll reveal
-(function initScrollReveal() {
-  if (!('IntersectionObserver' in window)) return;
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
-  }, { threshold: 0.1 });
-  document.querySelectorAll('.sr').forEach(el => obs.observe(el));
-})();

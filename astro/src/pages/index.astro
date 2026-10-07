@@ -41,12 +41,23 @@ const trendArrow = (t: string | undefined) =>
 // app.js's renderCurrent() will re-paint in °C on hydration (same flash
 // behavior as the hero today).
 const heroTemp     = fmt(boot?.tempf, 0);
-const heroFeels    = `Feels like ${fmt(boot?.feelsLike, 0)}°F`;
+const heroFeels    = fmt(boot?.feelsLike, 0) === fmt(boot?.tempf, 0) ? '' : `Feels like ${fmt(boot?.feelsLike, 0)}°F`;
 const heroCond     = boot?.condition ?? EMPTY;
 // API strings join clauses with a middle dot; the page reads them as sentences.
 const tidy = (s: string) => s.replace(/\s[\u00b7\u2014]\s/g, ', ');
 const anomHead     = tidy(boot?.anomalies?.temp?.label ?? '');
-const anomSub      = tidy(boot?.climate_context?.headline ?? '');
+// "Warmest <day> since <year>" names the last year that was warmer, so it is
+// true but empty for a below-median day; say where the day actually sits.
+const ord = (n: number) => { const v = n % 100; return n + ((v >= 11 && v <= 13) ? 'th' : (['th','st','nd','rd'][n % 10] || 'th')); };
+const climateHeadline = (cc: any): string => {
+  const t = cc?.verdict?.temp_high;
+  if (t && t.percentile < 50) {
+    const m = /^Warmest (.+?) (?:since|on record)/.exec(t.label || '');
+    return `Below the median high for ${m ? m[1] : 'today'}, ${ord(t.percentile)} percentile`;
+  }
+  return tidy(cc?.headline ?? '');
+};
+const anomSub      = climateHeadline(boot?.climate_context);
 const monthName    = new Date().toLocaleString('en-US', { month: 'long', timeZone: 'America/New_York' });
 const percentile   = boot?.percentile_rank?.label
   ? `Temp vs typical ${monthName}: ${boot.percentile_rank.label}`
@@ -130,7 +141,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       <div class="percentile-rank" id="percentile-rank">{percentile}</div>
     </section>
 
-    <section class="climate-panel sr" id="climate-panel" hidden={!(boot?.climate_context?.headline || boot?.climate_context?.verdict)}>
+    <section class="climate-panel" id="climate-panel" hidden={!(boot?.climate_context?.headline || boot?.climate_context?.verdict)}>
       <div class="climate-panel-header">
         <h2 class="section-title">TODAY IN HISTORY</h2>
         <span class="source-tag has-tooltip" id="climate-source-tag" data-tooltip="">NOAA / ERA5</span>
@@ -140,30 +151,30 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     </section>
 
     <section class="summary-section tomorrow-section" id="tomorrow-section" hidden>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-        <p class="summary-date" id="tomorrow-date" style="margin:0"></p>
-        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" style="display:inline-flex;align-items:center;gap:5px" data-tooltip="Apple WeatherKit - daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">WEATHERKIT</span>
+      <div class="summary-header">
+        <p class="summary-date" id="tomorrow-date"></p>
+        <span id="wk-attr-tag" class="source-tag source-external has-tooltip" data-tooltip="Apple WeatherKit - daily forecast for 40.75°N 73.98°W. Condition, high/low temperature, and wind pulled from Apple's forecast model. Updated every 15 minutes."><img src="weatherkit.png" alt="">WEATHERKIT</span>
       </div>
       <p class="summary-text" id="tomorrow-text"></p>
     </section>
 
     <section class="summary-section today-section" id="today-section" hidden>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-        <p class="summary-date" style="margin:0">TODAY <span class="live-dot"></span></p>
+      <div class="summary-header">
+        <p class="summary-date">TODAY <span class="live-dot"></span></p>
         <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
       </div>
       <p class="summary-text" id="today-text"></p>
     </section>
 
     <section class="summary-section" id="summary-section" hidden>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-        <p class="summary-date" id="summary-date" style="margin:0"></p>
+      <div class="summary-header">
+        <p class="summary-date" id="summary-date"></p>
         <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
       </div>
       <p class="summary-text" id="summary-text"></p>
     </section>
 
-    <div id="conditions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div id="conditions" class="section-header section-header-tag">
       <h2 class="section-title">CONDITIONS</h2>
       <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
     </div>
@@ -193,7 +204,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
         <div class="card-value" id="rain-hourly" set:html={reading(rainHourly)} />
         <div class="card-sub" id="rain-daily" set:html={reading(rainDaily)} />
       </div>
-      <button type="button" class="card card-clickable" data-chart-field="windspeedmph">
+      <button type="button" class="card card-clickable" data-chart-field="windgustmph">
         <div class="card-label">WIND GUST</div>
         <div class="card-value" id="wind-gust" set:html={reading(windGust)} />
         <div class="card-sub" id="wind-dir" set:html={reading(windDir)} />
@@ -222,7 +233,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="comfort-calendar-section" id="comfort-calendar-section">
       <div class="section-header">
         <h2 class="section-title">COMFORT CALENDAR</h2>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div class="head-tags">
           <span class="section-meta" id="comfort-meta">30-day history</span>
           <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS, computed: derived in-house from this station's own history (callsign CatHaus, KNYNEWYO2140). Click for docs.">CATHAUS, COMPUTED</a>
         </div>
@@ -236,9 +247,9 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       <div class="hourly-block" id="hourly-block">
         <div class="hourly-header">
           <h2 class="section-title has-tooltip" data-tooltip="Hour-by-hour conditions, temperature, and precipitation chance for the next 12 hours at 40.75°N 73.98°W.">NEXT 12 HOURS</h2>
-          <span id="hourly-attr-tag" class="source-tag source-external has-tooltip" style="display:inline-flex;align-items:center;gap:5px" data-tooltip="Apple WeatherKit hourly forecast for 40.75°N 73.98°W. Condition, temperature, and precipitation probability from Apple's forecast model. Refreshed every 30 minutes."><img src="weatherkit.png" alt="" style="width:14px;height:14px;border-radius:3px;vertical-align:middle">WEATHERKIT</span>
+          <span id="hourly-attr-tag" class="source-tag source-external has-tooltip" data-tooltip="Apple WeatherKit hourly forecast for 40.75°N 73.98°W. Condition, temperature, and precipitation probability from Apple's forecast model. Refreshed every 30 minutes."><img src="weatherkit.png" alt="">WEATHERKIT</span>
         </div>
-        <div class="hourly-strip" id="hourly-strip" aria-busy="true">
+        <div class="hourly-strip" id="hourly-strip" tabindex="0" role="region" aria-label="Next 12 hours" aria-busy="true">
           {Array.from({ length: 12 }).map(() => (
             <div class="hourly-cell skel-card" aria-hidden="true">
               <span class="skel skel-line" style="width:24px;height:8px" />
@@ -251,7 +262,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
       <div class="analog-block" id="analog-block">
         <div class="forecast-header">
           <h2 class="forecast-title has-tooltip" data-tooltip="Nearest-neighbor pattern matching on 90 days of 5-min station data. Finds the 5 most similar 6-hour weather patterns and averages their subsequent 3-hour trajectories. Recomputed every 30 minutes. Confidence reflects how closely the analogs matched current conditions.">ANALOG FORECAST</h2>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div class="head-tags">
             <span class="forecast-meta" id="forecast-meta"></span>
             <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS, computed: derived in-house from this station's own history (callsign CatHaus, KNYNEWYO2140). Click for docs.">CATHAUS, COMPUTED</a>
           </div>
@@ -273,7 +284,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="records-section" id="records-section">
       <div class="section-header">
         <h2 class="section-title">STATION RECORDS</h2>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div class="head-tags">
           <span class="section-meta" id="records-month"></span>
           <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
         </div>
@@ -292,7 +303,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="rain-events-section" id="rain-events-section">
       <div class="section-header">
         <h2 class="section-title">RECENT RAIN</h2>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div class="head-tags">
           <span class="section-meta" id="rain-events-meta">Last 14 days</span>
           <a class="source-tag has-tooltip" href="/docs#cathaus" data-tooltip="CATHAUS: this station's callsign (Ambient WS-2902, KNYNEWYO2140). In-house readings, stats, and ML signals. Click for docs.">CATHAUS</a>
         </div>
@@ -309,7 +320,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
     <section class="nearby-section" id="nearby-section">
       <div class="section-header">
         <h2 class="section-title">NEARBY STATIONS</h2>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div class="head-tags">
           <span class="section-meta" id="nearby-meta"></span>
           <span class="source-tag source-external">WEATHER UNDERGROUND</span>
         </div>
@@ -328,7 +339,7 @@ const ogImageUrl = `https://wx.jamestannahill.com/og.png?v=${ogBucket}`;
 
     <footer>
       <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
-      <p class="footer-links"><span>40.75°N 73.98°W</span> <a href="https://api.wx.jamestannahill.com/current" target="_blank">API</a> <a href="/docs" data-astro-prefetch>How it works</a> <a href="/embed">Embed</a></p>
+      <p class="footer-links"><span>40.75°N 73.98°W</span> <a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener">API<span class="sr-only"> (opens in a new tab)</span></a> <a href="/docs" data-astro-prefetch>How it works</a> <a href="/embed">Embed</a></p>
     </footer>
   </main>
 
