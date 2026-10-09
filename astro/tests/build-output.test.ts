@@ -56,4 +56,11 @@ describe('build output — docs (prerendered)', () => {
   it('emits the TechArticle JSON-LD', () => {
     expect(html()).toMatch(/"@type":\s*"TechArticle"/);
   });
+
+  it('footer links each assistant to a prompt naming the docs URL', () => {
+    const q = encodeURIComponent('Review this wx.jamestannahill.com page: https://wx.jamestannahill.com/docs\n');
+    expect(html()).toContain('Ask AI about this page');
+    expect(html()).toContain(`https://claude.ai/new?q=${q}`);
+    expect(html()).toContain('href="/llms.txt"');
+  });
 });

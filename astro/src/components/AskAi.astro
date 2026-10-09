@@ -1,0 +1,20 @@
+---
+import { askAiLinks, canonicalFor } from '../lib/ask-ai';
+
+interface Props {
+  // The page's canonical URL; falls back to site origin + path.
+  url?: string;
+}
+
+const url = Astro.props.url ?? canonicalFor(Astro.url.pathname, Astro.site?.href);
+const links = askAiLinks(url);
+---
+<div class="footer-ai">
+  <span class="footer-ai-label">Ask AI about this page</span>
+  <nav class="footer-ai-links" aria-label="Ask AI about this page">
+    {links.map(link => (
+      <a href={link.href} target="_blank" rel="noopener noreferrer">{link.label}<span class="sr-only"> (opens in new tab)</span></a>
+    ))}
+    <a href="/llms.txt">llms.txt</a>
+  </nav>
+</div>

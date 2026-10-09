@@ -615,6 +615,15 @@ footer { border-top: 1px solid var(--border); padding-top: 24px; }
 footer p { font-size: 12px; color: var(--muted); line-height: 1.8; max-width: 75ch; }
 footer a { color: var(--muted); text-decoration: underline; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.footer-ai {
+  display: flex; flex-wrap: wrap; align-items: center; column-gap: 18px;
+  font-size: 12px; color: var(--muted); line-height: 1.8;
+}
+/* Each link is a 44px tap target; the negative margins keep the row on the
+   1.8 line rhythm of the footer text, wrapped under the label or not. */
+.footer-ai-links { display: flex; flex-wrap: wrap; column-gap: 18px; margin: -11px 0; }
+.footer-ai-links a { display: inline-flex; align-items: center; min-height: 44px; }
+@media (hover: hover) and (pointer: fine) { .footer-ai-links a:hover { color: var(--accent); } }
 
 @media (max-width: 600px) {
   .conditions-grid { grid-template-columns: repeat(2, 1fr); }

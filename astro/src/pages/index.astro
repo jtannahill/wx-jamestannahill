@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import SchemaOrgIndex from '../components/SchemaOrgIndex.astro';
 import Chart from '../components/Chart.tsx';
+import AskAi from '../components/AskAi.astro';
 import { env } from 'cloudflare:workers';
 
 const API_BASE = (env as any)?.API_BASE ?? 'https://api.wx.jamestannahill.com';
@@ -350,6 +351,7 @@ const ogImageAlt = boot?.tempf != null
       <p>Data from a private weather station in Midtown Manhattan, New York. Updated every 5 minutes.</p>
       <p>Station data is licensed <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener license">CC BY 4.0<span class="sr-only"> (opens in a new tab)</span></a>. Credit wx.jamestannahill.com when you reuse it.</p>
       <p class="footer-links"><span>40.75°N, 73.98°W</span> <a href="https://api.wx.jamestannahill.com/current" target="_blank" rel="noopener">API<span class="sr-only"> (opens in a new tab)</span></a> <a href="/docs" data-astro-prefetch>How it works</a> <a href="/embed">Embed</a></p>
+      <AskAi url="https://wx.jamestannahill.com/" />
     </footer>
   </main>
 
