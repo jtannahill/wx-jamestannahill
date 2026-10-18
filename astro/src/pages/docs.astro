@@ -442,7 +442,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
 
 
     <h2 id="forecast-accuracy">FORECAST ACCURACY TRACKING</h2>
-    <p>On each run, <code>wx-forecaster</code> first reads the previous forecast from <code>wx-forecasts</code>. If that forecast is between 55 and 240 minutes old, so actual hourly readings exist for the +1h, +2h, and +3h windows, it computes mean absolute error (MAE) for all four forecast fields against the actual readings.</p>
+    <p>Every forecast <code>wx-forecaster</code> writes also joins a short pending queue on its <code>wx-forecasts</code> row. On each run, any queued forecast at least 4 hours old, so its +1h, +2h, and +3h hours have all closed, is scored: mean absolute error (MAE) for all four forecast fields against the actual hourly readings. It then leaves the queue, so each forecast is scored once.</p>
     <p>Each evaluation is written to <code>wx-forecast-accuracy</code> as a timestamped row. A <code>running</code> row in the same table accumulates the incremental mean across all evaluations. Once 5 or more evaluations exist, the dashboard shows the running +1h temperature MAE alongside the confidence percentage.</p>
 
 

@@ -10,8 +10,9 @@ Algorithm:
   5. Average their subsequent 3-hour trajectories → ensemble forecast.
   6. Write result to wx-forecasts (one item per station, overwritten each run).
 
-Also evaluates the previous forecast against actual readings and writes
-per-evaluation accuracy + running MAE to wx-forecast-accuracy.
+Each forecast also joins a 'pending' queue on that item. Once a queued
+forecast's +3h hour has closed, it is scored against the actual readings and
+per-evaluation accuracy + running MAE are written to wx-forecast-accuracy.
 
 This never runs synchronously — the API reads the pre-computed results.
 """
@@ -34,6 +35,12 @@ FORECAST_FIELDS = ['tempf', 'humidity', 'windspeedmph', 'baromrelin']
 WINDOW_HOURS    = 6
 FORECAST_HOURS  = 3
 TOP_N           = 5
+
+# A forecast is scored once its +3h hour has closed, so it waits about 4 hours
+# in the pending queue: 8 runs at the 30-minute cadence, plus headroom.
+EVAL_AFTER_MIN  = 240
+DROP_AFTER_MIN  = 24 * 60
+PENDING_MAX     = 12
 
 # Normalization ranges — physical bounds for Midtown Manhattan
 _RANGES = {
@@ -77,13 +84,22 @@ def handler(event, context):
         print(f"Not enough hourly buckets ({n} < {min_needed})")
         return
 
-    # ── Evaluate previous forecast against actuals ────────────────────────────
+    # ── Score queued forecasts whose +3h hour has passed ──────────────────────
+    # wx-forecasts holds one row that this run overwrites, so the forecast it
+    # replaces is only 30 minutes old. Forecasts wait in a 'pending' queue on
+    # that row until all three target hours have actuals.
+    pending = []
     try:
         forecasts_table = get_table(FORECASTS_TABLE)
-        prev_resp = forecasts_table.get_item(Key={'station_id': mac})
-        prev_item = prev_resp.get('Item')
+        prev_item = forecasts_table.get_item(Key={'station_id': mac}).get('Item')
         if prev_item:
-            _evaluate_forecast_accuracy(mac, _floatify(prev_item), hourly)
+            prev = _floatify(prev_item)
+            pending = prev.get('pending')
+            if pending is None and prev.get('computed_at'):
+                pending = [{'computed_at': prev['computed_at'], 'forecast': prev.get('forecast', [])}]
+            ready, pending = split_pending(pending or [], datetime.now(timezone.utc))
+            for entry in ready:
+                _record_accuracy(mac, entry['computed_at'], forecast_errors(entry, hourly))
     except Exception as e:
         print(f"Accuracy evaluation failed (non-fatal): {e}")
 
@@ -139,11 +155,14 @@ def handler(event, context):
         best_label = top[0][1]
 
     # ── Write to wx-forecasts ─────────────────────────────────────────────────
+    computed_at = datetime.now(timezone.utc).isoformat()
+    pending = (pending + [{'computed_at': computed_at, 'forecast': forecast}])[-PENDING_MAX:]
     forecasts_table = get_table(FORECASTS_TABLE)
     forecasts_table.put_item(Item={
         'station_id':    mac,
-        'computed_at':   datetime.now(timezone.utc).isoformat(),
+        'computed_at':   computed_at,
         'forecast':      _dec_deep(forecast),
+        'pending':       _dec_deep(pending),
         'best_match_ts': top[0][1],
         'best_match_label': best_label,
         'avg_distance':  _dec(avg_dist),
@@ -155,33 +174,36 @@ def handler(event, context):
 
 # ── Forecast accuracy evaluation ──────────────────────────────────────────────
 
-def _evaluate_forecast_accuracy(mac: str, prev_forecast: dict, hourly: dict):
+def split_pending(pending: list, now: datetime) -> tuple[list, list]:
     """
-    Compare the previous forecast to actual readings.
-    Only evaluates if the forecast is 55–240 minutes old (actuals available
-    for +1h but we haven't missed the +3h window).
+    Split queued forecasts into (ready to score, keep waiting). A forecast is
+    ready once EVAL_AFTER_MIN have passed, so its +3h hour has full actuals;
+    one older than DROP_AFTER_MIN is discarded unscored.
     """
-    computed_at_str = prev_forecast.get('computed_at')
-    prev_hours      = prev_forecast.get('forecast', [])
-    if not computed_at_str or not prev_hours:
-        return
+    ready, keep = [], []
+    for entry in pending:
+        computed = _parse_ts(entry.get('computed_at') or '')
+        if not computed:
+            continue
+        age_min = (now - computed).total_seconds() / 60
+        if age_min > DROP_AFTER_MIN:
+            continue
+        (ready if age_min >= EVAL_AFTER_MIN else keep).append(entry)
+    return ready, keep
 
-    computed_dt = _parse_ts(computed_at_str)
+
+def forecast_errors(entry: dict, hourly: dict) -> dict:
+    """Absolute error per offset and field, keyed mae_<offset>h_<field>."""
+    computed_dt = _parse_ts(entry.get('computed_at') or '')
     if not computed_dt:
-        return
-
-    age_min = (datetime.now(timezone.utc) - computed_dt).total_seconds() / 60
-    if age_min < 55 or age_min > 240:
-        # Too recent (actuals not available) or too stale (already evaluated / missed)
-        return
-
+        return {}
     errors = {}
-    for h_item in prev_hours:
+    for h_item in entry.get('forecast', []):
         offset = h_item.get('offset_hours')
         if not offset:
             continue
-        target_dt  = computed_dt + timedelta(hours=offset)
-        bucket_key = target_dt.replace(minute=0, second=0, microsecond=0).isoformat()
+        offset = int(offset)
+        target_dt = computed_dt + timedelta(hours=offset)
 
         # Accept ±1 bucket (±1 hour) to account for clock drift
         actual = None
@@ -198,18 +220,21 @@ def _evaluate_forecast_accuracy(mac: str, prev_forecast: dict, hourly: dict):
             a_val = actual.get(field)
             if f_val is not None and a_val is not None:
                 errors[f'mae_{offset}h_{field}'] = abs(float(f_val) - float(a_val))
+    return errors
 
+
+def _record_accuracy(mac: str, computed_at: str, errors: dict):
+    """Write one evaluation row and fold it into the running means."""
     if not errors:
-        print("Accuracy evaluation: no matched buckets")
+        print(f"Accuracy evaluation: no matched buckets for forecast {computed_at}")
         return
 
-    # Write per-evaluation entry
     evaluated_at = datetime.now(timezone.utc).isoformat()
     acc_table    = get_table(ACCURACY_TABLE)
     acc_table.put_item(Item={
         'station_id':           mac,
         'evaluated_at':         evaluated_at,
-        'forecast_computed_at': computed_at_str,
+        'forecast_computed_at': computed_at,
         **{k: _dec(v) for k, v in errors.items()},
     })
 

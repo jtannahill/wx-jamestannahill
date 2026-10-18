@@ -42,3 +42,13 @@ def test_condition_label_sunny():
 def test_condition_label_rainy():
     reading = {"uv": 0, "solarradiation": 50, "hourlyrainin": 0.1, "humidity": 90}
     assert condition_label(reading) == "Rainy"
+
+
+def test_percentile_rank_label_uses_correct_ordinal():
+    from unittest.mock import patch
+    from wx_api.anomaly import percentile_rank
+    for rank, word in ((32, '32nd'), (41, '41st'), (63, '63rd'), (22, '22nd'), (50, '50th')):
+        with patch('wx_api.anomaly._normal_cdf', return_value=rank / 100):
+            out = percentile_rank({'tempf': 60.0}, {'avg_tempf': 60.0}, 10)
+        assert out['rank'] == rank
+        assert f'({word} percentile)' in out['label']
