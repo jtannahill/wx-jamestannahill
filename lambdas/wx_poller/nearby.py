@@ -116,6 +116,10 @@ def _normalize_obs(obs: dict) -> dict | None:
         if _obs_is_stale(obs.get('obsTimeUtc')):
             return None
 
+        # Reporting but with a dead temp sensor: the tile would only say "No report"
+        if imp.get('temp') is None:
+            return None
+
         return {
             'station_id':      obs.get('stationID', ''),
             'neighborhood':    obs.get('neighborhood', ''),

@@ -100,6 +100,17 @@ def test_fetch_nearby_skips_stale_observations():
         result = fetch_nearby('fake_key')
     assert result == []
 
+def test_fetch_nearby_skips_stations_without_temp():
+    from unittest.mock import patch
+    no_temp = _obs('KNOTEMP01')
+    no_temp['imperial']['temp'] = None
+    side_effect = _make_wu_mocks(
+        ['KNOTEMP01', 'KNYTEST01'],
+        {'KNOTEMP01': no_temp, 'KNYTEST01': _obs('KNYTEST01')})
+    with patch('wx_poller.nearby.requests.get', side_effect=side_effect):
+        result = fetch_nearby('fake_key')
+    assert [s['station_id'] for s in result] == ['KNYTEST01']
+
 def test_fetch_nearby_sorted_by_distance():
     from unittest.mock import patch
     far  = _obs('KFAR01',  lat=40.80, lon=-73.95)
