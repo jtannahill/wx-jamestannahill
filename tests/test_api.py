@@ -95,6 +95,51 @@ def test_health_endpoint_returns_freshness():
     assert 'data_age_minutes' in body
     assert body['poller_healthy'] is True
 
+def test_health_endpoint_reports_rain_model_metrics():
+    from wx_api.handler import handler
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    model_item = {
+        'model_id': 'rain_probability', 'weights': [Decimal('0.1')], 'bias': Decimal('0'),
+        'trained_at': '2026-10-18T03:01:37+00:00', 'training_samples': 24608,
+        'positive_samples': 2621, 'f1': Decimal('0.48368286'), 'recall': Decimal('0.90194582'),
+        'precision': Decimal('0.33044451'), 'accuracy': Decimal('0.7949041'),
+    }
+    with patch('wx_api.handler.get_secret') as mock_secret, \
+         patch('wx_api.handler.get_table') as mock_table_fn:
+        mock_secret.return_value = {'mac_address': 'AA:BB:CC', 'label': 'Midtown Manhattan'}
+        mock_table = MagicMock()
+        mock_table_fn.return_value = mock_table
+        mock_table.query.return_value = {'Items': [_make_reading(timestamp=fresh_ts)]}
+        mock_table.get_item.return_value = {'Item': model_item}
+        event = {'rawPath': '/health', 'requestContext': {'http': {'method': 'GET'}}}
+        result = handler(event, {})
+    body = json.loads(result['body'])
+    rain = body['models']['rain_probability']
+    assert rain == {
+        'trained_at': '2026-10-18T03:01:37+00:00', 'training_samples': 24608,
+        'positive_samples': 2621, 'f1': 0.484, 'recall': 0.902,
+        'precision': 0.33, 'accuracy': 0.795,
+    }
+    assert 'weights' not in rain
+
+def test_health_endpoint_survives_missing_model():
+    from wx_api.handler import handler
+    from datetime import datetime, timezone
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    with patch('wx_api.handler.get_secret') as mock_secret, \
+         patch('wx_api.handler.get_table') as mock_table_fn:
+        mock_secret.return_value = {'mac_address': 'AA:BB:CC', 'label': 'Midtown Manhattan'}
+        mock_table = MagicMock()
+        mock_table_fn.return_value = mock_table
+        mock_table.query.return_value = {'Items': [_make_reading(timestamp=fresh_ts)]}
+        mock_table.get_item.return_value = {}
+        event = {'rawPath': '/health', 'requestContext': {'http': {'method': 'GET'}}}
+        result = handler(event, {})
+    assert result['statusCode'] == 200
+    assert json.loads(result['body'])['models']['rain_probability'] is None
+
 def test_unknown_route_returns_404():
     from wx_api.handler import handler
     event = {'rawPath': '/unknown', 'requestContext': {'http': {'method': 'GET'}}}

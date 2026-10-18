@@ -30,6 +30,7 @@ SUMMARIES_TABLE    = os.environ.get('SUMMARIES_TABLE',    'wx-daily-summaries')
 RECORDS_TABLE      = os.environ.get('RECORDS_TABLE',      'wx-station-records')
 CLIMATE_DOY_TABLE    = os.environ.get('CLIMATE_DOY_TABLE',    'wx-climate-doy')
 CLIMATE_HOURLY_TABLE = os.environ.get('CLIMATE_HOURLY_TABLE', 'wx-climate-hourly')
+MODELS_TABLE         = os.environ.get('MODELS_TABLE',         'wx-ml-models')
 STATION_SECRET     = 'ambient-weather/station-config'
 
 _MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -682,9 +683,28 @@ def _health():
             'last_reading_at': items[0]['timestamp'],
             'data_age_minutes': round(age_min, 1),
             'poller_healthy': not stale,
+            'models': {'rain_probability': _rain_model_metrics()},
         })
     except Exception as e:
         return _resp(503, {'ok': False, 'error': str(e)})
+
+
+def _rain_model_metrics() -> dict | None:
+    """Training metrics of the fitted rain model, for the docs page. None if unfitted."""
+    try:
+        item = get_table(MODELS_TABLE).get_item(Key={'model_id': 'rain_probability'}).get('Item')
+        if not isinstance(item, dict):
+            return None
+        m = _floatify(item)
+        return {
+            'trained_at':       m.get('trained_at'),
+            'training_samples': int(m.get('training_samples', 0)),
+            'positive_samples': int(m.get('positive_samples', 0)),
+            **{k: round(m[k], 3) for k in ('f1', 'recall', 'precision', 'accuracy') if m.get(k) is not None},
+        }
+    except Exception as e:
+        print(f"Rain model metrics (non-fatal): {e}")
+        return None
 
 
 def _forecast_route():
@@ -806,7 +826,7 @@ def _openapi_route():
         },
         'servers': [{'url': 'https://api.wx.jamestannahill.com'}],
         'paths': {
-            '/health': {'get': {'summary': 'Health and data freshness'}},
+            '/health': {'get': {'summary': 'Health, data freshness and rain model training metrics'}},
             '/current': {'get': {'summary': 'Latest reading with ML signals'}},
             '/history': {'get': {'summary': 'Historical readings', 'parameters': [{'name': 'hours', 'in': 'query', 'schema': {'type': 'integer', 'default': 24}}]}},
             '/rain-events': {'get': {'summary': 'Parsed rain events'}},
