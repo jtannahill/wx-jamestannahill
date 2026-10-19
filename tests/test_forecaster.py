@@ -77,3 +77,37 @@ def test_missing_actual_field_is_skipped_not_zero():
 
 def test_no_matching_hours_gives_no_errors():
     assert forecast_errors(_entry(250), {}) == {}
+
+
+# --- delta_forecast: current value plus the analogs' change -------------------
+
+from wx_forecaster.handler import delta_forecast
+
+
+def _analog(last, future_vals, field='tempf'):
+    return ({field: last}, [{field: v} for v in future_vals])
+
+
+def test_forecast_starts_from_current_value_not_analog_level():
+    # analogs ran 10F warmer than now but warmed by +1, +2, +3
+    analogs = [_analog(70.0, [71.0, 72.0, 73.0]), _analog(72.0, [73.0, 74.0, 75.0])]
+    out = delta_forecast({'tempf': 52.0}, analogs)
+    assert [b['tempf'] for b in out] == [53.0, 54.0, 55.0]
+    assert [b['offset_hours'] for b in out] == [1, 2, 3]
+
+
+def test_humidity_is_clamped_to_0_100_and_wind_to_non_negative():
+    hum = delta_forecast({'humidity': 98.0}, [_analog(50.0, [60.0, 60.0, 60.0], 'humidity')])
+    assert hum[0]['humidity'] == 100.0
+    wind = delta_forecast({'windspeedmph': 1.0}, [_analog(10.0, [5.0, 5.0, 5.0], 'windspeedmph')])
+    assert wind[0]['windspeedmph'] == 0.0
+
+
+def test_missing_current_value_falls_back_to_analog_average():
+    out = delta_forecast({'tempf': None}, [_analog(70.0, [71.0, 72.0, 73.0])])
+    assert out[0]['tempf'] == 71.0
+
+
+def test_field_missing_everywhere_is_none():
+    out = delta_forecast({}, [({}, [{}, {}, {}])])
+    assert out[0]['tempf'] is None

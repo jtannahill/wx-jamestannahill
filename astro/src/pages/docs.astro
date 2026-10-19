@@ -436,7 +436,7 @@ label = "8.2°F above average for 9am in April"</code></pre>
       <li>Fetch all 90-day readings and bucket into 1-hour averages (about 2,100 hourly buckets across 4 fields).</li>
       <li>The <em>current fingerprint</em> is the last 6 hourly buckets, normalized to [0,1] within physical bounds for Midtown Manhattan.</li>
       <li>For every historical 6-hour window with at least 50% field coverage, compute normalized Euclidean distance to the current fingerprint.</li>
-      <li>Take the 5 closest analogs. Average their subsequent 3-hour trajectories into an ensemble forecast.</li>
+      <li>Take the 5 closest analogs. For each hour ahead, average how much each field changed after the analogs' windows ended, and add that change to the current reading. Using the change rather than the analogs' own values matters: the 90-day pool is mostly late summer, and copying its absolute temperatures ran October forecasts 4 to 10°F warm.</li>
     </ol>
     <p>Confidence (0 to 100%) reflects how closely the analogs matched: lower average distance means higher confidence. The best-matching analog date is shown for interpretability. The model improves continuously as new readings expand the pool of candidates.</p>
 

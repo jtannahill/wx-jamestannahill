@@ -7,7 +7,8 @@ Algorithm:
   3. For every historical 6-hour window that has 3 hours of data following it,
      compute normalized Euclidean distance to the current fingerprint.
   4. Take the top-5 closest analogs.
-  5. Average their subsequent 3-hour trajectories → ensemble forecast.
+  5. Add the analogs' average change over the next 3 hours to the current
+     reading (their absolute values would inherit their season's level).
   6. Write result to wx-forecasts (one item per station, overwritten each run).
 
 Each forecast also joins a 'pending' queue on that item. Once a queued
@@ -41,6 +42,8 @@ TOP_N           = 5
 EVAL_AFTER_MIN  = 240
 DROP_AFTER_MIN  = 24 * 60
 PENDING_MAX     = 12
+
+FIELD_LIMITS    = {'humidity': (0, 100), 'windspeedmph': (0, None)}
 
 # Normalization ranges — physical bounds for Midtown Manhattan
 _RANGES = {
@@ -118,7 +121,7 @@ def handler(event, context):
         if dist is None:
             continue
         future   = [hourly[k] for k in keys[i + WINDOW_HOURS:i + WINDOW_HOURS + FORECAST_HOURS]]
-        candidates.append((dist, keys[i], future))
+        candidates.append((dist, keys[i], future, window[-1]))
 
     if not candidates:
         print("No valid analog candidates")
@@ -129,19 +132,10 @@ def handler(event, context):
     print(f"Top analog distances: {[round(c[0],4) for c in top]}")
     print(f"Best match window starts: {top[0][1]}")
 
-    # ── Average the forecast trajectories ────────────────────────────────────
-    forecast = []
-    for hr in range(FORECAST_HOURS):
-        bucket = {}
-        for field in FORECAST_FIELDS:
-            vals = [
-                c[2][hr][field] for c in top
-                if len(c[2]) > hr and c[2][hr].get(field) is not None
-            ]
-            bucket[field] = round(sum(vals) / len(vals), 1) if vals else None
-        bucket['offset_hours'] = hr + 1
-        bucket['timestamp']    = (datetime.now(timezone.utc) + timedelta(hours=hr + 1)).isoformat()
-        forecast.append(bucket)
+    # ── Ensemble: current value plus the analogs' average change ─────────────
+    forecast = delta_forecast(current[-1], [(c[3], c[2]) for c in top])
+    for bucket in forecast:
+        bucket['timestamp'] = (datetime.now(timezone.utc) + timedelta(hours=bucket['offset_hours'])).isoformat()
 
     # Confidence: lower avg_distance = better match = higher confidence
     avg_dist   = sum(c[0] for c in top) / len(top)
@@ -173,6 +167,41 @@ def handler(event, context):
 
 
 # ── Forecast accuracy evaluation ──────────────────────────────────────────────
+
+def delta_forecast(current_last: dict, analogs: list) -> list:
+    """
+    Ensemble forecast from (window_last, future) analog pairs. Each field is
+    the current value plus the mean change the analogs showed from the end of
+    their window. Copying the analogs' absolute values instead inherited their
+    level: with a summer-heavy 90-day pool, October forecasts ran 4 to 10F warm
+    (14-day backtest, +1h temperature MAE 5.4F absolute vs 1.05F as a change).
+    Falls back to the analogs' mean level when the current value is missing.
+    """
+    forecast = []
+    for hr in range(FORECAST_HOURS):
+        bucket = {}
+        for field in FORECAST_FIELDS:
+            now_v = current_last.get(field)
+            deltas = [
+                fut[hr][field] - last[field] for last, fut in analogs
+                if len(fut) > hr and fut[hr].get(field) is not None and last.get(field) is not None
+            ]
+            levels = [fut[hr][field] for _, fut in analogs if len(fut) > hr and fut[hr].get(field) is not None]
+            if now_v is not None and deltas:
+                val = now_v + sum(deltas) / len(deltas)
+            elif levels:
+                val = sum(levels) / len(levels)
+            else:
+                bucket[field] = None
+                continue
+            lo, hi = FIELD_LIMITS.get(field, (None, None))
+            if lo is not None: val = max(lo, val)
+            if hi is not None: val = min(hi, val)
+            bucket[field] = round(val, 2 if field == 'baromrelin' else 1)
+        bucket['offset_hours'] = hr + 1
+        forecast.append(bucket)
+    return forecast
+
 
 def split_pending(pending: list, now: datetime) -> tuple[list, list]:
     """
