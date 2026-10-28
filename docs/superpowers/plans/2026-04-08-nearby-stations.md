@@ -459,7 +459,7 @@ aws secretsmanager update-secret \
   --secret-string '{
     "api_key": "<existing_api_key>",
     "application_key": "<existing_application_key>",
-    "wu_api_key": "517b29c7000d4e68bb29c7000dae680a"
+    "wu_api_key": "<wu_api_key>"
   }'
 ```
 

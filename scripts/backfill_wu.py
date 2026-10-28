@@ -14,7 +14,6 @@ sys.path.insert(0, 'lambdas')
 from shared.secrets import get_secret
 from shared.dynamodb import get_table
 
-WU_API_KEY = '517b29c7000d4e68bb29c7000dae680a'
 WU_STATION = 'KNYNEWYO2140'
 READINGS_TABLE = 'wx-readings'
 STATS_TABLE = 'wx-daily-stats'
@@ -43,7 +42,7 @@ def _feels_like(obs):
     return temp
 
 
-def fetch_day(date_str):
+def fetch_day(date_str, api_key):
     """date_str: YYYYMMDD"""
     resp = requests.get(
         'https://api.weather.com/v2/pws/history/all',
@@ -52,7 +51,7 @@ def fetch_day(date_str):
             'format': 'json',
             'units': 'e',
             'date': date_str,
-            'apiKey': WU_API_KEY,
+            'apiKey': api_key,
         },
         timeout=15,
     )
@@ -143,6 +142,7 @@ def update_stats(stats_table, station_id, obs, dt):
 def main():
     station = get_secret('ambient-weather/station-config')
     station_id = station['mac_address']
+    wu_key = get_secret('ambient-weather/api-keys')['wu_api_key']
 
     readings_table = get_table(READINGS_TABLE)
     stats_table = get_table(STATS_TABLE)
@@ -156,7 +156,7 @@ def main():
         date_str = day.strftime('%Y%m%d')
 
         try:
-            obs_list = fetch_day(date_str)
+            obs_list = fetch_day(date_str, wu_key)
         except Exception as e:
             print(f"  {date_str}: fetch failed ({e})")
             time.sleep(1)
